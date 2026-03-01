@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Procesando...</title>
+</head>
+<body>
+
+<script>
+    // Abrir factura en nueva ventana
+    const factura = window.open(
+        "/sales/factura/{{ venta_id }}/",
+        "_blank"
+    );
+
+    // Esperar 1.5 segundos y regresar al POS
+    setTimeout(function() {
+        window.location.href = "/sales/pos/";
+    }, 1500);
+</script>
+
+</body>
+</html>

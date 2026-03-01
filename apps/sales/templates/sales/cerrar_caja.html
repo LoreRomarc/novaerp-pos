@@ -1,0 +1,10 @@
+<h2>Cerrar Caja</h2>
+
+<p>Total Sistema: {{ total_sistema }}</p>
+
+<form method="post">
+    {% csrf_token %}
+    <label>Monto Real Contado:</label>
+    <input type="number" step="0.01" name="monto_real" required>
+    <button type="submit">Cerrar Caja</button>
+</form>

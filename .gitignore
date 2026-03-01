@@ -1,0 +1,33 @@
+# ==============================
+# ARCHIVOS QUE NO SE DEBEN SUBIR
+# ==============================
+
+# Archivos compilados de Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Base de datos local
+db.sqlite3
+
+# Entorno virtual
+venv/
+.env/
+
+# Variables sensibles
+.env
+
+# Logs
+*.log
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
+
+# Archivos del editor
+.vscode/
+.idea/
+
+# Archivos estáticos recolectados
+staticfiles/

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container mt-4">
+
+    <h3>Abrir Caja</h3>
+
+    {% if error %}
+        <div class="alert alert-danger">
+            {{ error }}
+        </div>
+    {% endif %}
+
+    {% if cajas %}
+        <form method="post">
+            {% csrf_token %}
+
+            <div class="mb-3">
+                <label>Caja</label>
+                <select name="caja_id" class="form-control" required>
+                    {% for caja in cajas %}
+                        <option value="{{ caja.id }}">
+                            {{ caja.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="mb-3">
+                <label>Monto inicial</label>
+                <input type="number"
+                       name="monto_inicial"
+                       step="0.01"
+                       class="form-control"
+                       required>
+            </div>
+
+            <button type="submit" class="btn btn-success">
+                Abrir Caja
+            </button>
+        </form>
+    {% else %}
+        <div class="alert alert-warning">
+            No hay cajas registradas para esta sucursal.
+            Registra una caja desde el panel de administración.
+        </div>
+    {% endif %}
+
+</div>
+
+{% endblock %}

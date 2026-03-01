@@ -1,0 +1,875 @@
+{% extends "base.html" %} {% block content %}
+
+<style>
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+    background: #f4f6f9;
+    font-size: 13px;
+  }
+
+  .pos-wrapper {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    height: 100vh;
+  }
+
+  .pos-left {
+    padding: 25px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ===== TIPO VENTA ===== */
+  .tipo-venta-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .tipo-btn {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    background: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+
+  .tipo-btn.activo {
+    background: #198754;
+    color: white;
+    border-color: #198754;
+  }
+
+  .tipo-btn:hover {
+    transform: translateY(-1px);
+  }
+
+  .search-row {
+    display: grid;
+    grid-template-columns: 1fr 100px 110px;
+    gap: 10px;
+    margin-bottom: 15px;
+    position: relative;
+  }
+
+  #sugerencias {
+    position: absolute;
+    top: 45px;
+    left: 0;
+    width: calc(100% - 210px);
+    background: white;
+    border-radius: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+    z-index: 9999;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  }
+
+  .table-area {
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .pos-right {
+    background: white;
+    border-left: 1px solid #eaeaea;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 15px;
+  }
+
+  .keypad button {
+    height: 42px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    background: #fafafa;
+    font-weight: 600;
+  }
+
+  .keypad button:active {
+    background: #eaeaea;
+  }
+
+  .total-final {
+    font-size: 20px;
+    font-weight: 700;
+  }
+</style>
+
+<div class="pos-wrapper">
+  <div class="pos-left">
+    <!-- BOTONES TIPO VENTA -->
+    <div class="tipo-venta-bar">
+      <button
+        id="btnDetal"
+        class="tipo-btn activo"
+        onclick="cambiarTipo('DETAL')"
+      >
+        🛒 Detal
+      </button>
+      <button
+        id="btnMayorista"
+        class="tipo-btn"
+        onclick="cambiarTipo('MAYORISTA')"
+      >
+        📦 Mayorista
+      </button>
+    </div>
+
+    <div class="search-row">
+      <input
+        type="text"
+        id="buscar"
+        class="form-control"
+        placeholder="Escanear código o escribir nombre..."
+        autocomplete="off"
+      />
+
+      <input type="text" id="cantidad" class="form-control" value="1" />
+
+      <button onclick="agregarManual()" class="btn btn-primary">Agregar</button>
+
+      <div id="sugerencias" class="list-group"></div>
+    </div>
+
+    <div class="table-area">
+      <table class="table table-sm table-hover align-middle">
+        <thead>
+          <tr>
+            <th>Producto</th>
+            <th width="100">Cant</th>
+            <th width="110">Precio</th>
+            <th width="110">IVA</th>
+            <th width="110">Subtotal</th>
+            <th width="50"></th>
+          </tr>
+        </thead>
+        <tbody id="tabla_items"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- =================== RIGHT =================== -->
+  <div class="pos-right">
+    <div
+      class="keypad"
+      onmousedown="usandoKeypad = true"
+      onmouseup="setTimeout(() => (usandoKeypad = false), 50)"
+    >
+      <button
+        onmousedown="
+          insertNumber('1');
+          return false;
+        "
+      >
+        1
+      </button>
+      <button
+        onmousedown="
+          insertNumber('2');
+          return false;
+        "
+      >
+        2
+      </button>
+      <button
+        onmousedown="
+          insertNumber('3');
+          return false;
+        "
+      >
+        3
+      </button>
+      <button
+        onmousedown="
+          insertNumber('4');
+          return false;
+        "
+      >
+        4
+      </button>
+      <button
+        onmousedown="
+          insertNumber('5');
+          return false;
+        "
+      >
+        5
+      </button>
+      <button
+        onmousedown="
+          insertNumber('6');
+          return false;
+        "
+      >
+        6
+      </button>
+      <button
+        onmousedown="
+          insertNumber('7');
+          return false;
+        "
+      >
+        7
+      </button>
+      <button
+        onmousedown="
+          insertNumber('8');
+          return false;
+        "
+      >
+        8
+      </button>
+      <button
+        onmousedown="
+          insertNumber('9');
+          return false;
+        "
+      >
+        9
+      </button>
+      <button
+        onmousedown="
+          insertNumber('.');
+          return false;
+        "
+      >
+        .
+      </button>
+      <button
+        onmousedown="
+          insertNumber('0');
+          return false;
+        "
+      >
+        0
+      </button>
+      <button
+        onmousedown="
+          enterKey();
+          return false;
+        "
+      >
+        Enter
+      </button>
+      <button
+        onmousedown="
+          backspaceKey();
+          return false;
+        "
+      >
+        ⌫
+      </button>
+      <button
+        onmousedown="
+          clearActive();
+          return false;
+        "
+      >
+        C
+      </button>
+    </div>
+
+    <div class="mb-2">Subtotal: <span id="subtotal">0.00</span></div>
+    <div class="mb-2">IVA: <span id="iva">0.00</span></div>
+    <div class="total-final mb-2">Total: <span id="total">0.00</span></div>
+
+    <hr />
+
+    <input
+      type="text"
+      id="efectivo"
+      class="form-control form-control-sm mb-2"
+      placeholder="Efectivo"
+    />
+
+    <input
+      type="text"
+      id="transferencia"
+      class="form-control form-control-sm mb-2"
+      placeholder="Transferencia"
+    />
+
+    <input
+      type="text"
+      id="tarjeta"
+      class="form-control form-control-sm mb-2"
+      placeholder="Tarjeta"
+    />
+
+    <div>Total Pagado: $<span id="total_pagado">0.00</span></div>
+    <div id="info_pago" class="fw-bold text-danger mb-2">Faltan $0.00</div>
+
+    <div class="d-flex gap-2">
+      <button onclick="cancelarVenta()" class="btn btn-danger w-50">
+        Cancelar
+      </button>
+      <button
+        id="btnCerrar"
+        onclick="cerrarVenta()"
+        class="btn btn-success w-50"
+        disabled
+      >
+        Cerrar Venta
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+      function getCSRFToken() {
+        const name = "csrftoken=";
+        const decodedCookie = decodeURIComponent(document.cookie);
+        const cookies = decodedCookie.split(";");
+
+        for (let cookie of cookies) {
+          cookie = cookie.trim();
+          if (cookie.startsWith(name)) {
+            return cookie.substring(name.length);
+          }
+        }
+        return null;
+      }
+      const csrf = getCSRFToken();
+      /* =========================================================
+       ESTADO GLOBAL (igual comportamiento)
+    ========================================================= */
+      let productosAutocomplete = [];
+      let indiceSeleccionado = -1;
+      let activeInput = null;
+      let debounceTimer;
+      let pagoEditadoManualmente = false;
+      let usandoKeypad = false;
+      let tipoVentaActual = "DETAL";
+
+      /* =========================================================
+       REFERENCIAS DOM
+    ========================================================= */
+      const $ = (id) => document.getElementById(id);
+
+      const inputBuscar = $("buscar");
+      const inputCantidad = $("cantidad");
+      const sugerencias = $("sugerencias");
+
+      const inputEfectivo = $("efectivo");
+      const inputTransferencia = $("transferencia");
+      const inputTarjeta = $("tarjeta");
+
+      const btnCerrar = $("btnCerrar");
+      const tablaItems = $("tabla_items");
+
+      /* =========================================================
+       HELPERS
+    ========================================================= */
+      const toNumber = (v) => {
+      if (!v) return 0;
+
+      if (typeof v === "number") return v;
+
+      return parseFloat(
+        v.toString()
+          .replace(/\$/g, "")
+          .replace(/\./g, "")
+          .replace(/,/g, ".")
+      ) || 0;
+    };
+
+      const moneyFormatter = new Intl.NumberFormat("es-CO", {
+        style: "currency",
+        currency: "COP",
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
+
+      const money = (v) => {
+        return moneyFormatter.format(toNumber(v));
+      };
+
+      // Inicializa la venta desde el backend
+      const ventaInicial = {{ venta|safe }};
+      document.addEventListener("DOMContentLoaded", function () {
+        if (ventaInicial && ventaInicial.items) {
+          actualizarTabla(ventaInicial);
+        }
+      });
+
+      function confirmarCantidadInput(input) {
+        const id = input.dataset.id;
+        const nuevaCantidad = parseFloat(input.value);
+
+        // Solo bloquear si es NaN
+        if (isNaN(nuevaCantidad)) return;
+
+        actualizarCantidad(id, nuevaCantidad);
+      }
+
+      /* =========================================================
+       DETECTAR INPUT ACTIVO (keypad)
+    ========================================================= */
+      document.addEventListener("focusin", (e) => {
+        if (e.target.tagName === "INPUT") {
+          activeInput = e.target;
+        }
+
+        if (e.target.classList.contains("cantidad-input")) {
+          setTimeout(() => e.target.select(), 0);
+        }
+      });
+
+      /* =========================================================
+       AUTOCOMPLETE
+    ========================================================= */
+      function renderSugerencias() {
+        sugerencias.textContent = "";
+
+        if (!productosAutocomplete.length) {
+          indiceSeleccionado = -1;
+          sugerencias.style.display = "none";
+          return;
+        }
+
+        const fragment = document.createDocumentFragment();
+
+        productosAutocomplete.forEach((prod, index) => {
+          const item = document.createElement("a");
+          item.href = "#";
+          item.className =
+            "list-group-item list-group-item-action d-flex justify-content-between align-items-center";
+
+          if (index === indiceSeleccionado) {
+            item.classList.add("active");
+          }
+
+          // Evita usar innerHTML (más seguro y más limpio)
+          const nombre = document.createElement("strong");
+          nombre.textContent = prod.nombre;
+
+          const codigo = document.createElement("small");
+          codigo.className = "text-muted";
+          codigo.textContent = prod.codigo || "";
+
+          item.appendChild(nombre);
+          item.appendChild(codigo);
+
+          item.addEventListener("mousedown", (e) => {
+            e.preventDefault();
+            seleccionarProducto(prod.id);
+          });
+
+          fragment.appendChild(item);
+        });
+
+        sugerencias.appendChild(fragment);
+        sugerencias.style.display = "block";
+      }
+
+      inputBuscar.addEventListener("input", function () {
+        clearTimeout(debounceTimer);
+
+        const valor = this.value.trim();
+
+        if (valor.length < 2) {
+          productosAutocomplete = [];
+          renderSugerencias();
+          return;
+        }
+
+        debounceTimer = setTimeout(() => {
+          fetch(`/sales/pos/autocomplete/?q=${encodeURIComponent(valor)}`)
+            .then((res) => res.json())
+            .then((response) => {
+              if (response.success) {
+                productosAutocomplete = response.data.results;
+                indiceSeleccionado = -1;
+                renderSugerencias();
+              }
+            });
+        }, 250);
+      });
+
+      /* =========================================================
+       TECLADO FÍSICO
+    ========================================================= */
+      inputBuscar.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") {
+          e.preventDefault();
+
+          if (
+            productosAutocomplete.length > 0 &&
+            indiceSeleccionado >= 0 &&
+            productosAutocomplete[indiceSeleccionado]
+          ) {
+            seleccionarProducto(productosAutocomplete[indiceSeleccionado].id);
+          } else {
+            agregarManual();
+          }
+
+          return;
+        }
+
+        if (productosAutocomplete.length === 0) return;
+
+        if (e.key === "ArrowDown") {
+          e.preventDefault();
+
+          indiceSeleccionado++;
+          if (indiceSeleccionado >= productosAutocomplete.length) {
+            indiceSeleccionado = 0;
+          }
+
+          renderSugerencias();
+        }
+
+        if (e.key === "ArrowUp") {
+          e.preventDefault();
+
+          indiceSeleccionado--;
+          if (indiceSeleccionado < 0) {
+            indiceSeleccionado = productosAutocomplete.length - 1;
+          }
+
+          renderSugerencias();
+        }
+      });
+
+      /* =========================================================
+       CONFIRMAR CAMBIO EN CANTIDAD (blur + enter físico)
+    ========================================================= */
+
+      document.addEventListener(
+        "blur",
+        function (e) {
+          if (!e.target.classList.contains("cantidad-input")) return;
+          if (usandoKeypad) return;
+
+          confirmarCantidadInput(e.target);
+        },
+        true,
+      );
+
+      document.addEventListener("keydown", function (e) {
+        if (!e.target.classList.contains("cantidad-input")) return;
+
+        if (e.key === "Enter") {
+          e.preventDefault();
+          confirmarCantidadInput(e.target);
+        }
+      });
+
+      /* =========================================================
+       PETICIONES FETCH CENTRALIZADAS
+    ========================================================= */
+      function postJSON(url, body) {
+        return fetch(url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": csrf,
+          },
+          body: JSON.stringify(body || {}),
+        }).then((res) => res.json());
+      }
+
+      /* =========================================================
+       AGREGAR PRODUCTO
+    ========================================================= */
+      function seleccionarProducto(producto_id) {
+        postJSON("{% url 'sales:pos_agregar' %}", {
+          producto_id,
+          cantidad: toNumber(inputCantidad.value) || 1,
+        }).then(handleTablaResponse);
+      }
+
+      function agregarManual() {
+        const termino = inputBuscar.value.trim();
+        if (!termino) return;
+
+        postJSON("{% url 'sales:pos_agregar' %}", {
+          termino,
+          cantidad: toNumber(inputCantidad.value) || 1,
+        }).then(handleTablaResponse);
+      }
+
+      function handleTablaResponse(response) {
+        if (response.success) {
+          actualizarTabla(response.data);
+          limpiarBusqueda();
+        } else {
+          alert(response.error);
+        }
+      }
+
+      function limpiarBusqueda() {
+        inputBuscar.value = "";
+        inputCantidad.value = 1;
+        productosAutocomplete = [];
+        indiceSeleccionado = -1;
+        renderSugerencias();
+        inputBuscar.focus();
+      }
+
+      /* =========================================================
+        ACTUALIZAR TABLA
+    ========================================================= */
+      function actualizarTabla(data) {
+        tablaItems.innerHTML = "";
+
+        const fragment = document.createDocumentFragment();
+
+        data.items.forEach((item) => {
+          const tr = document.createElement("tr");
+
+          tr.innerHTML = `
+          <td>${item.nombre || ""}</td>
+          <td>
+            <input type="text"
+              inputmode="numeric"
+              value="${toNumber(item.cantidad)}"
+              data-id="${item.id}"
+              data-current="${toNumber(item.cantidad)}"
+              class="form-control form-control-sm cantidad-input">
+          </td>
+          <td>${money(item.precio)}</td>
+          <td>${money(item.iva)}</td>
+          <td>${money(item.subtotal)}</td>
+          <td>
+            <button onclick="eliminarItem(${item.id})"
+              class="btn btn-danger btn-sm">
+              X
+            </button>
+          </td>
+        `;
+
+          fragment.appendChild(tr);
+        });
+
+        tablaItems.appendChild(fragment);
+
+        $("subtotal").innerText = money(data.subtotal);
+        $("iva").innerText = money(data.iva);
+        $("total").innerText = money(data.total);
+        $("total").dataset.raw = toNumber(data.total);
+
+
+        if (data.items.length === 0) {
+          inputEfectivo.value = "";
+          inputTransferencia.value = "";
+          inputTarjeta.value = "";
+          pagoEditadoManualmente = false;
+        }
+
+        actualizarTotalesPago();
+      }
+
+      /* =========================================================
+        ACTUALIZAR CANTIDAD / ELIMINAR ITEM
+    ========================================================= */
+      function actualizarCantidad(id, cantidad) {
+        if (isNaN(cantidad)) return;
+
+        postJSON("{% url 'sales:pos_actualizar' %}", {
+          item_id: id,
+          cantidad: cantidad,
+        }).then((response) => {
+          if (response.success) {
+            actualizarTabla(response.data);
+          } else {
+            alert(response.error);
+          }
+        });
+      }
+
+      function eliminarItem(id) {
+        postJSON("{% url 'sales:pos_eliminar' %}", {
+          item_id: id,
+        }).then((response) => {
+          if (response.success) actualizarTabla(response.data);
+          else alert(response.error);
+        });
+      }
+
+      /* =========================================================
+        ACTUALIZAR PAGOS
+    ========================================================= */
+      [inputEfectivo, inputTransferencia, inputTarjeta].forEach((inp) => {
+        inp.addEventListener("input", () => {
+          pagoEditadoManualmente = true;
+          actualizarTotalesPago();
+        });
+      });
+
+      function actualizarTotalesPago() {
+      const total = Math.round(toNumber($("total").dataset.raw || 0));
+
+      const efectivo = Math.round(toNumber(inputEfectivo.value));
+      const transferencia = Math.round(toNumber(inputTransferencia.value));
+      const tarjeta = Math.round(toNumber(inputTarjeta.value));
+
+      const totalPagado = efectivo + transferencia + tarjeta;
+      const saldo = totalPagado - total;
+
+      $("total_pagado").innerText = money(totalPagado);
+
+      const infoPago = $("info_pago");
+
+      if (saldo > 0) {
+        infoPago.innerText = "Vuelto: " + money(saldo);
+        infoPago.className = "fw-bold text-success mb-2";
+      } else if (saldo < 0) {
+        infoPago.innerText = "Faltante: " + money(Math.abs(saldo));
+        infoPago.className = "fw-bold text-danger mb-2";
+      } else if (total > 0) {
+        infoPago.innerText = "Pago completo";
+        infoPago.className = "fw-bold text-primary mb-2";
+      } else {
+        infoPago.innerText = "";
+      }
+
+      btnCerrar.disabled = !(total > 0 && totalPagado >= total);
+    }
+
+      /* =========================================================
+        CERRAR / CANCELAR VENTA
+    ========================================================= */
+      function cerrarVenta() {
+      postJSON("{% url 'sales:pos_cerrar' %}", {
+        efectivo: toNumber(inputEfectivo.value),
+        transferencia: toNumber(inputTransferencia.value),
+        tarjeta: toNumber(inputTarjeta.value),
+      }).then((response) => {
+        if (!response.success) {
+          alert(response.error);
+          return;
+        }
+
+        if (response.data.reset) {
+          tablaItems.innerHTML = "";
+
+          inputEfectivo.value = "";
+          inputTransferencia.value = "";
+          inputTarjeta.value = "";
+
+          $("subtotal").innerText = "0.00";
+          $("iva").innerText = "0.00";
+          $("total").innerText = "0.00";
+          $("total").dataset.raw = 0;
+          $("total_pagado").innerText = "0.00";
+          $("info_pago").innerText = "";
+
+          btnCerrar.disabled = true;
+          pagoEditadoManualmente = false;
+
+          setTipoVentaUI("DETAL");
+
+          inputBuscar.focus();
+        }
+      });
+    }
+
+      function cancelarVenta() {
+        if (!confirm("¿Cancelar la venta actual?")) return;
+
+        postJSON("{% url 'sales:pos_cancelar' %}").then((response) => {
+          if (response.success) location.reload();
+          else alert(response.error);
+        });
+      }
+
+      /* =========================================================
+        kEYBOARD NUMÉRICO
+    ========================================================= */
+      function insertNumber(valor) {
+        if (!activeInput) return;
+
+        if (
+          activeInput.selectionStart === 0 &&
+          activeInput.selectionEnd === activeInput.value.length
+        ) {
+          activeInput.value = valor;
+        } else {
+          activeInput.value += valor;
+        }
+
+        activeInput.dispatchEvent(new Event("input"));
+      }
+
+      function backspaceKey() {
+        if (!activeInput) return;
+        activeInput.value = activeInput.value.slice(0, -1);
+        activeInput.dispatchEvent(new Event("input"));
+      }
+
+      function clearActive() {
+        if (!activeInput) return;
+        activeInput.value = "";
+        activeInput.dispatchEvent(new Event("input"));
+      }
+
+      function enterKey() {
+        if (!activeInput) return;
+
+        if (activeInput === inputBuscar) {
+          agregarManual();
+          return;
+        }
+
+        if (activeInput.classList.contains("cantidad-input")) {
+          confirmarCantidadInput(activeInput);
+          return;
+        }
+        activeInput.dispatchEvent(new Event("input"));
+      }
+
+      /* =========================================================
+       CAMBIAR TIPO VENTA (UI)  - SOLO CAMBIO VISUAL, NO HACE PETICIÓN
+    ========================================================= */
+      function setTipoVentaUI(tipo) {
+        tipoVentaActual = tipo;
+
+        const btnDetal = document.getElementById("btnDetal");
+        const btnMayorista = document.getElementById("btnMayorista");
+
+        btnDetal.classList.remove("activo");
+        btnMayorista.classList.remove("activo");
+
+        if (tipo === "DETAL") {
+          btnDetal.classList.add("activo");
+        } else {
+          btnMayorista.classList.add("activo");
+        }
+      }
+
+      /* ================================
+       CAMBIAR TIPO VENTA
+    ================================ */
+      function cambiarTipo(tipo) {
+        if (tipo === tipoVentaActual) return;
+
+        postJSON("{% url 'sales:pos_cambiar_tipo' %}", {
+          tipo: tipo,
+        }).then((response) => {
+          if (!response.success) {
+            alert(response.error);
+            return;
+          }
+
+          setTipoVentaUI(tipo);
+          actualizarTabla(response.data);
+        });
+      }
+</script>
+
+{% endblock %}

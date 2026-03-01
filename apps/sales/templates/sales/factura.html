@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container mt-4">
+
+    <div class="card shadow-sm">
+        <div class="card-body">
+
+            <div class="d-flex justify-content-between mb-3">
+                <div>
+                    <h4>Factura #{{ venta.id }}</h4>
+                    <small>{{ venta.creada }}</small>
+                </div>
+                <div class="text-end">
+                    <strong>{{ venta.sucursal.nombre }}</strong><br>
+                    Caja: {{ venta.caja.nombre }}
+                </div>
+            </div>
+
+            <table class="table table-sm table-bordered">
+                <thead class="table-light">
+                    <tr>
+                        <th>Producto</th>
+                        <th width="100">Cant</th>
+                        <th width="120">Precio</th>
+                        <th width="120">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in venta.items.all %}
+                    <tr>
+                        <td>{{ item.producto.nombre }}</td>
+                        <td>{{ item.cantidad }}</td>
+                        <td>${{ item.precio_unitario }}</td>
+                        <td>${{ item.total_linea }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <div class="text-end">
+                <p>Subtotal: ${{ venta.subtotal }}</p>
+                <p>IVA: ${{ venta.total_iva }}</p>
+                <h5>Total: ${{ venta.total }}</h5>
+            </div>
+
+            <hr>
+
+            <div class="text-end">
+                <p>Efectivo: ${{ venta.monto_efectivo }}</p>
+                <p>Transferencia: ${{ venta.monto_transferencia }}</p>
+                <p>Tarjeta: ${{ venta.monto_tarjeta }}</p>
+            </div>
+
+            {% if venta.estado == "CERRADA" %}
+            <form method="post" action="{% url 'sales:pos_anular' venta.id %}">
+                {% csrf_token %}
+                <button class="btn btn-warning">
+                    Anular factura
+                </button>
+            </form>
+            {% endif %}
+
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}
