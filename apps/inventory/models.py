@@ -1,13 +1,73 @@
 # apps/inventory/models.py
-
 from decimal import Decimal
 from django.db import models
 from django.db.models import Q
+
 from apps.core.models import Sucursal
 
 
 # =========================================================
-# PRODUCTO
+# COLOR
+# =========================================================
+
+class Color(models.Model):
+    nombre = models.CharField(max_length=50)
+    codigo_hex = models.CharField(max_length=7, blank=True)
+
+    def __str__(self):
+        return self.nombre
+
+
+# =========================================================
+# TELA
+# =========================================================
+
+class TipoTela(models.Model):
+    nombre = models.CharField(max_length=100)
+    descripcion = models.TextField(blank=True)
+    activo = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.nombre
+
+
+# =========================================================
+# PRODUCTO BASE
+# =========================================================
+
+class ProductoBase(models.Model):
+    nombre = models.CharField(max_length=200)
+    descripcion = models.TextField(blank=True)
+    activo = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.nombre
+
+
+# =========================================================
+# VARIANTE (SKU REAL)
+# =========================================================
+
+class ProductoVariante(models.Model):
+    producto_base = models.ForeignKey(
+        ProductoBase,
+        on_delete=models.CASCADE,
+        related_name="variantes"
+    )
+
+    tipo_tela = models.ForeignKey(TipoTela, on_delete=models.PROTECT)
+    color = models.ForeignKey(Color, on_delete=models.PROTECT)
+
+    talla = models.CharField(max_length=10)
+
+    sku = models.CharField(max_length=100, unique=True)
+
+    def __str__(self):
+        return f"{self.producto_base.nombre} - {self.color.nombre} - {self.talla}"
+
+
+# =========================================================
+# PRODUCTO POS
 # =========================================================
 
 class ProductoQuerySet(models.QuerySet):
@@ -29,10 +89,16 @@ class Producto(models.Model):
         ("NO_SUJETO", "No sujeto"),
     )
 
+    variante = models.ForeignKey(
+        ProductoVariante,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True
+    )
+
     nombre = models.CharField(max_length=200)
     codigo_barras = models.CharField(max_length=100, unique=True, null=True, blank=True)
 
-    # Información fiscal
     tipo_iva = models.CharField(max_length=20, choices=TIPO_IVA, default="GRAVADO")
     porcentaje_iva = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal("19.00"))
     incluye_iva = models.BooleanField(default=True)
@@ -44,22 +110,15 @@ class Producto(models.Model):
 
     objects = ProductoQuerySet.as_manager()
 
-    class Meta:
-        indexes = [
-            models.Index(fields=["nombre"]),
-            models.Index(fields=["codigo_barras"]),
-            models.Index(fields=["activo"]),
-        ]
-
     def tasa_iva(self):
         return self.porcentaje_iva / Decimal("100")
 
     def __str__(self):
-        return f"{self.nombre} ({self.codigo_barras})"
- 
+        return self.nombre
+
 
 # =========================================================
-# STOCK
+# STOCK (POR VARIANTE)
 # =========================================================
 
 class StockManager(models.Manager):
@@ -69,8 +128,8 @@ class StockManager(models.Manager):
 
 class Stock(models.Model):
 
-    producto = models.ForeignKey(
-        Producto,
+    variante = models.ForeignKey(
+        ProductoVariante,
         on_delete=models.CASCADE,
         related_name="stocks"
     )
@@ -81,31 +140,24 @@ class Stock(models.Model):
         related_name="stocks"
     )
 
-    cantidad = models.DecimalField(
-        max_digits=14,
-        decimal_places=2,
-        default=0
-    )
+    cantidad = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
     objects = StockManager()
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["producto", "sucursal"],
-                name="unique_stock_producto_sucursal"
+                fields=["variante", "sucursal"],
+                name="unique_stock_variante_sucursal"
             )
-        ]
-        indexes = [
-            models.Index(fields=["producto", "sucursal"]),
         ]
 
     def __str__(self):
-        return f"{self.producto.nombre} - {self.sucursal.nombre}"
+        return f"{self.variante} - {self.sucursal.nombre}"
 
 
 # =========================================================
-# MOVIMIENTO STOCK
+# MOVIMIENTO STOCK (🔥 CORREGIDO)
 # =========================================================
 
 class MovimientoStock(models.Model):
@@ -115,19 +167,20 @@ class MovimientoStock(models.Model):
         ("ANULACION", "Anulación"),
         ("AJUSTE", "Ajuste"),
         ("TRASLADO", "Traslado"),
+        ("PRODUCCION", "Producción"),
     )
 
-    producto = models.ForeignKey(Producto, on_delete=models.PROTECT)
+    variante = models.ForeignKey(
+        ProductoVariante,
+        on_delete=models.PROTECT
+    )
+
     sucursal = models.ForeignKey(Sucursal, on_delete=models.PROTECT)
 
     tipo = models.CharField(max_length=20, choices=TIPOS)
+
     cantidad = models.DecimalField(max_digits=12, decimal_places=2)
 
-    referencia = models.IntegerField()  # id venta o ajuste
-    creado = models.DateTimeField(auto_now_add=True)
+    referencia = models.IntegerField()
 
-    class Meta:
-        indexes = [
-            models.Index(fields=["producto", "sucursal"]),
-            models.Index(fields=["tipo"]),
-        ]
+    creado = models.DateTimeField(auto_now_add=True)

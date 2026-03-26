@@ -12,7 +12,7 @@ class Sucursal(models.Model):
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="sucursales_default" 
+        related_name="sucursales_default"
     )
 
     activa = models.BooleanField(default=True)

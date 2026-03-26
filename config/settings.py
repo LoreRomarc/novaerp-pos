@@ -39,12 +39,14 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+    'nested_admin',
+    
     # Custom apps
     'apps.accounts',
     'apps.customers',
     'apps.inventory',
     'apps.sales',
-    'apps.reports',
     'apps.core',
 ]
 
@@ -84,9 +86,9 @@ WSGI_APPLICATION = 'config.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'novaerp_db',
+        'NAME': 'novaerp',
         'USER': 'postgres',
-        'PASSWORD': 'db2025',
+        'PASSWORD': 'DB2026',
         'HOST': 'localhost',
         'PORT': '5432',
     }

@@ -4,12 +4,17 @@ from django.utils import timezone
 from django.conf import settings
 from django.db import transaction
 from django.core.exceptions import ValidationError
-from django.db.models import Q, Sum
+from django.db.models import Sum
+
 from apps.sales.models import Caja
 from apps.sales.models_caja_enterprise import CajaMovimiento, TurnoCaja
 
 
 class CajaService:
+
+    # ======================================================
+    # OBTENER TURNO ABIERTO
+    # ======================================================
 
     @staticmethod
     def obtener_turno_abierto(sucursal):
@@ -19,6 +24,10 @@ class CajaService:
             .filter(sucursal=sucursal, estado="ABIERTO")
             .first()
         )
+
+    # ======================================================
+    # ABRIR CAJA
+    # ======================================================
 
     @staticmethod
     @transaction.atomic
@@ -30,15 +39,10 @@ class CajaService:
         ).first()
 
         if not caja:
-            raise Exception("La caja no pertenece a esta sucursal.")
+            raise ValidationError("La caja no pertenece a esta sucursal.")
 
-        turno_abierto = TurnoCaja.objects.filter(
-            caja=caja,
-            estado="ABIERTO"
-        ).exists()
-
-        if turno_abierto:
-            raise Exception("Ya existe un turno abierto en esta caja.")
+        if TurnoCaja.objects.filter(caja=caja, estado="ABIERTO").exists():
+            raise ValidationError("Ya existe un turno abierto en esta caja.")
 
         turno = TurnoCaja.objects.create(
             caja=caja,
@@ -49,29 +53,18 @@ class CajaService:
 
         return turno
 
+    # ======================================================
+    # CERRAR CAJA
+    # ======================================================
+
     @staticmethod
     @transaction.atomic
     def cerrar_caja(sucursal, usuario, monto_real):
 
-        turno = TurnoCaja.objects.select_for_update().filter(
-            sucursal=sucursal,
-            estado="ABIERTO"
-        ).first()
-
-        if not turno:
-            raise ValidationError("No hay turno abierto.")
-
-        turno.cerrar(monto_real, usuario)
-
-        return turno
-
-    @staticmethod
-    @transaction.atomic
-    def cerrar_turno(turno_id, usuario, monto_real: Decimal):
         turno = (
             TurnoCaja.objects
             .select_for_update()
-            .filter(id=turno_id, estado="ABIERTO")
+            .filter(sucursal=sucursal, estado="ABIERTO")
             .first()
         )
 
@@ -79,8 +72,13 @@ class CajaService:
             raise ValidationError("No hay turno abierto.")
 
         turno.cerrar(monto_real, usuario)
+
         return turno
-    
+
+    # ======================================================
+    # RETIRO A BÓVEDA
+    # ======================================================
+
     @staticmethod
     @transaction.atomic
     def retiro_caja(turno_id, monto, usuario):
@@ -93,7 +91,7 @@ class CajaService:
         monto = Decimal(str(monto))
 
         if monto <= 0:
-            raise ValidationError("Monto inválido")
+            raise ValidationError("Monto inválido.")
 
         CajaMovimiento.objects.create(
             turno=turno,
@@ -108,36 +106,18 @@ class CajaService:
         boveda.saldo_actual += monto
         boveda.save(update_fields=["saldo_actual"])
 
+    # ======================================================
+    # REGISTRAR MOVIMIENTOS DE VENTA (🔥 IMPORTANTE)
+    # ======================================================
 
     @staticmethod
     @transaction.atomic
     def registrar_movimientos_venta(venta, usuario, pagos: dict):
         """
-        Genera movimientos financieros inmutables al cerrar venta.
+        Genera movimientos financieros al cerrar venta.
         """
 
-        from apps.sales.models_caja_enterprise import TurnoCaja, CajaMovimiento
-
-        # Bloqueo fuerte del turno para evitar condiciones de carrera
-        turno = (
-            TurnoCaja.objects
-            .select_for_update()
-            .get(id=venta.turno_id)
-        )
-
-        saldo_actual = turno.caja.turnos.filter(
-            estado="ABIERTO"
-        ).first()
-
-        saldo_teorico = turno.caja.turnos.filter(
-            estado="ABIERTO"
-        ).first()
-
-        saldo = turno.movimientos.aggregate(
-            total=Sum("monto")
-        )["total"] or Decimal("0")
-
-        saldo_actual = saldo
+        turno = TurnoCaja.objects.select_for_update().get(id=venta.turno_id)
 
         for medio, monto in pagos.items():
 
@@ -145,11 +125,6 @@ class CajaService:
 
             if monto <= 0:
                 continue
-
-            nuevo_saldo = saldo_actual
-
-            if medio == "EFECTIVO":
-                nuevo_saldo += monto
 
             CajaMovimiento.objects.create(
                 turno=turno,
@@ -160,22 +135,31 @@ class CajaService:
                 referencia_venta=venta,
             )
 
-            if medio == "EFECTIVO":
-                saldo_actual = nuevo_saldo
+        # 🔥 Verificar retiro automático después de registrar venta
+        CajaService.verificar_retiro_automatico(turno)
 
         return True
 
+    # ======================================================
+    # RETIRO AUTOMÁTICO POR EXCESO DE EFECTIVO
+    # ======================================================
+
     @staticmethod
     def verificar_retiro_automatico(turno):
+
+        limite = getattr(settings, "LIMITE_EFECTIVO_CAJA", None)
+
+        if not limite:
+            return
 
         efectivo = turno.movimientos.filter(
             medio_pago="EFECTIVO",
             tipo="VENTA"
         ).aggregate(total=Sum("monto"))["total"] or Decimal("0")
 
-        if efectivo > settings.LIMITE_EFECTIVO_CAJA:
+        if efectivo > limite:
 
-            monto_retiro = efectivo - settings.LIMITE_EFECTIVO_CAJA
+            monto_retiro = efectivo - limite
 
             CajaMovimiento.objects.create(
                 turno=turno,

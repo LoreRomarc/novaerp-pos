@@ -1,0 +1,106 @@
+html,
+  body {
+    height: 100%;
+    overflow: hidden;
+    background: #f4f6f9;
+    font-size: 13px;
+  }
+
+  .pos-wrapper {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    height: 100vh;
+  }
+
+  .pos-left {
+    padding: 25px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  /* ===== TIPO VENTA ===== */
+  .tipo-venta-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .tipo-btn {
+    flex: 1;
+    padding: 8px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    background: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+
+  .tipo-btn.activo {
+    background: #198754;
+    color: white;
+    border-color: #198754;
+  }
+
+  .tipo-btn:hover {
+    transform: translateY(-1px);
+  }
+
+  .search-row {
+    display: grid;
+    grid-template-columns: 1fr 100px 110px;
+    gap: 10px;
+    margin-bottom: 15px;
+    position: relative;
+  }
+
+  #sugerencias {
+    position: absolute;
+    top: 45px;
+    left: 0;
+    width: calc(100% - 210px);
+    background: white;
+    border-radius: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+    z-index: 9999;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  }
+
+  .table-area {
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .pos-right {
+    background: white;
+    border-left: 1px solid #eaeaea;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+    margin-bottom: 15px;
+  }
+
+  .keypad button {
+    height: 42px;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+    background: #fafafa;
+    font-weight: 600;
+  }
+
+  .keypad button:active {
+    background: #eaeaea;
+  }
+
+  .total-final {
+    font-size: 20px;
+    font-weight: 700;
+  }

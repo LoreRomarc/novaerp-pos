@@ -1,10 +1,24 @@
 # apps/sales/urls.py
 from django.urls import path
-from .views import *
+from .views import (
+    POSView,
+    POSAgregarProductoView,
+    POSActualizarCantidadView,
+    POSEliminarItemView,
+    POSCerrarVentaView,
+    POSCancelarVentaView,
+    ProductoAutocompleteView,
+    POSCambiarTipoVentaView,
+    AbrirCajaView,
+    CerrarCajaView,
+)
 
 app_name = "sales"
 
 urlpatterns = [
+    # ==========================
+    # POS
+    # ==========================
     path("pos/", POSView.as_view(), name="pos"),
     path("pos/agregar/", POSAgregarProductoView.as_view(), name="pos_agregar"),
     path("pos/actualizar/", POSActualizarCantidadView.as_view(), name="pos_actualizar"),
@@ -14,6 +28,9 @@ urlpatterns = [
     path("pos/autocomplete/", ProductoAutocompleteView.as_view(), name="pos_autocomplete"),
     path("pos/cambiar-tipo/", POSCambiarTipoVentaView.as_view(), name="pos_cambiar_tipo"),
 
+    # ==========================
+    # CAJA
+    # ==========================
     path("caja/abrir/", AbrirCajaView.as_view(), name="abrir_caja"),
     path("caja/cerrar/", CerrarCajaView.as_view(), name="cerrar_caja"),
 ]

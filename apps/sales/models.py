@@ -1,5 +1,4 @@
 # apps/sales/models.py
-
 from decimal import ROUND_HALF_UP, Decimal
 from django.db import models, transaction
 from django.core.exceptions import ValidationError
@@ -7,15 +6,24 @@ from django.db.models import Q, Sum
 from django.utils import timezone
 from django.conf import settings
 
-from apps.inventory.models import MovimientoStock, Producto, Stock
+from apps.inventory.models import MovimientoStock, Stock
 from apps.sales.models_caja_enterprise import TurnoCaja
 
 
-def redondear_2(valor: Decimal) -> Decimal:
-    return valor.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+# =========================================================
+# HELPERS
+# =========================================================
 
-def redondear_peso(valor: Decimal) -> Decimal:
-    return valor.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+def redondear_a_peso_colombiano(valor: Decimal) -> Decimal:
+    """
+    Redondea al múltiplo de 50 o 100 más cercano (estilo efectivo Colombia).
+    Ajusta según regla de negocio.
+    """
+
+    valor = Decimal(valor)
+
+    # redondeo a 100 (puedes cambiar a 50 si quieres más precisión)
+    return (valor / Decimal("100")).quantize(Decimal("1")) * Decimal("100")
 
 
 # =========================================================
@@ -23,10 +31,6 @@ def redondear_peso(valor: Decimal) -> Decimal:
 # =========================================================
 
 class Caja(models.Model):
-    """
-    Representa el hardware físico.
-    Ej: Caja 01 - POS Frente Tienda
-    """
 
     sucursal = models.ForeignKey(
         "core.Sucursal",
@@ -51,16 +55,13 @@ class Caja(models.Model):
 
     def __str__(self):
         return f"{self.sucursal} - {self.codigo}"
-    
-    
+
+
 # =========================================================
-# CAJERO EN TURNO
+# CAJEROS EN TURNO
 # =========================================================
 
 class TurnoCajaUsuario(models.Model):
-    """
-    Permite múltiples cajeros en el mismo turno.
-    """
 
     turno = models.ForeignKey(
         TurnoCaja,
@@ -87,19 +88,12 @@ class TurnoCajaUsuario(models.Model):
             )
         ]
 
+
 # =========================================================
 # VENTA
 # =========================================================
 
 class Venta(models.Model):
-    """
-    Modelo transaccional principal del POS.
-
-    Flujo:
-    ABIERTA -> CERRADA -> (ANULADA opcional)
-
-    La venta solo descuenta stock al cerrarse.
-    """
 
     ESTADOS = (
         ("ABIERTA", "Abierta"),
@@ -113,19 +107,27 @@ class Venta(models.Model):
     )
 
     sucursal = models.ForeignKey("core.Sucursal", on_delete=models.PROTECT, related_name="ventas")
+
     turno = models.ForeignKey(
         "sales.TurnoCaja",
         on_delete=models.PROTECT,
         related_name="ventas"
     )
-    usuario = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="ventas")
+
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="ventas"
+    )
 
     tipo_venta = models.CharField(max_length=20, choices=TIPO_VENTA, default="DETAL")
+
     estado = models.CharField(max_length=20, choices=ESTADOS, default="ABIERTA")
 
     # ===============================
     # TOTALES
     # ===============================
+
     subtotal = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     total_iva = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     total = models.DecimalField(max_digits=14, decimal_places=2, default=0)
@@ -133,15 +135,12 @@ class Venta(models.Model):
     # ===============================
     # PAGOS
     # ===============================
+
     monto_efectivo = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     monto_tarjeta = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     monto_transferencia = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
-    ajuste_redondeo = models.DecimalField(
-        max_digits=14,
-        decimal_places=2,
-        default=0
-    )
+    ajuste_redondeo = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
     creada = models.DateTimeField(auto_now_add=True)
     cerrada = models.DateTimeField(null=True, blank=True)
@@ -162,10 +161,8 @@ class Venta(models.Model):
         ]
 
     def __str__(self):
-        # Ejemplo: "Venta #123 - Sucursal Soledad - Total: $123.456"
-        total_formato = f"${self.total:,.0f}"
-        return f"Venta #{self.id} - {self.sucursal.nombre} - Total: {total_formato} - Estado: {self.estado}"
-    
+        return f"Venta #{self.id} - {self.sucursal.nombre} - Total: ${self.total:,.0f}"
+
     # =========================================================
     # CÁLCULOS
     # =========================================================
@@ -178,22 +175,17 @@ class Venta(models.Model):
             total=Sum("total_linea"),
         )
 
-        subtotal = totales["subtotal"] or Decimal("0.00")
-        iva = totales["iva"] or Decimal("0.00")
-        total = totales["total"] or Decimal("0.00")
-
-        # Redondeo final de agregados
-        self.subtotal = redondear_2(subtotal)
-        self.total_iva = redondear_2(iva)
-        self.total = redondear_2(total)
+        self.subtotal = redondear_a_peso_colombiano(totales["subtotal"] or Decimal("0"))
+        self.total_iva = redondear_a_peso_colombiano(totales["iva"] or Decimal("0"))
+        self.total = redondear_a_peso_colombiano(totales["total"] or Decimal("0"))
 
         self.save(update_fields=["subtotal", "total_iva", "total"])
 
     def total_pagado(self):
         return (
             self.monto_efectivo +
-            self.monto_transferencia +
-            self.monto_tarjeta
+            self.monto_tarjeta +
+            self.monto_transferencia
         )
 
     def puede_cerrar(self):
@@ -209,39 +201,32 @@ class Venta(models.Model):
 
     @transaction.atomic
     def cerrar_venta(self):
-        """
-        - Valida pagos
-        - Descuenta stock
-        - Marca como cerrada
-        """
 
         if not self.puede_cerrar():
             raise ValidationError("El pago no cubre el total.")
 
-        for item in self.items.select_related("producto").select_for_update():
+        for item in self.items.select_for_update():
 
-            if item.producto.controla_stock:
+            stock = Stock.objects.select_for_update().get(
+                variante=item.variante,
+                sucursal=self.sucursal
+            )
 
-                stock = Stock.objects.select_for_update().get(
-                    producto=item.producto,
-                    sucursal=self.sucursal
+            if stock.cantidad < item.cantidad:
+                raise ValidationError(
+                    f"Stock insuficiente para {item.variante}"
                 )
 
-                if stock.cantidad < item.cantidad:
-                    raise ValidationError(
-                        f"Stock insuficiente para {item.producto.nombre}"
-                    )
+            stock.cantidad -= item.cantidad
+            stock.save(update_fields=["cantidad"])
 
-                stock.cantidad -= item.cantidad
-                stock.save(update_fields=["cantidad"])
-
-                MovimientoStock.objects.create(
-                    producto=item.producto,
-                    sucursal=self.sucursal,
-                    tipo="VENTA",
-                    cantidad=item.cantidad,
-                    referencia=self.id
-                )
+            MovimientoStock.objects.create(
+                variante=item.variante,
+                sucursal=self.sucursal,
+                tipo="VENTA",
+                cantidad=item.cantidad,
+                referencia=self.id
+            )
 
         self.estado = "CERRADA"
         self.cerrada = timezone.now()
@@ -250,59 +235,57 @@ class Venta(models.Model):
 
 
 # =========================================================
-# VENTA ITEM
+# VENTA ITEM (🔥 VARIANTE)
 # =========================================================
+
+from django.db import models
+from decimal import Decimal
+
+
 class VentaItem(models.Model):
 
-    venta = models.ForeignKey(Venta, related_name="items", on_delete=models.CASCADE)
-    producto = models.ForeignKey(Producto, on_delete=models.PROTECT)
+    venta = models.ForeignKey(
+        "sales.Venta",
+        on_delete=models.CASCADE,
+        related_name="items"
+    )
 
-    cantidad = models.DecimalField(max_digits=12, decimal_places=2)
-    precio_unitario = models.DecimalField(max_digits=12, decimal_places=2)
-    tasa_iva_aplicada = models.DecimalField(max_digits=6,decimal_places=4,default=0)
-    tipo_iva_aplicado = models.CharField( max_length=20,blank=True)
+    # CAMBIO CLAVE: ahora es VARIANTE
+    variante = models.ForeignKey(
+        "inventory.ProductoVariante",
+        on_delete=models.PROTECT
+    )
 
+    cantidad = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=1
+    )
+
+    precio_unitario = models.DecimalField(
+        max_digits=14,
+        decimal_places=2
+    )
     subtotal_linea = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     iva_linea = models.DecimalField(max_digits=14, decimal_places=2, default=0)
     total_linea = models.DecimalField(max_digits=14, decimal_places=2, default=0)
 
-    class Meta:
-        ordering = ["id"]
+    def subtotal(self):
+        return self.cantidad * self.precio_unitario
 
     def __str__(self):
-        # Formatear números con $ y separador de miles
-        def format_cop(valor):
-            return "${:,.0f}".format(valor)
-
-        return (
-            f"[Venta #{self.venta.id}] {self.producto.nombre} - "
-            f"{self.cantidad} x {format_cop(self.precio_unitario)} = {format_cop(self.total_linea)}"
-        )
-
+        return f"{self.variante} x {self.cantidad}"
+    
     def save(self, *args, **kwargs):
 
         if self.venta.estado != "ABIERTA":
             raise ValidationError("No se puede modificar una venta cerrada.")
 
-        producto = self.producto
-        tasa = producto.tasa_iva()
+        precio = redondear_a_peso_colombiano(self.precio_unitario)
+        base = redondear_a_peso_colombiano(precio * self.cantidad)
 
-        self.tasa_iva_aplicada = tasa
-        self.tipo_iva_aplicado = producto.tipo_iva
-
-        # 1. Precio unitario normalizado
-        precio = redondear_2(self.precio_unitario)
-
-        # 2. Base imponible
-        base = redondear_2(precio * self.cantidad)
-
-        # 3. Cálculo IVA por línea
-        if producto.tipo_iva in ["EXENTO", "NO_SUJETO"]:
-            iva = Decimal("0.00")
-            total = base
-        else:
-            iva = redondear_2(base * tasa)
-            total = redondear_2(base + iva)
+        iva = Decimal("0.00")  # puedes ajustar si quieres IVA después
+        total = base + iva
 
         self.subtotal_linea = base
         self.iva_linea = iva
@@ -310,17 +293,22 @@ class VentaItem(models.Model):
 
         super().save(*args, **kwargs)
 
+
+# =========================================================
+# LISTA DE PRECIOS
+# =========================================================
+
 class ListaPrecio(models.Model):
 
     sucursal = models.ForeignKey(
         "core.Sucursal",
         on_delete=models.CASCADE,
-        related_name="listas_precios",         
+        related_name="listas_precios",
     )
 
     nombre = models.CharField(max_length=100)
 
-    tipo_venta = models.CharField(max_length=20,choices=Venta.TIPO_VENTA)
+    tipo_venta = models.CharField(max_length=20, choices=Venta.TIPO_VENTA)
 
     activa = models.BooleanField(default=True)
 
@@ -336,14 +324,16 @@ class ListaPrecio(models.Model):
 
     def __str__(self):
         return f"{self.sucursal} - {self.nombre}"
-    
 
 
+# =========================================================
+# PRECIO POR VARIANTE (🔥 CORRECTO)
+# =========================================================
 
-class PrecioProducto(models.Model):
+class PrecioVariante(models.Model):
 
-    producto = models.ForeignKey(
-        Producto,
+    variante = models.ForeignKey(
+        "inventory.ProductoVariante",
         on_delete=models.CASCADE,
         related_name="precios"
     )
@@ -354,17 +344,10 @@ class PrecioProducto(models.Model):
         related_name="precios"
     )
 
-    precio = models.DecimalField(
-        max_digits=14,
-        decimal_places=2
-    )
+    precio = models.DecimalField(max_digits=14, decimal_places=2)
 
     class Meta:
-        unique_together = ("producto", "lista")
-        indexes = [
-            models.Index(fields=["producto", "lista"])
-        ]
+        unique_together = ("variante", "lista")
 
     def __str__(self):
-        precio_formateado = f"${self.precio:,.0f}"
-        return f"{self.producto.nombre} - {self.lista.nombre} - {precio_formateado}"
+        return f"{self.variante} - {self.lista.nombre} - ${self.precio:,.0f}"
