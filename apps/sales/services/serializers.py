@@ -1,5 +1,4 @@
 # apps/sales/services/serializers.py
-
 from decimal import Decimal
 
 
@@ -18,7 +17,7 @@ def serializar_venta(venta):
             {
                 "id": item.id,
 
-                # 🔥 VARIANTE (NUEVO MODELO)
+                # VARIANTE (NUEVO MODELO)
                 "variante_id": item.variante.id,
                 "sku": item.variante.sku,
 

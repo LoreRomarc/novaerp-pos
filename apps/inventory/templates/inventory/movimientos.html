@@ -1,0 +1,19 @@
+<h2>Movimientos</h2>
+
+<table>
+    <tr>
+        <th>Tipo</th>
+        <th>Variante</th>
+        <th>Sucursal</th>
+        <th>Cantidad</th>
+    </tr>
+
+    {% for m in movimientos %}
+    <tr>
+        <td>{{ m.tipo }}</td>
+        <td>{{ m.variante }}</td>
+        <td>{{ m.sucursal }}</td>
+        <td>{{ m.cantidad }}</td>
+    </tr>
+    {% endfor %}
+</table>

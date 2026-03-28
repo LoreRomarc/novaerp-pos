@@ -1,0 +1,17 @@
+<h2>Stock</h2>
+
+<table>
+    <tr>
+        <th>Variante</th>
+        <th>Sucursal</th>
+        <th>Cantidad</th>
+    </tr>
+
+    {% for s in stocks %}
+    <tr>
+        <td>{{ s.variante }}</td>
+        <td>{{ s.sucursal }}</td>
+        <td>{{ s.cantidad }}</td>
+    </tr>
+    {% endfor %}
+</table>

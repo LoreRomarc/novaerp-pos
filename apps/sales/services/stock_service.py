@@ -1,13 +1,18 @@
+# apps/sales/services/stock_service.py
 from decimal import Decimal
-from django.db import transaction
 from django.core.exceptions import ValidationError
+
+from apps.inventory.services.stock_domain_service import StockDomainService
 from apps.inventory.models import Stock
 
 
 class StockService:
 
+    # ======================================================
+    # GET STOCK
+    # ======================================================
+
     @staticmethod
-    @transaction.atomic
     def _get_stock(variante, sucursal):
 
         stock = (
@@ -22,8 +27,11 @@ class StockService:
 
         return stock
 
+    # ======================================================
+    # VALIDAR
+    # ======================================================
+
     @staticmethod
-    @transaction.atomic
     def validar_stock_disponible(variante, sucursal, cantidad: Decimal):
 
         stock = StockService._get_stock(variante, sucursal)
@@ -35,8 +43,11 @@ class StockService:
 
         return stock
 
+    # ======================================================
+    # DESCONTAR (POS)
+    # ======================================================
+
     @staticmethod
-    @transaction.atomic
     def descontar_stock(variante, sucursal, cantidad: Decimal):
 
         if cantidad <= 0:
@@ -45,20 +56,24 @@ class StockService:
         stock = StockService._get_stock(variante, sucursal)
 
         if stock.cantidad < cantidad:
-            raise ValidationError("Stock insuficiente (concurrencia detectada).")
+            raise ValidationError("Stock insuficiente.")
 
         stock.cantidad -= cantidad
         stock.save(update_fields=["cantidad"])
 
         return stock
 
+    # ======================================================
+    # DEVOLVER
+    # ======================================================
+
     @staticmethod
-    @transaction.atomic
     def devolver_stock(variante, sucursal, cantidad: Decimal):
 
         if cantidad <= 0:
             return
 
         stock = StockService._get_stock(variante, sucursal)
+
         stock.cantidad += cantidad
         stock.save(update_fields=["cantidad"])

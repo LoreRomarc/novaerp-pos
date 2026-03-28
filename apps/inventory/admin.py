@@ -1,123 +1,108 @@
-from decimal import Decimal
+# apps/inventory/admin.py
+# apps/inventory/admin.py
 from django.contrib import admin
-import nested_admin
-
 from apps.inventory.models import (
-    Color, TipoTela, ProductoBase, ProductoVariante,
-    Producto, Stock, MovimientoStock,
+    Color, TipoTela, ProductoBase, ProductoVariante
 )
-from apps.inventory.models_produccion import IngresoProduccion, IngresoProduccionDetalle, OrdenCorte, OrdenCorteDetalle, RolloTela
-from apps.sales.models import ListaPrecio, PrecioVariante
+from apps.inventory.models_produccion import RolloTela, ProduccionLote, ProduccionDetalle
+from apps.inventory.services.corte_service import CorteService
 
-# =========================================================
-# COLORES
-# =========================================================
+# ======================================================
+# MODELOS BASE PARA CREAR COLORES, TELAS Y PRODUCTOS
+# ======================================================
+
 @admin.register(Color)
 class ColorAdmin(admin.ModelAdmin):
-    list_display = ["nombre", "codigo_hex"]
-    search_fields = ["nombre", "codigo_hex"]  # <-- agregado
+    list_display = ("nombre", "codigo_hex")
+    search_fields = ("nombre", "codigo_hex")
 
-# =========================================================
-# TELAS
-# =========================================================
+
 @admin.register(TipoTela)
 class TipoTelaAdmin(admin.ModelAdmin):
-    list_display = ["nombre", "activo"]
-    search_fields = ["nombre"]  # <-- agregado
+    list_display = ("nombre", "descripcion", "activo")
+    list_filter = ("activo",)
+    search_fields = ("nombre",)
 
-# =========================================================
-# STOCK INLINE
-# =========================================================
-class StockInline(nested_admin.NestedTabularInline):
-    model = Stock
-    extra = 1
-    autocomplete_fields = ["sucursal"]
 
-# =========================================================
-# PRECIO VARIANTE INLINE
-# =========================================================
-class PrecioVarianteInline(nested_admin.NestedTabularInline):
-    model = PrecioVariante
-    extra = 1
-    autocomplete_fields = ["lista"]
-
-# =========================================================
-# VARIANTE INLINE (incluye Stock y Precio)
-# =========================================================
-class ProductoVarianteInline(nested_admin.NestedTabularInline):
-    model = ProductoVariante
-    extra = 1
-    autocomplete_fields = ["tipo_tela", "color"]
-    inlines = [StockInline, PrecioVarianteInline]
-
-# =========================================================
-# PRODUCTO BASE ADMIN (todo desde aquí)
-# =========================================================
 @admin.register(ProductoBase)
-class ProductoBaseAdmin(nested_admin.NestedModelAdmin):
-    list_display = ["nombre", "activo"]
-    search_fields = ["nombre"]
-    inlines = [ProductoVarianteInline]
+class ProductoBaseAdmin(admin.ModelAdmin):
+    list_display = ("nombre", "activo")
+    list_filter = ("activo",)
+    search_fields = ("nombre",)
 
-# =========================================================
-# PRODUCTO VARIANTE ADMIN (para consultas rápidas)
-# =========================================================
+
 @admin.register(ProductoVariante)
 class ProductoVarianteAdmin(admin.ModelAdmin):
-    list_display = ["producto_base", "tipo_tela", "color", "talla", "sku"]
+    list_display = ("sku", "producto_base", "tipo_tela", "color", "talla")
+    list_filter = ("tipo_tela", "color")
+    search_fields = ("sku", "producto_base__nombre", "talla")
+    autocomplete_fields = ("producto_base", "tipo_tela", "color")
 
-# =========================================================
-# PRODUCTO POS
-# =========================================================
-@admin.register(Producto)
-class ProductoAdmin(admin.ModelAdmin):
-    list_display = ["nombre", "variante", "codigo_barras", "tipo_iva", "activo"]
+# ======================================================
+# ROLLOS
+# ======================================================
 
-# =========================================================
-# STOCK
-# =========================================================
-@admin.register(Stock)
-class StockAdmin(admin.ModelAdmin):
-    list_display = ["producto_display", "sucursal", "cantidad"]
-
-    @admin.display(description="Producto")
-    def producto_display(self, obj):
-        return obj.variante
-
-# =========================================================
-# MOVIMIENTO STOCK
-# =========================================================
-@admin.register(MovimientoStock)
-class MovimientoStockAdmin(admin.ModelAdmin):
-    list_display = ["producto_display", "sucursal", "tipo", "cantidad", "referencia", "creado"]
-
-    @admin.display(description="Producto")
-    def producto_display(self, obj):
-        return obj.variante
-
-# =========================================================
-# PRODUCCION
-# =========================================================
 @admin.register(RolloTela)
 class RolloTelaAdmin(admin.ModelAdmin):
-    list_display = ["codigo", "tipo_tela", "color", "estado"]
+    list_display = ("codigo", "tipo_tela", "color", "cantidad_disponible", "estado")
+    list_filter = ("tipo_tela", "color", "estado")
+    search_fields = ("codigo",)
+    autocomplete_fields = ("tipo_tela", "color")
 
-@admin.register(OrdenCorte)
-class OrdenCorteAdmin(admin.ModelAdmin):
-    list_display = ["id", "sucursal", "estado", "detalles_count"]
+# ======================================================
+# PRODUCCION CORTE
+# ======================================================
 
-    @admin.display(description="Cantidad de Detalles")
-    def detalles_count(self, obj):
-        return obj.detalles.count()
+class ProduccionDetalleInline(admin.TabularInline):
+    model = ProduccionDetalle
+    extra = 1
+    autocomplete_fields = ("producto_base", "tipo_tela", "color", "variante")
 
-@admin.register(OrdenCorteDetalle)
-class OrdenCorteDetalleAdmin(admin.ModelAdmin):
-    list_display = ["orden", "variante", "cantidad"]
 
-@admin.register(IngresoProduccion)
-class IngresoProduccionAdmin(admin.ModelAdmin):
-    list_display = ["id", "orden"]
+@admin.register(ProduccionLote)
+class ProduccionLoteAdmin(admin.ModelAdmin):
 
-@admin.register(IngresoProduccionDetalle)
-class IngresoProduccionDetalleAdmin(admin.ModelAdmin):
-    list_display = ["ingreso", "variante", "cantidad"]
+    list_display = (
+        "id",
+        "rollo",
+        "consumo_total",
+        "total_prendas",
+        "ejecutado",
+        "creado"
+    )
+
+    inlines = [ProduccionDetalleInline]
+
+    actions = ["ejecutar_corte"]
+
+    autocomplete_fields = ("rollo",)
+
+    def ejecutar_corte(self, request, queryset):
+
+        for lote in queryset:
+
+            if lote.ejecutado:
+                self.message_user(request, f"Lote {lote.id} ya ejecutado", level="warning")
+                continue
+
+            try:
+                items = []
+
+                for d in lote.detalles.all():
+                    items.append({
+                        "producto_base_id": d.producto_base_id,
+                        "talla": d.talla,
+                        "cantidad": d.cantidad,
+                    })
+
+                CorteService.ejecutar_corte(
+                    rollo_id=lote.rollo_id,
+                    es_completo=True,
+                    metros_usados=None,
+                    items=items
+                )
+
+            except Exception as e:
+                self.message_user(request, str(e), level="error")
+
+    ejecutar_corte.short_description = "Ejecutar corte seleccionado"

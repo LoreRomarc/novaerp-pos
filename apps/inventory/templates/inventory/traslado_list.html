@@ -1,0 +1,11 @@
+<h2>Traslados</h2>
+
+<a href="{% url 'traslado_create' %}">Nuevo traslado</a>
+
+<ul>
+    {% for t in traslados %}
+        <li>
+            {{ t.id }} - {{ t.origen }} → {{ t.destino }} - Ejecutado: {{ t.ejecutado }}
+        </li>
+    {% endfor %}
+</ul>

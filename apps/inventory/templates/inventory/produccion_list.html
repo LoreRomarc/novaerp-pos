@@ -1,0 +1,9 @@
+<h2>Producciones</h2>
+
+<a href="{% url 'produccion' %}">Nueva Producción</a>
+
+<ul>
+    {% for p in producciones %}
+        <li>ID: {{ p.id }}</li>
+    {% endfor %}
+</ul>

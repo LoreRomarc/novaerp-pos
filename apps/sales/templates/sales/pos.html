@@ -1,4 +1,6 @@
-{% extends "base.html" %} {% block link %}<link rel="stylesheet" href="{% static 'sales/pos.css' %}">{% endblock link %} {% block content %}
+{% extends "base.html" %} {% load static %} {% block content-link %}
+<link rel="stylesheet" href="{% static 'sales/pos.css' %}" />
+{% endblock %} {% block content %}
 
 <div class="pos-wrapper">
   <div class="pos-left">
@@ -221,372 +223,372 @@
 </div>
 
 <script>
-/* =========================================================
-   CSRF
-========================================================= */
-const getCSRFToken = () => {
-  const name = "csrftoken=";
-  const decodedCookie = decodeURIComponent(document.cookie);
-  const cookies = decodedCookie.split(";");
+  /* =========================================================
+     CSRF
+  ========================================================= */
+  const getCSRFToken = () => {
+    const name = "csrftoken=";
+    const decodedCookie = decodeURIComponent(document.cookie);
+    const cookies = decodedCookie.split(";");
 
-  for (let cookie of cookies) {
-    cookie = cookie.trim();
-    if (cookie.startsWith(name)) return cookie.substring(name.length);
-  }
-  return null;
-};
-const csrf = getCSRFToken();
+    for (let cookie of cookies) {
+      cookie = cookie.trim();
+      if (cookie.startsWith(name)) return cookie.substring(name.length);
+    }
+    return null;
+  };
+  const csrf = getCSRFToken();
 
-/* =========================================================
-   ESTADO GLOBAL
-========================================================= */
-let productosAutocomplete = [];
-let indiceSeleccionado = -1;
-let activeInput = null;
-let debounceTimer;
-let pagoEditadoManualmente = false;
-let usandoKeypad = false;
-let tipoVentaActual = "DETAL";
+  /* =========================================================
+     ESTADO GLOBAL
+  ========================================================= */
+  let productosAutocomplete = [];
+  let indiceSeleccionado = -1;
+  let activeInput = null;
+  let debounceTimer;
+  let pagoEditadoManualmente = false;
+  let usandoKeypad = false;
+  let tipoVentaActual = "DETAL";
 
-/* =========================================================
-   REFERENCIAS DOM
-========================================================= */
-const $ = (id) => document.getElementById(id);
-const inputBuscar = $("buscar");
-const inputCantidad = $("cantidad");
-const sugerencias = $("sugerencias");
-const inputEfectivo = $("efectivo");
-const inputTransferencia = $("transferencia");
-const inputTarjeta = $("tarjeta");
-const btnCerrar = $("btnCerrar");
-const tablaItems = $("tabla_items");
+  /* =========================================================
+     REFERENCIAS DOM
+  ========================================================= */
+  const $ = (id) => document.getElementById(id);
+  const inputBuscar = $("buscar");
+  const inputCantidad = $("cantidad");
+  const sugerencias = $("sugerencias");
+  const inputEfectivo = $("efectivo");
+  const inputTransferencia = $("transferencia");
+  const inputTarjeta = $("tarjeta");
+  const btnCerrar = $("btnCerrar");
+  const tablaItems = $("tabla_items");
 
-/* =========================================================
-   HELPERS
-========================================================= */
-const toNumber = (v) => {
-  if (!v) return 0;
-  if (typeof v === "number") return v;
-  return parseFloat(v.toString().replace(/\$/g, "").replace(/\./g, "").replace(/,/g, ".")) || 0;
-};
+  /* =========================================================
+     HELPERS
+  ========================================================= */
+  const toNumber = (v) => {
+    if (!v) return 0;
+    if (typeof v === "number") return v;
+    return parseFloat(v.toString().replace(/\$/g, "").replace(/\./g, "").replace(/,/g, ".")) || 0;
+  };
 
-const moneyFormatter = new Intl.NumberFormat("es-CO", {
-  style: "currency",
-  currency: "COP",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+  const moneyFormatter = new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 
-const money = (v) => moneyFormatter.format(toNumber(v));
+  const money = (v) => moneyFormatter.format(toNumber(v));
 
-/* =========================================================
-   VENTA INICIAL
-========================================================= */
-const ventaInicial = {{ venta|safe }};
-document.addEventListener("DOMContentLoaded", () => {
-  if (ventaInicial && ventaInicial.items) actualizarTabla(ventaInicial);
-});
+  /* =========================================================
+     VENTA INICIAL
+  ========================================================= */
+  const ventaInicial = {{ venta|safe }};
+  document.addEventListener("DOMContentLoaded", () => {
+    if (ventaInicial && ventaInicial.items) actualizarTabla(ventaInicial);
+  });
 
-/* =========================================================
-   INPUT ACTIVO Y SELECCIÓN TECLADO
-========================================================= */
-document.addEventListener("focusin", (e) => {
-  if (e.target.tagName === "INPUT") activeInput = e.target;
-  if (e.target.classList.contains("cantidad-input")) setTimeout(() => e.target.select(), 0);
-});
+  /* =========================================================
+     INPUT ACTIVO Y SELECCIÓN TECLADO
+  ========================================================= */
+  document.addEventListener("focusin", (e) => {
+    if (e.target.tagName === "INPUT") activeInput = e.target;
+    if (e.target.classList.contains("cantidad-input")) setTimeout(() => e.target.select(), 0);
+  });
 
-/* =========================================================
-   FETCH CENTRALIZADO
-========================================================= */
-const postJSON = (url, body) =>
-  fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
-    body: JSON.stringify(body || {}),
-  }).then((res) => res.json());
+  /* =========================================================
+     FETCH CENTRALIZADO
+  ========================================================= */
+  const postJSON = (url, body) =>
+    fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
+      body: JSON.stringify(body || {}),
+    }).then((res) => res.json());
 
-/* =========================================================
-   AUTOCOMPLETE
-========================================================= */
-function renderSugerencias() {
-  sugerencias.textContent = "";
-  if (!productosAutocomplete.length) {
-    indiceSeleccionado = -1;
-    sugerencias.style.display = "none";
-    return;
-  }
+  /* =========================================================
+     AUTOCOMPLETE
+  ========================================================= */
+  function renderSugerencias() {
+    sugerencias.textContent = "";
+    if (!productosAutocomplete.length) {
+      indiceSeleccionado = -1;
+      sugerencias.style.display = "none";
+      return;
+    }
 
-  const fragment = document.createDocumentFragment();
-  productosAutocomplete.forEach((prod, index) => {
-    const item = document.createElement("a");
-    item.href = "#";
-    item.className =
-      "list-group-item list-group-item-action d-flex justify-content-between align-items-center";
-    if (index === indiceSeleccionado) item.classList.add("active");
+    const fragment = document.createDocumentFragment();
+    productosAutocomplete.forEach((prod, index) => {
+      const item = document.createElement("a");
+      item.href = "#";
+      item.className =
+        "list-group-item list-group-item-action d-flex justify-content-between align-items-center";
+      if (index === indiceSeleccionado) item.classList.add("active");
 
-    const nombre = document.createElement("strong");
-    nombre.textContent = prod.nombre;
-    const codigo = document.createElement("small");
-    codigo.className = "text-muted";
-    codigo.textContent = prod.codigo || "";
-    item.appendChild(nombre);
-    item.appendChild(codigo);
+      const nombre = document.createElement("strong");
+      nombre.textContent = prod.nombre;
+      const codigo = document.createElement("small");
+      codigo.className = "text-muted";
+      codigo.textContent = prod.codigo || "";
+      item.appendChild(nombre);
+      item.appendChild(codigo);
 
-    item.addEventListener("mousedown", (e) => {
-      e.preventDefault();
-      seleccionarProducto(prod.id);
+      item.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        seleccionarProducto(prod.id);
+      });
+
+      fragment.appendChild(item);
     });
 
-    fragment.appendChild(item);
+    sugerencias.appendChild(fragment);
+    sugerencias.style.display = "block";
+  }
+
+  inputBuscar.addEventListener("input", () => {
+    clearTimeout(debounceTimer);
+    const valor = inputBuscar.value.trim();
+    if (valor.length < 2) {
+      productosAutocomplete = [];
+      renderSugerencias();
+      return;
+    }
+
+    debounceTimer = setTimeout(() => {
+      fetch(`/sales/pos/autocomplete/?q=${encodeURIComponent(valor)}`)
+        .then((res) => res.json())
+        .then((response) => {
+          if (response.success) {
+            productosAutocomplete = response.data.results;
+            indiceSeleccionado = -1;
+            renderSugerencias();
+          }
+        });
+    }, 200); // más rápido para UX
   });
 
-  sugerencias.appendChild(fragment);
-  sugerencias.style.display = "block";
-}
+  inputBuscar.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (productosAutocomplete.length && indiceSeleccionado >= 0) seleccionarProducto(productosAutocomplete[indiceSeleccionado].id);
+      else agregarManual();
+      return;
+    }
 
-inputBuscar.addEventListener("input", () => {
-  clearTimeout(debounceTimer);
-  const valor = inputBuscar.value.trim();
-  if (valor.length < 2) {
+    if (!productosAutocomplete.length) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      indiceSeleccionado = (indiceSeleccionado + 1) % productosAutocomplete.length;
+      renderSugerencias();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      indiceSeleccionado = (indiceSeleccionado - 1 + productosAutocomplete.length) % productosAutocomplete.length;
+      renderSugerencias();
+    }
+  });
+
+  /* =========================================================
+     AGREGAR PRODUCTO
+  ========================================================= */
+  function seleccionarProducto(variante_id) {
+    postJSON("{% url 'sales:pos_agregar' %}", {
+      variante_id,
+      cantidad: toNumber(inputCantidad.value) || 1,
+    }).then(handleTablaResponse);
+  }
+
+  function agregarManual() {
+    const termino = inputBuscar.value.trim();
+    if (!termino) return;
+
+    postJSON("{% url 'sales:pos_agregar' %}", {
+      termino,
+      cantidad: toNumber(inputCantidad.value) || 1,
+    }).then(handleTablaResponse);
+  }
+
+  function handleTablaResponse(response) {
+    if (response.success) {
+      actualizarTabla(response.data);
+      limpiarBusqueda();
+    } else alert(response.error);
+  }
+
+  function limpiarBusqueda() {
+    inputBuscar.value = "";
+    inputCantidad.value = 1;
     productosAutocomplete = [];
+    indiceSeleccionado = -1;
     renderSugerencias();
-    return;
+    inputBuscar.focus();
   }
 
-  debounceTimer = setTimeout(() => {
-    fetch(`/sales/pos/autocomplete/?q=${encodeURIComponent(valor)}`)
-      .then((res) => res.json())
-      .then((response) => {
-        if (response.success) {
-          productosAutocomplete = response.data.results;
-          indiceSeleccionado = -1;
-          renderSugerencias();
-        }
-      });
-  }, 200); // más rápido para UX
-});
+  /* =========================================================
+     TABLA
+  ========================================================= */
+  function actualizarTabla(data) {
+    tablaItems.innerHTML = "";
+    data.items.forEach((item) => {
+      const tr = document.createElement("tr");
+      tr.innerHTML = `
+        <td>${item.nombre || ""}</td>
+        <td>
+          <input type="text"
+            inputmode="numeric"
+            value="${toNumber(item.cantidad)}"
+            data-id="${item.id}"
+            class="form-control form-control-sm cantidad-input">
+        </td>
+        <td>${money(item.precio)}</td>
+        <td>${money(item.iva)}</td>
+        <td>${money(item.subtotal)}</td>
+        <td>
+          <button onclick="eliminarItem(${item.id})" class="btn btn-danger btn-sm">X</button>
+        </td>
+      `;
+      tablaItems.appendChild(tr);
+    });
 
-inputBuscar.addEventListener("keydown", (e) => {
-  if (e.key === "Enter") {
-    e.preventDefault();
-    if (productosAutocomplete.length && indiceSeleccionado >= 0) seleccionarProducto(productosAutocomplete[indiceSeleccionado].id);
-    else agregarManual();
-    return;
-  }
+    $("subtotal").innerText = money(data.subtotal);
+    $("iva").innerText = money(data.iva);
+    $("total").innerText = money(data.total);
+    $("total").dataset.raw = toNumber(data.total);
 
-  if (!productosAutocomplete.length) return;
-  if (e.key === "ArrowDown") {
-    e.preventDefault();
-    indiceSeleccionado = (indiceSeleccionado + 1) % productosAutocomplete.length;
-    renderSugerencias();
-  } else if (e.key === "ArrowUp") {
-    e.preventDefault();
-    indiceSeleccionado = (indiceSeleccionado - 1 + productosAutocomplete.length) % productosAutocomplete.length;
-    renderSugerencias();
-  }
-});
-
-/* =========================================================
-   AGREGAR PRODUCTO
-========================================================= */
-function seleccionarProducto(variante_id) {
-  postJSON("{% url 'sales:pos_agregar' %}", {
-    variante_id,
-    cantidad: toNumber(inputCantidad.value) || 1,
-  }).then(handleTablaResponse);
-}
-
-function agregarManual() {
-  const termino = inputBuscar.value.trim();
-  if (!termino) return;
-
-  postJSON("{% url 'sales:pos_agregar' %}", {
-    termino,
-    cantidad: toNumber(inputCantidad.value) || 1,
-  }).then(handleTablaResponse);
-}
-
-function handleTablaResponse(response) {
-  if (response.success) {
-    actualizarTabla(response.data);
-    limpiarBusqueda();
-  } else alert(response.error);
-}
-
-function limpiarBusqueda() {
-  inputBuscar.value = "";
-  inputCantidad.value = 1;
-  productosAutocomplete = [];
-  indiceSeleccionado = -1;
-  renderSugerencias();
-  inputBuscar.focus();
-}
-
-/* =========================================================
-   TABLA
-========================================================= */
-function actualizarTabla(data) {
-  tablaItems.innerHTML = "";
-  data.items.forEach((item) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${item.nombre || ""}</td>
-      <td>
-        <input type="text"
-          inputmode="numeric"
-          value="${toNumber(item.cantidad)}"
-          data-id="${item.id}"
-          class="form-control form-control-sm cantidad-input">
-      </td>
-      <td>${money(item.precio)}</td>
-      <td>${money(item.iva)}</td>
-      <td>${money(item.subtotal)}</td>
-      <td>
-        <button onclick="eliminarItem(${item.id})" class="btn btn-danger btn-sm">X</button>
-      </td>
-    `;
-    tablaItems.appendChild(tr);
-  });
-
-  $("subtotal").innerText = money(data.subtotal);
-  $("iva").innerText = money(data.iva);
-  $("total").innerText = money(data.total);
-  $("total").dataset.raw = toNumber(data.total);
-
-  if (!data.items.length) {
-    inputEfectivo.value = "";
-    inputTransferencia.value = "";
-    inputTarjeta.value = "";
-    pagoEditadoManualmente = false;
-  }
-
-  actualizarTotalesPago();
-}
-
-/* =========================================================
-   CANTIDAD INSTANTÁNEA
-========================================================= */
-document.addEventListener("input", (e) => {
-  if (e.target.classList.contains("cantidad-input")) {
-    const id = e.target.dataset.id;
-    const valor = parseFloat(e.target.value);
-    if (!isNaN(valor)) actualizarCantidad(id, valor);
-  }
-});
-
-/* =========================================================
-   ACTUALIZAR / ELIMINAR
-========================================================= */
-function actualizarCantidad(id, cantidad) {
-  postJSON("{% url 'sales:pos_actualizar' %}", { item_id: id, cantidad }).then((r) => {
-    if (r.success) actualizarTabla(r.data);
-    else alert(r.error);
-  });
-}
-
-function eliminarItem(id) {
-  postJSON("{% url 'sales:pos_eliminar' %}", { item_id: id }).then((r) => {
-    if (r.success) actualizarTabla(r.data);
-    else alert(r.error);
-  });
-}
-
-/* =========================================================
-   PAGOS EN TIEMPO REAL
-========================================================= */
-[inputEfectivo, inputTransferencia, inputTarjeta].forEach((inp) =>
-  inp.addEventListener("input", actualizarTotalesPago)
-);
-
-function actualizarTotalesPago() {
-  const total = Math.round(toNumber($("total").dataset.raw || 0));
-  const efectivo = Math.round(toNumber(inputEfectivo.value));
-  const transferencia = Math.round(toNumber(inputTransferencia.value));
-  const tarjeta = Math.round(toNumber(inputTarjeta.value));
-  const totalPagado = efectivo + transferencia + tarjeta;
-  const saldo = totalPagado - total;
-
-  $("total_pagado").innerText = money(totalPagado);
-
-  const infoPago = $("info_pago");
-  if (saldo > 0) {
-    infoPago.innerText = "Vuelto: " + money(saldo);
-    infoPago.className = "fw-bold text-success mb-2";
-  } else if (saldo < 0) {
-    infoPago.innerText = "Faltante: " + money(Math.abs(saldo));
-    infoPago.className = "fw-bold text-danger mb-2";
-  } else if (total > 0) {
-    infoPago.innerText = "Pago completo";
-    infoPago.className = "fw-bold text-primary mb-2";
-  } else {
-    infoPago.innerText = "";
-  }
-
-  btnCerrar.disabled = !(total > 0 && totalPagado >= total);
-}
-
-/* =========================================================
-   CERRAR / CANCELAR
-========================================================= */
-function cerrarVenta() {
-  postJSON("{% url 'sales:pos_cerrar' %}", {
-    efectivo: toNumber(inputEfectivo.value),
-    transferencia: toNumber(inputTransferencia.value),
-    tarjeta: toNumber(inputTarjeta.value),
-  }).then((r) => {
-    if (!r.success) return alert(r.error);
-    if (r.data.reset) {
-      tablaItems.innerHTML = "";
+    if (!data.items.length) {
       inputEfectivo.value = "";
       inputTransferencia.value = "";
       inputTarjeta.value = "";
-      $("subtotal").innerText = "0.00";
-      $("iva").innerText = "0.00";
-      $("total").innerText = "0.00";
-      $("total").dataset.raw = 0;
-      $("total_pagado").innerText = "0.00";
-      $("info_pago").innerText = "";
-      btnCerrar.disabled = true;
       pagoEditadoManualmente = false;
-      setTipoVentaUI("DETAL");
-      inputBuscar.focus();
+    }
+
+    actualizarTotalesPago();
+  }
+
+  /* =========================================================
+     CANTIDAD INSTANTÁNEA
+  ========================================================= */
+  document.addEventListener("input", (e) => {
+    if (e.target.classList.contains("cantidad-input")) {
+      const id = e.target.dataset.id;
+      const valor = parseFloat(e.target.value);
+      if (!isNaN(valor)) actualizarCantidad(id, valor);
     }
   });
-}
 
-function cancelarVenta() {
-  if (!confirm("¿Cancelar la venta actual?")) return;
-  postJSON("{% url 'sales:pos_cancelar' %}").then((r) => {
-    if (r.success) location.reload();
-    else alert(r.error);
-  });
-}
+  /* =========================================================
+     ACTUALIZAR / ELIMINAR
+  ========================================================= */
+  function actualizarCantidad(id, cantidad) {
+    postJSON("{% url 'sales:pos_actualizar' %}", { item_id: id, cantidad }).then((r) => {
+      if (r.success) actualizarTabla(r.data);
+      else alert(r.error);
+    });
+  }
 
-/* =========================================================
-   TECLADO VIRTUAL
-========================================================= */
-function insertNumber(v) { if (!activeInput) return; const s = activeInput.selectionStart; activeInput.value = activeInput.value.slice(0, s) + v + activeInput.value.slice(activeInput.selectionEnd); activeInput.selectionStart = activeInput.selectionEnd = s + v.length; activeInput.dispatchEvent(new Event("input")); }
-function backspaceKey() { if (!activeInput) return; const s = activeInput.selectionStart; if (s === 0) return; activeInput.value = activeInput.value.slice(0, s - 1) + activeInput.value.slice(activeInput.selectionEnd); activeInput.selectionStart = activeInput.selectionEnd = s - 1; activeInput.dispatchEvent(new Event("input")); }
-function clearActive() { if (!activeInput) return; activeInput.value = ""; activeInput.dispatchEvent(new Event("input")); }
-function enterKey() { if (!activeInput) return; if (activeInput === inputBuscar) { agregarManual(); } else if (activeInput.classList.contains("cantidad-input")) { confirmarCantidadInput(activeInput); } else { activeInput.dispatchEvent(new Event("input")); } }
+  function eliminarItem(id) {
+    postJSON("{% url 'sales:pos_eliminar' %}", { item_id: id }).then((r) => {
+      if (r.success) actualizarTabla(r.data);
+      else alert(r.error);
+    });
+  }
 
-/* =========================================================
-   CAMBIO TIPO VENTA
-========================================================= */
-function setTipoVentaUI(tipo) {
-  tipoVentaActual = tipo;
-  $("btnDetal").classList.toggle("activo", tipo === "DETAL");
-  $("btnMayorista").classList.toggle("activo", tipo === "MAYORISTA");
-}
+  /* =========================================================
+     PAGOS EN TIEMPO REAL
+  ========================================================= */
+  [inputEfectivo, inputTransferencia, inputTarjeta].forEach((inp) =>
+    inp.addEventListener("input", actualizarTotalesPago)
+  );
 
-function cambiarTipo(tipo) {
-  if (tipo === tipoVentaActual) return;
-  postJSON("{% url 'sales:pos_cambiar_tipo' %}", { tipo }).then((r) => {
-    if (!r.success) return alert(r.error);
-    setTipoVentaUI(tipo);
-    actualizarTabla(r.data);
-  });
-}
+  function actualizarTotalesPago() {
+    const total = Math.round(toNumber($("total").dataset.raw || 0));
+    const efectivo = Math.round(toNumber(inputEfectivo.value));
+    const transferencia = Math.round(toNumber(inputTransferencia.value));
+    const tarjeta = Math.round(toNumber(inputTarjeta.value));
+    const totalPagado = efectivo + transferencia + tarjeta;
+    const saldo = totalPagado - total;
+
+    $("total_pagado").innerText = money(totalPagado);
+
+    const infoPago = $("info_pago");
+    if (saldo > 0) {
+      infoPago.innerText = "Vuelto: " + money(saldo);
+      infoPago.className = "fw-bold text-success mb-2";
+    } else if (saldo < 0) {
+      infoPago.innerText = "Faltante: " + money(Math.abs(saldo));
+      infoPago.className = "fw-bold text-danger mb-2";
+    } else if (total > 0) {
+      infoPago.innerText = "Pago completo";
+      infoPago.className = "fw-bold text-primary mb-2";
+    } else {
+      infoPago.innerText = "";
+    }
+
+    btnCerrar.disabled = !(total > 0 && totalPagado >= total);
+  }
+
+  /* =========================================================
+     CERRAR / CANCELAR
+  ========================================================= */
+  function cerrarVenta() {
+    postJSON("{% url 'sales:pos_cerrar' %}", {
+      efectivo: toNumber(inputEfectivo.value),
+      transferencia: toNumber(inputTransferencia.value),
+      tarjeta: toNumber(inputTarjeta.value),
+    }).then((r) => {
+      if (!r.success) return alert(r.error);
+      if (r.data.reset) {
+        tablaItems.innerHTML = "";
+        inputEfectivo.value = "";
+        inputTransferencia.value = "";
+        inputTarjeta.value = "";
+        $("subtotal").innerText = "0.00";
+        $("iva").innerText = "0.00";
+        $("total").innerText = "0.00";
+        $("total").dataset.raw = 0;
+        $("total_pagado").innerText = "0.00";
+        $("info_pago").innerText = "";
+        btnCerrar.disabled = true;
+        pagoEditadoManualmente = false;
+        setTipoVentaUI("DETAL");
+        inputBuscar.focus();
+      }
+    });
+  }
+
+  function cancelarVenta() {
+    if (!confirm("¿Cancelar la venta actual?")) return;
+    postJSON("{% url 'sales:pos_cancelar' %}").then((r) => {
+      if (r.success) location.reload();
+      else alert(r.error);
+    });
+  }
+
+  /* =========================================================
+     TECLADO VIRTUAL
+  ========================================================= */
+  function insertNumber(v) { if (!activeInput) return; const s = activeInput.selectionStart; activeInput.value = activeInput.value.slice(0, s) + v + activeInput.value.slice(activeInput.selectionEnd); activeInput.selectionStart = activeInput.selectionEnd = s + v.length; activeInput.dispatchEvent(new Event("input")); }
+  function backspaceKey() { if (!activeInput) return; const s = activeInput.selectionStart; if (s === 0) return; activeInput.value = activeInput.value.slice(0, s - 1) + activeInput.value.slice(activeInput.selectionEnd); activeInput.selectionStart = activeInput.selectionEnd = s - 1; activeInput.dispatchEvent(new Event("input")); }
+  function clearActive() { if (!activeInput) return; activeInput.value = ""; activeInput.dispatchEvent(new Event("input")); }
+  function enterKey() { if (!activeInput) return; if (activeInput === inputBuscar) { agregarManual(); } else if (activeInput.classList.contains("cantidad-input")) { confirmarCantidadInput(activeInput); } else { activeInput.dispatchEvent(new Event("input")); } }
+
+  /* =========================================================
+     CAMBIO TIPO VENTA
+  ========================================================= */
+  function setTipoVentaUI(tipo) {
+    tipoVentaActual = tipo;
+    $("btnDetal").classList.toggle("activo", tipo === "DETAL");
+    $("btnMayorista").classList.toggle("activo", tipo === "MAYORISTA");
+  }
+
+  function cambiarTipo(tipo) {
+    if (tipo === tipoVentaActual) return;
+    postJSON("{% url 'sales:pos_cambiar_tipo' %}", { tipo }).then((r) => {
+      if (!r.success) return alert(r.error);
+      setTipoVentaUI(tipo);
+      actualizarTabla(r.data);
+    });
+  }
 </script>
 
 {% endblock %}

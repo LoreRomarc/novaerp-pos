@@ -1,0 +1,18 @@
+<form method="post">
+    {% csrf_token %}
+    <h2>Nuevo Traslado</h2>
+
+    <label>Origen (Sucursal ID)</label>
+    <input type="number" name="origen" required>
+
+    <label>Destino (Sucursal ID)</label>
+    <input type="number" name="destino" required>
+
+    <label>Variante ID</label>
+    <input type="number" name="variante_id" required>
+
+    <label>Cantidad</label>
+    <input type="number" name="cantidad" required>
+
+    <button type="submit">Trasladar</button>
+</form>

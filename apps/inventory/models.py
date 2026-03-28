@@ -6,10 +6,6 @@ from django.db.models import Q
 from apps.core.models import Sucursal
 
 
-# =========================================================
-# COLOR
-# =========================================================
-
 class Color(models.Model):
     nombre = models.CharField(max_length=50)
     codigo_hex = models.CharField(max_length=7, blank=True)
@@ -17,10 +13,6 @@ class Color(models.Model):
     def __str__(self):
         return self.nombre
 
-
-# =========================================================
-# TELA
-# =========================================================
 
 class TipoTela(models.Model):
     nombre = models.CharField(max_length=100)
@@ -31,10 +23,6 @@ class TipoTela(models.Model):
         return self.nombre
 
 
-# =========================================================
-# PRODUCTO BASE
-# =========================================================
-
 class ProductoBase(models.Model):
     nombre = models.CharField(max_length=200)
     descripcion = models.TextField(blank=True)
@@ -43,10 +31,6 @@ class ProductoBase(models.Model):
     def __str__(self):
         return self.nombre
 
-
-# =========================================================
-# VARIANTE (SKU REAL)
-# =========================================================
 
 class ProductoVariante(models.Model):
     producto_base = models.ForeignKey(
@@ -59,16 +43,11 @@ class ProductoVariante(models.Model):
     color = models.ForeignKey(Color, on_delete=models.PROTECT)
 
     talla = models.CharField(max_length=10)
-
     sku = models.CharField(max_length=100, unique=True)
 
     def __str__(self):
         return f"{self.producto_base.nombre} - {self.color.nombre} - {self.talla}"
 
-
-# =========================================================
-# PRODUCTO POS
-# =========================================================
 
 class ProductoQuerySet(models.QuerySet):
     def activos(self):
@@ -117,10 +96,6 @@ class Producto(models.Model):
         return self.nombre
 
 
-# =========================================================
-# STOCK (POR VARIANTE)
-# =========================================================
-
 class StockManager(models.Manager):
     def for_update(self):
         return self.select_for_update()
@@ -156,10 +131,6 @@ class Stock(models.Model):
         return f"{self.variante} - {self.sucursal.nombre}"
 
 
-# =========================================================
-# MOVIMIENTO STOCK (🔥 CORREGIDO)
-# =========================================================
-
 class MovimientoStock(models.Model):
 
     TIPOS = (
@@ -184,3 +155,47 @@ class MovimientoStock(models.Model):
     referencia = models.IntegerField()
 
     creado = models.DateTimeField(auto_now_add=True)
+
+
+# =========================================================
+# TRASLADOS (NUEVO)
+# =========================================================
+
+class Traslado(models.Model):
+
+    origen = models.ForeignKey(
+        Sucursal,
+        on_delete=models.PROTECT,
+        related_name="traslados_origen"
+    )
+
+    destino = models.ForeignKey(
+        Sucursal,
+        on_delete=models.PROTECT,
+        related_name="traslados_destino"
+    )
+
+    creado = models.DateTimeField(auto_now_add=True)
+    ejecutado = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"Traslado #{self.id} {self.origen} → {self.destino}"
+
+
+class TrasladoDetalle(models.Model):
+
+    traslado = models.ForeignKey(
+        Traslado,
+        related_name="detalles",
+        on_delete=models.CASCADE
+    )
+
+    variante = models.ForeignKey(
+        ProductoVariante,
+        on_delete=models.PROTECT
+    )
+
+    cantidad = models.DecimalField(max_digits=12, decimal_places=2)
+
+    def __str__(self):
+        return f"{self.variante} x {self.cantidad}"

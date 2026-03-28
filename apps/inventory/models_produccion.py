@@ -1,10 +1,12 @@
 # apps/inventory/models_produccion.py
 from django.db import models
-from apps.inventory.models import ProductoVariante, TipoTela, Color
+from decimal import Decimal
+
+from apps.inventory.models import ProductoVariante, TipoTela, Color, ProductoBase
 
 
 # =========================================================
-# ROLLOS
+# ROLLOS (ACTUALIZADO)
 # =========================================================
 
 class RolloTela(models.Model):
@@ -14,6 +16,8 @@ class RolloTela(models.Model):
 
     codigo = models.CharField(max_length=50, unique=True)
 
+    cantidad_disponible = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
     ESTADOS = (
         ("DISPONIBLE", "Disponible"),
         ("CONSUMIDO", "Consumido"),
@@ -22,11 +26,62 @@ class RolloTela(models.Model):
     estado = models.CharField(max_length=20, choices=ESTADOS, default="DISPONIBLE")
 
     def __str__(self):
-        return self.codigo
+        return f"{self.codigo} - {self.tipo_tela} - {self.color}"
 
 
 # =========================================================
-# ORDEN CORTE
+# PRODUCCION DESDE CORTE (NUEVO)
+# =========================================================
+
+class ProduccionLote(models.Model):
+
+    rollo = models.ForeignKey(RolloTela, on_delete=models.PROTECT)
+
+    tipo_tela = models.ForeignKey(TipoTela, on_delete=models.PROTECT)
+    color = models.ForeignKey(Color, on_delete=models.PROTECT)
+
+    consumo_total = models.DecimalField(max_digits=12, decimal_places=2)
+    consumo_unitario = models.DecimalField(max_digits=12, decimal_places=6)
+
+    total_prendas = models.IntegerField()
+
+    ejecutado = models.BooleanField(default=False)
+
+    creado = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"Lote #{self.id} - {self.rollo.codigo}"
+
+
+class ProduccionDetalle(models.Model):
+
+    lote = models.ForeignKey(
+        ProduccionLote,
+        related_name="detalles",
+        on_delete=models.CASCADE
+    )
+
+    producto_base = models.ForeignKey(ProductoBase, on_delete=models.PROTECT)
+    talla = models.CharField(max_length=10)
+
+    variante = models.ForeignKey(
+        ProductoVariante,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True
+    )
+
+    cantidad = models.IntegerField()
+
+    tipo_tela = models.ForeignKey(TipoTela, on_delete=models.PROTECT)
+    color = models.ForeignKey(Color, on_delete=models.PROTECT)
+
+    def __str__(self):
+        return f"{self.producto_base} - {self.talla} x {self.cantidad}"
+
+
+# =========================================================
+# ORDEN CORTE (SE MANTIENE)
 # =========================================================
 
 class OrdenCorte(models.Model):
@@ -42,10 +97,6 @@ class OrdenCorte(models.Model):
     estado = models.CharField(max_length=20, choices=ESTADOS, default="PENDIENTE")
 
 
-# =========================================================
-# DETALLE CORTE
-# =========================================================
-
 class OrdenCorteDetalle(models.Model):
 
     orden = models.ForeignKey(OrdenCorte, related_name="detalles", on_delete=models.CASCADE)
@@ -56,11 +107,11 @@ class OrdenCorteDetalle(models.Model):
 
 
 # =========================================================
-# INGRESO A INVENTARIO (CORREGIDO)
+# INGRESO PRODUCCION (NO MODIFICADO)
 # =========================================================
 
 class IngresoProduccion(models.Model):
-    orden = models.ForeignKey(OrdenCorte, on_delete=models.CASCADE)
+    orden = models.ForeignKey(OrdenCorte, on_delete=models.CASCADE, null=True, blank=True)
 
 
 class IngresoProduccionDetalle(models.Model):

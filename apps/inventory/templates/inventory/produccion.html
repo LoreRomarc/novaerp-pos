@@ -1,0 +1,12 @@
+<form method="post">
+    {% csrf_token %}
+    <h2>Producción</h2>
+
+    <label>Variante ID</label>
+    <input type="number" name="variante_id" required>
+
+    <label>Cantidad</label>
+    <input type="number" name="cantidad" required>
+
+    <button type="submit">Registrar Producción</button>
+</form>
