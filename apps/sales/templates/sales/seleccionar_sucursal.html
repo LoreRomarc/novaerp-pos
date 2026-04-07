@@ -1,0 +1,11 @@
+<!-- templates/sales/seleccionar_sucursal.html -->
+<h2>Selecciona tu Sucursal</h2>
+<form method="post">
+    {% csrf_token %}
+    <select name="sucursal_id">
+        {% for s in sucursales %}
+        <option value="{{ s.id }}">{{ s.nombre }}</option>
+        {% endfor %}
+    </select>
+    <button type="submit">Continuar</button>
+</form>

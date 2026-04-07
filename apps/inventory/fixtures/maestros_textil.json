@@ -1,0 +1,45 @@
+[
+    {
+        "model": "inventory.tipotela",
+        "pk": 1,
+        "fields": {
+            "nombre": "Algodón",
+            "descripcion": "Tela algodón",
+            "activo": true
+        }
+    },
+    {
+        "model": "inventory.tipotela",
+        "pk": 2,
+        "fields": {
+            "nombre": "Poliéster",
+            "descripcion": "Tela poliéster",
+            "activo": true
+        }
+    },
+    {
+        "model": "inventory.color",
+        "pk": 1,
+        "fields": {
+            "nombre": "Negro",
+            "codigo_hex": "#000000"
+        }
+    },
+    {
+        "model": "inventory.color",
+        "pk": 2,
+        "fields": {
+            "nombre": "Blanco",
+            "codigo_hex": "#FFFFFF"
+        }
+    },
+    {
+        "model": "inventory.productobase",
+        "pk": 1,
+        "fields": {
+            "nombre": "Camiseta",
+            "descripcion": "",
+            "activo": true
+        }
+    }
+]

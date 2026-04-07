@@ -2,6 +2,7 @@
 from django.db import models
 from decimal import Decimal
 
+from apps.core.models import Sucursal
 from apps.inventory.models import ProductoVariante, TipoTela, Color, ProductoBase
 
 
@@ -34,6 +35,7 @@ class RolloTela(models.Model):
 # =========================================================
 
 class ProduccionLote(models.Model):
+    sucursal = models.ForeignKey(Sucursal, on_delete=models.PROTECT)
 
     rollo = models.ForeignKey(RolloTela, on_delete=models.PROTECT)
 

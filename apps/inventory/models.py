@@ -54,10 +54,14 @@ class ProductoQuerySet(models.QuerySet):
         return self.filter(activo=True)
 
     def buscar(self, termino):
+        # Busca tanto en producto como en variantes, color, tela y SKU
         return self.filter(
             Q(nombre__icontains=termino) |
-            Q(codigo_barras__icontains=termino)
-        )
+            Q(codigo_barras__icontains=termino) |
+            Q(variante__sku__icontains=termino) |
+            Q(variante__color__nombre__icontains=termino) |
+            Q(variante__tipo_tela__nombre__icontains=termino)
+        ).distinct()
 
 
 class Producto(models.Model):
@@ -94,6 +98,11 @@ class Producto(models.Model):
 
     def __str__(self):
         return self.nombre
+    
+    def variantes_disponibles(self):
+        if self.variante:
+            return self.variante.producto_base.variantes.all()
+        return ProductoVariante.objects.filter(producto_base=self)
 
 
 class StockManager(models.Manager):
@@ -152,7 +161,7 @@ class MovimientoStock(models.Model):
 
     cantidad = models.DecimalField(max_digits=12, decimal_places=2)
 
-    referencia = models.IntegerField()
+    referencia = models.CharField(max_length=100)
 
     creado = models.DateTimeField(auto_now_add=True)
 

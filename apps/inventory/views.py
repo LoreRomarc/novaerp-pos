@@ -1,8 +1,7 @@
 # apps/inventory/views.py
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.views.generic import ListView, CreateView, DetailView, FormView
+from django.views.generic import ListView, FormView
 from django.shortcuts import redirect, get_object_or_404
-from django.urls import reverse_lazy
 from django import forms
 from django.db import transaction
 from django.core.exceptions import ValidationError
@@ -12,13 +11,12 @@ from apps.inventory.models import (
     MovimientoStock,
     Traslado,
     TrasladoDetalle,
+    ProductoVariante
 )
 from apps.inventory.models_produccion import (
     IngresoProduccion,
     IngresoProduccionDetalle,
 )
-from apps.inventory.services.stock_domain_service import StockDomainService
-
 
 # ======================================================
 # PRODUCCION
@@ -40,11 +38,23 @@ class ProduccionView(LoginRequiredMixin, PermissionRequiredMixin, FormView):
 
         with transaction.atomic():
             ingreso = IngresoProduccion.objects.create()
-
             IngresoProduccionDetalle.objects.create(
                 ingreso=ingreso,
                 variante_id=variante_id,
                 cantidad=cantidad
+            )
+
+            # Actualizar stock de la variante
+            variante = get_object_or_404(ProductoVariante, id=variante_id)
+            variante.stock += cantidad
+            variante.save()
+
+            MovimientoStock.objects.create(
+                variante=variante,
+                sucursal=None,  # opcional: asignar sucursal si aplica
+                tipo="PRODUCCION",
+                cantidad=cantidad,
+                referencia=ingreso.id
             )
 
         return redirect("produccion_list")
@@ -86,21 +96,57 @@ class TrasladoCreateView(LoginRequiredMixin, PermissionRequiredMixin, FormView):
     permission_required = "inventory.add_traslado"
 
     def form_valid(self, form):
+        origen_id = form.cleaned_data["origen"]
+        destino_id = form.cleaned_data["destino"]
+        variante_id = form.cleaned_data["variante_id"]
+        cantidad = form.cleaned_data["cantidad"]
 
         with transaction.atomic():
-
             traslado = Traslado.objects.create(
-                origen_id=form.cleaned_data["origen"],
-                destino_id=form.cleaned_data["destino"],
+                origen_id=origen_id,
+                destino_id=destino_id,
             )
 
             TrasladoDetalle.objects.create(
                 traslado=traslado,
-                variante_id=form.cleaned_data["variante_id"],
-                cantidad=form.cleaned_data["cantidad"],
+                variante_id=variante_id,
+                cantidad=cantidad,
             )
 
-            StockDomainService.ejecutar_traslado(traslado)
+            # ====== Actualizar stock manualmente ======
+            variante = get_object_or_404(ProductoVariante, id=variante_id)
+
+            # Restar stock del origen
+            stock_origen = Stock.objects.filter(sucursal_id=origen_id, variante=variante).first()
+            if not stock_origen or stock_origen.cantidad < cantidad:
+                raise ValidationError(f"No hay suficiente stock en la sucursal origen ({origen_id}).")
+            stock_origen.cantidad -= cantidad
+            stock_origen.save()
+
+            # Sumar stock al destino
+            stock_destino, _ = Stock.objects.get_or_create(
+                sucursal_id=destino_id,
+                variante=variante,
+                defaults={"cantidad": 0}
+            )
+            stock_destino.cantidad += cantidad
+            stock_destino.save()
+
+            # Registrar movimientos de inventario
+            MovimientoStock.objects.create(
+                variante=variante,
+                sucursal_id=origen_id,
+                tipo="TRASLADO_SALIDA",
+                cantidad=cantidad,
+                referencia=traslado.id
+            )
+            MovimientoStock.objects.create(
+                variante=variante,
+                sucursal_id=destino_id,
+                tipo="TRASLADO_ENTRADA",
+                cantidad=cantidad,
+                referencia=traslado.id
+            )
 
         return redirect("traslado_list")
 
