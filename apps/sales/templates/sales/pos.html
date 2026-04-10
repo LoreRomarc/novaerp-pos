@@ -375,23 +375,22 @@
        HELPERS
     ========================================================= */
       const toNumber = (v) => {
-      if (!v) return 0;
+        if (!v) return 0;
+        if (typeof v === "number") return v;
 
-      if (typeof v === "number") return v;
-
-      return parseFloat(
-        v.toString()
-          .replace(/\$/g, "")
-          .replace(/\./g, "")
-          .replace(/,/g, ".")
-      ) || 0;
-    };
+        return parseFloat(
+          v.toString()
+            .replace(/\$/g, "")
+            .replace(/\./g, "")
+            .replace(/,/g, ".")
+        ) || 0;
+      };
 
       const moneyFormatter = new Intl.NumberFormat("es-CO", {
         style: "currency",
         currency: "COP",
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
       });
 
       const money = (v) => {
@@ -459,7 +458,7 @@
 
           const codigo = document.createElement("small");
           codigo.className = "text-muted";
-          codigo.textContent = prod.codigo || "";
+          codigo.textContent = prod.sku + (prod.stock <= 0 ? " (SIN STOCK)" : ""); 
 
           item.appendChild(nombre);
           item.appendChild(codigo);
@@ -491,11 +490,9 @@
           fetch(`/sales/pos/autocomplete/?q=${encodeURIComponent(valor)}`)
             .then((res) => res.json())
             .then((response) => {
-              if (response.success) {
-                productosAutocomplete = response.data.results;
-                indiceSeleccionado = -1;
-                renderSugerencias();
-              }
+              productosAutocomplete = response.results || []; // ✅ FIX
+              indiceSeleccionado = -1;
+              renderSugerencias();
             });
         }, 250);
       });
@@ -587,9 +584,11 @@
        AGREGAR PRODUCTO
     ========================================================= */
       function seleccionarProducto(producto_id) {
+        const cantidad = parseFloat(inputCantidad.value || "1");
+
         postJSON("{% url 'sales:pos_agregar' %}", {
-          producto_id,
-          cantidad: toNumber(inputCantidad.value) || 1,
+          variante_id: producto_id,
+          cantidad: isNaN(cantidad) ? 1 : cantidad,
         }).then(handleTablaResponse);
       }
 
@@ -637,15 +636,15 @@
           <td>
             <input type="text"
               inputmode="numeric"
-              value="${toNumber(item.cantidad)}"
+              value="${item.cantidad}"
               data-id="${item.id}"
               data-current="${toNumber(item.cantidad)}"
               class="form-control form-control-sm cantidad-input">
           </td>
-          <td>${money(item.precio)}</td>
-          <td>${money(item.iva)}</td>
-          <td>${money(item.subtotal)}</td>
-          <td>
+            <td>${money(item.precio_unitario)}</td>  
+            <td>${money(item.iva_linea)}</td>
+            <td>${money(item.subtotal_linea)}</td>
+            <td>
             <button onclick="eliminarItem(${item.id})"
               class="btn btn-danger btn-sm">
               X

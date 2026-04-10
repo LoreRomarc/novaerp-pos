@@ -12,7 +12,7 @@ from apps.sales.models import (
     PrecioVariante,
     redondear_a_peso_colombiano,
 )
-from apps.inventory.models import ProductoVariante, MovimientoStock
+from apps.inventory.models import ProductoVariante
 from apps.inventory.services.stock_service import InventoryService
 from apps.sales.services.serializers import serializar_venta
 from .caja_service import CajaService
@@ -48,13 +48,32 @@ class POSService:
     # =========================
     @staticmethod
     def obtener_precio_variante(variante, venta):
-        lista = ListaPrecio.objects.filter(sucursal=venta.sucursal, tipo_venta=venta.tipo_venta, activa=True).first()
-        if not lista:
-            raise ValidationError("No existe lista de precios configurada.")
+        lista = ListaPrecio.objects.filter(
+            sucursal=venta.sucursal,
+            tipo_venta=venta.tipo_venta,
+            activa=True
+        ).first()
 
-        precio_obj = PrecioVariante.objects.filter(variante=variante, lista=lista).first()
+        # fallback a DETAL si no existe lista
+        if not lista:
+            lista = ListaPrecio.objects.filter(
+                sucursal=venta.sucursal,
+                tipo_venta="DETAL",
+                activa=True
+            ).first()
+
+        if not lista:
+            raise ValidationError("No existe lista de precios configurada (ni DETAL fallback).")
+
+        precio_obj = PrecioVariante.objects.filter(
+            variante=variante,
+            lista=lista
+        ).first()
+
         if not precio_obj:
-            raise ValidationError(f"La variante '{variante}' no tiene precio configurado.")
+            raise ValidationError(
+                f"No hay precio configurado para {variante} en lista {lista.id}"
+            )
 
         return precio_obj.precio
 
@@ -233,15 +252,14 @@ class POSService:
     # =========================
     # CAMBIAR TIPO DE VENTA
     # =========================
+
     @staticmethod
     @transaction.atomic
     def cambiar_tipo_venta(usuario, sucursal, tipo):
         if tipo not in ["DETAL", "MAYORISTA"]:
             raise ValidationError("Tipo inválido.")
 
-        venta = POSService.obtener_venta_abierta(usuario, sucursal)
-        if not venta:
-            raise ValidationError("No hay venta activa.")
+        venta = POSService.obtener_o_crear_venta(usuario, sucursal)
 
         venta.tipo_venta = tipo
         venta.save(update_fields=["tipo_venta"])

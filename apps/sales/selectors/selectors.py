@@ -1,4 +1,4 @@
-# apps/sales/selectors.py
+# apps/sales/selectors/selectors.py
 from django.db.models import Prefetch
 from apps.sales.models import Venta, VentaItem
 

@@ -73,7 +73,12 @@ class POSAgregarProductoView(LoginRequiredMixin, RolePermissionMixin, SucursalIs
         try:
             data = json.loads(request.body)
             variante_id = data.get("variante_id")
-            cantidad = Decimal(str(data.get("cantidad", 1)))
+
+            try:
+                cantidad = Decimal(str(data.get("cantidad") or "1"))
+            except:
+                cantidad = Decimal("1")
+
             termino = data.get("termino")
 
             venta = POSService.agregar_producto(
@@ -182,34 +187,38 @@ class POSCancelarVentaView(LoginRequiredMixin, RolePermissionMixin, SucursalIsol
 class ProductoAutocompleteView(LoginRequiredMixin, SucursalIsolationMixin, View):
     def get(self, request):
         q = request.GET.get("q", "").strip()
+
         if len(q) < 2:
             return JsonResponse({"results": []})
 
         sucursal = self.get_sucursal()
 
-        variantes = ProductoVariante.objects.select_related(
-            "producto_base", "color", "tipo_tela"
-        ).filter(
-            Q(producto_base__nombre__icontains=q) |
-            Q(sku__icontains=q) |
-            Q(talla__icontains=q) |
-            Q(color__nombre__icontains=q) |
-            Q(tipo_tela__nombre__icontains=q)
-        ).order_by("producto_base__nombre")[:25]
+        variantes = (
+            ProductoVariante.objects
+            .select_related("producto_base", "color", "tipo_tela")
+            .filter(
+                Q(producto_base__nombre__icontains=q) |
+                Q(sku__icontains=q) |
+                Q(talla__icontains=q) |
+                Q(color__nombre__icontains=q) |
+                Q(tipo_tela__nombre__icontains=q)
+            )[:25]
+        )
 
-        resultados = []
+        results = []
+
         for v in variantes:
             stock = v.stocks.filter(sucursal=sucursal).first()
             cantidad = stock.cantidad if stock else 0
-            if cantidad > 0:
-                resultados.append({
-                    "id": v.id,
-                    "nombre": f"{v.producto_base.nombre} - {v.color.nombre} - {v.tipo_tela.nombre} - {v.talla}",
-                    "sku": v.sku,
-                    "stock": float(cantidad),
-                })
 
-        return JsonResponse({"results": resultados})
+            results.append({
+                "id": v.id,
+                "nombre": f"{v.producto_base.nombre} - {v.color.nombre} - {v.talla}",
+                "sku": v.sku,
+                "stock": float(cantidad),
+            })
+
+        return JsonResponse({"results": results})
 
 
 # =========================

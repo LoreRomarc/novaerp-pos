@@ -205,29 +205,6 @@ class Venta(models.Model):
         if not self.puede_cerrar():
             raise ValidationError("El pago no cubre el total.")
 
-        for item in self.items.select_for_update():
-
-            stock = Stock.objects.select_for_update().get(
-                variante=item.variante,
-                sucursal=self.sucursal
-            )
-
-            if stock.cantidad < item.cantidad:
-                raise ValidationError(
-                    f"Stock insuficiente para {item.variante}"
-                )
-
-            stock.cantidad -= item.cantidad
-            stock.save(update_fields=["cantidad"])
-
-            MovimientoStock.objects.create(
-                variante=item.variante,
-                sucursal=self.sucursal,
-                tipo="VENTA",
-                cantidad=item.cantidad,
-                referencia=self.id
-            )
-
         self.estado = "CERRADA"
         self.cerrada = timezone.now()
 

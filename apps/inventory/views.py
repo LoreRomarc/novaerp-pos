@@ -38,23 +38,24 @@ class ProduccionView(LoginRequiredMixin, PermissionRequiredMixin, FormView):
 
         with transaction.atomic():
             ingreso = IngresoProduccion.objects.create()
-            IngresoProduccionDetalle.objects.create(
+
+            detalle = IngresoProduccionDetalle.objects.create(
                 ingreso=ingreso,
                 variante_id=variante_id,
                 cantidad=cantidad
             )
 
-            # Actualizar stock de la variante
             variante = get_object_or_404(ProductoVariante, id=variante_id)
-            variante.stock += cantidad
-            variante.save()
 
-            MovimientoStock.objects.create(
+            # USAR SERVICIO CENTRAL
+            from apps.inventory.services.stock_service import InventoryService
+
+            InventoryService.agregar_stock(
                 variante=variante,
-                sucursal=None,  # opcional: asignar sucursal si aplica
-                tipo="PRODUCCION",
                 cantidad=cantidad,
-                referencia=ingreso.id
+                sucursal_id=self.request.session.get("sucursal_id"),
+                referencia=f"Producción {ingreso.id}",
+                tipo="PRODUCCION"
             )
 
         return redirect("produccion_list")
@@ -136,16 +137,17 @@ class TrasladoCreateView(LoginRequiredMixin, PermissionRequiredMixin, FormView):
             MovimientoStock.objects.create(
                 variante=variante,
                 sucursal_id=origen_id,
-                tipo="TRASLADO_SALIDA",
-                cantidad=cantidad,
-                referencia=traslado.id
+                tipo="TRASLADO",
+                cantidad=-cantidad,
+                referencia=f"Traslado {traslado.id} SALIDA"
             )
+
             MovimientoStock.objects.create(
                 variante=variante,
                 sucursal_id=destino_id,
-                tipo="TRASLADO_ENTRADA",
+                tipo="TRASLADO",
                 cantidad=cantidad,
-                referencia=traslado.id
+                referencia=f"Traslado {traslado.id} ENTRADA"
             )
 
         return redirect("traslado_list")

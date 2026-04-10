@@ -136,9 +136,14 @@ class Stock(models.Model):
             )
         ]
 
+    def save(self, *args, **kwargs):
+        if self.cantidad < 0:
+            raise ValueError("Stock no puede ser negativo")
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.variante} - {self.sucursal.nombre}"
-
+    
 
 class MovimientoStock(models.Model):
 
