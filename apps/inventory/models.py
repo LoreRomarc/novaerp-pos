@@ -213,3 +213,24 @@ class TrasladoDetalle(models.Model):
 
     def __str__(self):
         return f"{self.variante} x {self.cantidad}"
+    
+usuario = models.ForeignKey(
+    "auth.User",
+    on_delete=models.PROTECT,
+    null=True,
+    blank=True
+)
+
+costo_unitario = models.DecimalField(
+    max_digits=14,
+    decimal_places=2,
+    null=True,
+    blank=True
+)
+
+saldo_post_movimiento = models.DecimalField(
+    max_digits=14,
+    decimal_places=2,
+    null=True,
+    blank=True
+)

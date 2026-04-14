@@ -12,6 +12,7 @@ from apps.inventory.models_produccion import (
     IngresoProduccionDetalle,
 )
 from apps.inventory.models import ProductoVariante, Stock, MovimientoStock, Sucursal
+from apps.inventory.services.stock_service import InventoryService
 
 
 class CorteService:
@@ -120,28 +121,16 @@ class CorteService:
             # ==========================
             # STOCK
             # ==========================
-            stock_obj, _ = Stock.objects.get_or_create(
+            InventoryService.agregar_stock(
                 variante=variante,
-                sucursal=sucursal_fabrica,
-                defaults={"cantidad": Decimal("0")}
-            )
-
-            stock_obj.cantidad += cantidad
-            stock_obj.save(update_fields=["cantidad"])
-
-            movimientos_stock.append(
-                MovimientoStock(
-                    variante=variante,
-                    sucursal=sucursal_fabrica,
-                    tipo="PRODUCCION",
-                    cantidad=cantidad,
-                    referencia=f"Lote {lote.id} - Corte"
-                )
+                cantidad=cantidad,
+                sucursal_id=sucursal_fabrica.id,
+                referencia=f"Lote {lote.id} - Corte",
+                tipo="PRODUCCION"
             )
 
         ProduccionDetalle.objects.bulk_create(detalles_produccion)
         IngresoProduccionDetalle.objects.bulk_create(detalles_ingreso)
-        MovimientoStock.objects.bulk_create(movimientos_stock)
 
         # ==========================
         # DESCONTAR ROLLO

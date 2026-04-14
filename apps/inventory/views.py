@@ -17,6 +17,7 @@ from apps.inventory.models_produccion import (
     IngresoProduccion,
     IngresoProduccionDetalle,
 )
+from apps.inventory.services.traslado_service import TrasladoService
 
 # ======================================================
 # PRODUCCION
@@ -53,7 +54,7 @@ class ProduccionView(LoginRequiredMixin, PermissionRequiredMixin, FormView):
             InventoryService.agregar_stock(
                 variante=variante,
                 cantidad=cantidad,
-                sucursal_id=self.request.session.get("sucursal_id"),
+                user=self.request.user,
                 referencia=f"Producción {ingreso.id}",
                 tipo="PRODUCCION"
             )
@@ -97,58 +98,22 @@ class TrasladoCreateView(LoginRequiredMixin, PermissionRequiredMixin, FormView):
     permission_required = "inventory.add_traslado"
 
     def form_valid(self, form):
-        origen_id = form.cleaned_data["origen"]
-        destino_id = form.cleaned_data["destino"]
-        variante_id = form.cleaned_data["variante_id"]
-        cantidad = form.cleaned_data["cantidad"]
 
         with transaction.atomic():
+
             traslado = Traslado.objects.create(
-                origen_id=origen_id,
-                destino_id=destino_id,
+                origen_id=form.cleaned_data["origen"],
+                destino_id=form.cleaned_data["destino"],
             )
 
             TrasladoDetalle.objects.create(
                 traslado=traslado,
-                variante_id=variante_id,
-                cantidad=cantidad,
+                variante_id=form.cleaned_data["variante_id"],
+                cantidad=form.cleaned_data["cantidad"],
             )
 
-            # ====== Actualizar stock manualmente ======
-            variante = get_object_or_404(ProductoVariante, id=variante_id)
-
-            # Restar stock del origen
-            stock_origen = Stock.objects.filter(sucursal_id=origen_id, variante=variante).first()
-            if not stock_origen or stock_origen.cantidad < cantidad:
-                raise ValidationError(f"No hay suficiente stock en la sucursal origen ({origen_id}).")
-            stock_origen.cantidad -= cantidad
-            stock_origen.save()
-
-            # Sumar stock al destino
-            stock_destino, _ = Stock.objects.get_or_create(
-                sucursal_id=destino_id,
-                variante=variante,
-                defaults={"cantidad": 0}
-            )
-            stock_destino.cantidad += cantidad
-            stock_destino.save()
-
-            # Registrar movimientos de inventario
-            MovimientoStock.objects.create(
-                variante=variante,
-                sucursal_id=origen_id,
-                tipo="TRASLADO",
-                cantidad=-cantidad,
-                referencia=f"Traslado {traslado.id} SALIDA"
-            )
-
-            MovimientoStock.objects.create(
-                variante=variante,
-                sucursal_id=destino_id,
-                tipo="TRASLADO",
-                cantidad=cantidad,
-                referencia=f"Traslado {traslado.id} ENTRADA"
-            )
+            # CENTRALIZADO
+            TrasladoService.ejecutar_traslado(traslado.id)
 
         return redirect("traslado_list")
 

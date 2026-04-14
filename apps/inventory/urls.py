@@ -1,6 +1,7 @@
 # apps/inventory/urls.py
 from django.urls import path
 
+from apps.inventory.views_kardex import KardexListView
 from apps.inventory.views_produccion import CorteProduccionView
 from .views import (
     ProduccionView,
@@ -25,4 +26,6 @@ urlpatterns = [
     path("movimientos/", MovimientoListView.as_view(), name="movimientos"),
 
     path("corte-produccion/", CorteProduccionView.as_view(), name="corte_produccion"),
+
+    path("kardex/", KardexListView.as_view(), name="kardex"),
 ]
