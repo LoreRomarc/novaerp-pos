@@ -1,10 +1,15 @@
 # apps/inventory/models.py
+
 from decimal import Decimal
 from django.db import models
 from django.db.models import Q
 
 from apps.core.models import Sucursal
 
+
+# =========================================================
+# MAESTROS
+# =========================================================
 
 class Color(models.Model):
     nombre = models.CharField(max_length=50)
@@ -49,12 +54,15 @@ class ProductoVariante(models.Model):
         return f"{self.producto_base.nombre} - {self.color.nombre} - {self.talla}"
 
 
+# =========================================================
+# PRODUCTO FINAL
+# =========================================================
+
 class ProductoQuerySet(models.QuerySet):
     def activos(self):
         return self.filter(activo=True)
 
     def buscar(self, termino):
-        # Busca tanto en producto como en variantes, color, tela y SKU
         return self.filter(
             Q(nombre__icontains=termino) |
             Q(codigo_barras__icontains=termino) |
@@ -98,12 +106,16 @@ class Producto(models.Model):
 
     def __str__(self):
         return self.nombre
-    
+
     def variantes_disponibles(self):
         if self.variante:
             return self.variante.producto_base.variantes.all()
         return ProductoVariante.objects.filter(producto_base=self)
 
+
+# =========================================================
+# STOCK
+# =========================================================
 
 class StockManager(models.Manager):
     def for_update(self):
@@ -143,7 +155,11 @@ class Stock(models.Model):
 
     def __str__(self):
         return f"{self.variante} - {self.sucursal.nombre}"
-    
+
+
+# =========================================================
+# MOVIMIENTOS DE STOCK (🔥 CORREGIDO)
+# =========================================================
 
 class MovimientoStock(models.Model):
 
@@ -160,19 +176,47 @@ class MovimientoStock(models.Model):
         on_delete=models.PROTECT
     )
 
-    sucursal = models.ForeignKey(Sucursal, on_delete=models.PROTECT)
+    sucursal = models.ForeignKey(
+        Sucursal,
+        on_delete=models.PROTECT
+    )
 
     tipo = models.CharField(max_length=20, choices=TIPOS)
 
     cantidad = models.DecimalField(max_digits=12, decimal_places=2)
 
-    referencia = models.CharField(max_length=100)
+    referencia = models.CharField(max_length=100, null=True, blank=True)
+
+    # 🔥 CAMPOS QUE TE FALTABAN (YA ARREGLADO)
+    usuario = models.ForeignKey(
+        "auth.User",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True
+    )
+
+    saldo_post_movimiento = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
+
+    costo_unitario = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        null=True,
+        blank=True
+    )
 
     creado = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return f"{self.variante} | {self.tipo} | {self.cantidad}"
+
 
 # =========================================================
-# TRASLADOS (NUEVO)
+# TRASLADOS
 # =========================================================
 
 class Traslado(models.Model):
@@ -213,24 +257,3 @@ class TrasladoDetalle(models.Model):
 
     def __str__(self):
         return f"{self.variante} x {self.cantidad}"
-    
-usuario = models.ForeignKey(
-    "auth.User",
-    on_delete=models.PROTECT,
-    null=True,
-    blank=True
-)
-
-costo_unitario = models.DecimalField(
-    max_digits=14,
-    decimal_places=2,
-    null=True,
-    blank=True
-)
-
-saldo_post_movimiento = models.DecimalField(
-    max_digits=14,
-    decimal_places=2,
-    null=True,
-    blank=True
-)

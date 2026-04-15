@@ -7,9 +7,10 @@ from django.views import View
 from apps.inventory.models_produccion import RolloTela
 from apps.inventory.models import ProductoBase
 from apps.inventory.services.corte_service import CorteService
+from apps.sales.mixins import SucursalIsolationMixin
 
 
-class CorteProduccionView(View):
+class CorteProduccionView(SucursalIsolationMixin, View):
 
     template_name = "inventory/corte_produccion.html"
 
@@ -25,6 +26,8 @@ class CorteProduccionView(View):
     def post(self, request):
 
         try:
+            sucursal = self.get_sucursal()  # ✅ CLAVE
+
             rollo_id = request.POST.get("rollo")
             es_completo = request.POST.get("es_completo") == "on"
             metros = request.POST.get("metros")
@@ -47,13 +50,14 @@ class CorteProduccionView(View):
                 rollo_id=rollo_id,
                 es_completo=es_completo,
                 metros_usados=metros,
-                items=items
+                items=items,
+                sucursal=sucursal,   # ✅ FIX REAL
+                usuario=request.user # 🔥 PRO: trazabilidad
             )
 
             messages.success(request, "✅ Corte ejecutado correctamente.")
             return redirect("inventory:corte_produccion")
 
-        # ✅ CAPTURA CORRECTA
         except ValidationError as e:
 
             if hasattr(e, "messages"):

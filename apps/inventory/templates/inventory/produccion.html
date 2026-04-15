@@ -1,12 +1,53 @@
-<form method="post">
-    {% csrf_token %}
-    <h2>Producción</h2>
+{% extends "base_erp.html" %}
 
-    <label>Variante ID</label>
-    <input type="number" name="variante_id" required>
+{% block content %}
 
-    <label>Cantidad</label>
-    <input type="number" name="cantidad" required>
+<div class="card">
+    <h2>Registrar Producción</h2>
 
-    <button type="submit">Registrar Producción</button>
-</form>
+    <form method="post">
+        {% csrf_token %}
+
+        <!-- BUSCADOR DE VARIANTE -->
+        <label>Buscar Producto</label>
+        <input
+            type="text"
+            id="search"
+            placeholder="Escribe nombre, color o SKU..."
+            onkeyup="filtrarVariantes()"
+        >
+
+        <!-- SELECT REAL OCULTO UX -->
+        <label>Producto</label>
+        <select name="variante_id" id="varianteSelect" required>
+            {% for v in variantes %}
+                <option value="{{ v.id }}">
+                    {{ v.producto_base.nombre }} - {{ v.color.nombre }} - {{ v.talla }} ({{ v.sku }})
+                </option>
+            {% endfor %}
+        </select>
+
+        <br><br>
+
+        <label>Cantidad</label>
+        <input type="number" name="cantidad" min="1" required>
+
+        <br><br>
+
+        <button type="submit">Registrar Producción</button>
+    </form>
+</div>
+
+<script>
+function filtrarVariantes() {
+    const input = document.getElementById("search").value.toLowerCase();
+    const select = document.getElementById("varianteSelect");
+
+    for (let option of select.options) {
+        const text = option.text.toLowerCase();
+        option.style.display = text.includes(input) ? "" : "none";
+    }
+}
+</script>
+
+{% endblock %}

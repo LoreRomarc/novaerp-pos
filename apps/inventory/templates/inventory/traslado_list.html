@@ -1,11 +1,25 @@
-<h2>Traslados</h2>
+{% extends "base_erp.html" %}
 
-<a href="{% url 'traslado_create' %}">Nuevo traslado</a>
+{% block content %}
 
-<ul>
-    {% for t in traslados %}
-        <li>
-            {{ t.id }} - {{ t.origen }} → {{ t.destino }} - Ejecutado: {{ t.ejecutado }}
-        </li>
-    {% endfor %}
-</ul>
+<div class="card">
+    <h2>Traslados</h2>
+
+    <a href="{% url 'inventory:traslado_create' %}">
+        <button>Nuevo traslado</button>
+    </a>
+</div>
+
+<div class="card">
+    <h3>Historial</h3>
+
+    <ul>
+        {% for t in traslados %}
+            <li>
+                #{{ t.id }} - {{ t.origen }} → {{ t.destino }} - {{ t.creado }}
+            </li>
+        {% endfor %}
+    </ul>
+</div>
+
+{% endblock %}

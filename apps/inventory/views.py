@@ -1,10 +1,8 @@
-# apps/inventory/views.py
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.views.generic import ListView, FormView
-from django.shortcuts import redirect, get_object_or_404
 from django import forms
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.views.generic import ListView, FormView, TemplateView
+from django.shortcuts import redirect, get_object_or_404
 from django.db import transaction
-from django.core.exceptions import ValidationError
 
 from apps.inventory.models import (
     Stock,
@@ -13,54 +11,70 @@ from apps.inventory.models import (
     TrasladoDetalle,
     ProductoVariante
 )
+
 from apps.inventory.models_produccion import (
     IngresoProduccion,
     IngresoProduccionDetalle,
 )
+
 from apps.inventory.services.traslado_service import TrasladoService
+from apps.inventory.services.stock_service import InventoryService
+
 
 # ======================================================
 # PRODUCCION
 # ======================================================
 
-class ProduccionForm(forms.Form):
-    variante_id = forms.IntegerField()
-    cantidad = forms.IntegerField(min_value=1)
-
-
-class ProduccionView(LoginRequiredMixin, PermissionRequiredMixin, FormView):
+class ProduccionView(LoginRequiredMixin, TemplateView):
     template_name = "inventory/produccion.html"
-    form_class = ProduccionForm
-    permission_required = "inventory.add_ingresoproduccion"
 
-    def form_valid(self, form):
-        variante_id = form.cleaned_data["variante_id"]
-        cantidad = form.cleaned_data["cantidad"]
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        context["variantes"] = ProductoVariante.objects.select_related(
+            "producto_base", "color", "tipo_tela"
+        ).all()
+
+        return context
+
+    def post(self, request):
+
+        variante_id = request.POST.get("variante_id")
+
+        try:
+            cantidad = int(request.POST.get("cantidad"))
+        except:
+            cantidad = 0
+
+        if not variante_id or cantidad <= 0:
+            return redirect("inventory:produccion")
+
+        variante = get_object_or_404(ProductoVariante, id=variante_id)
 
         with transaction.atomic():
+
             ingreso = IngresoProduccion.objects.create()
 
-            detalle = IngresoProduccionDetalle.objects.create(
+            IngresoProduccionDetalle.objects.create(
                 ingreso=ingreso,
-                variante_id=variante_id,
+                variante=variante,
                 cantidad=cantidad
             )
-
-            variante = get_object_or_404(ProductoVariante, id=variante_id)
-
-            # USAR SERVICIO CENTRAL
-            from apps.inventory.services.stock_service import InventoryService
 
             InventoryService.agregar_stock(
                 variante=variante,
                 cantidad=cantidad,
-                user=self.request.user,
+                user=request.user,
                 referencia=f"Producción {ingreso.id}",
                 tipo="PRODUCCION"
             )
 
-        return redirect("produccion_list")
+        return redirect("inventory:produccion")
 
+
+# ======================================================
+# LISTA PRODUCCION
+# ======================================================
 
 class ProduccionListView(LoginRequiredMixin, ListView):
     model = IngresoProduccion
@@ -112,10 +126,12 @@ class TrasladoCreateView(LoginRequiredMixin, PermissionRequiredMixin, FormView):
                 cantidad=form.cleaned_data["cantidad"],
             )
 
-            # CENTRALIZADO
-            TrasladoService.ejecutar_traslado(traslado.id)
+            TrasladoService.ejecutar_traslado(
+                traslado.id,
+                usuario=self.request.user
+            )
 
-        return redirect("traslado_list")
+        return redirect("inventory:traslado_list")
 
 
 class TrasladoListView(LoginRequiredMixin, ListView):

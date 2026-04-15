@@ -42,11 +42,51 @@ class ProduccionLote(models.Model):
     tipo_tela = models.ForeignKey(TipoTela, on_delete=models.PROTECT)
     color = models.ForeignKey(Color, on_delete=models.PROTECT)
 
+    # ==========================
+    # CONSUMO
+    # ==========================
     consumo_total = models.DecimalField(max_digits=12, decimal_places=2)
     consumo_unitario = models.DecimalField(max_digits=12, decimal_places=6)
 
     total_prendas = models.IntegerField()
 
+    # ==========================
+    # INDUSTRIAL (NUEVO)
+    # ==========================
+    merma = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=0
+    )
+
+    eficiencia = models.DecimalField(
+        max_digits=5,
+        decimal_places=2,
+        default=100
+    )
+
+    costo_total = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=0
+    )
+
+    costo_unitario_real = models.DecimalField(
+        max_digits=14,
+        decimal_places=4,
+        default=0
+    )
+
+    operario = models.ForeignKey(
+        "auth.User",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True
+    )
+
+    # ==========================
+    # CONTROL
+    # ==========================
     ejecutado = models.BooleanField(default=False)
 
     creado = models.DateTimeField(auto_now_add=True)

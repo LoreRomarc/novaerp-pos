@@ -1,17 +1,21 @@
 # apps/inventory/services/traslado_service.py
+
 from decimal import Decimal
 from django.db import transaction
 from django.core.exceptions import ValidationError
 
-from apps.inventory.models import Stock, MovimientoStock
-from apps.inventory.models import Traslado
+from apps.inventory.models import Stock, Traslado
+from apps.inventory.services.stock_service import InventoryService
 
 
 class TrasladoService:
 
     @staticmethod
     @transaction.atomic
-    def ejecutar_traslado(traslado_id):
+    def ejecutar_traslado(traslado_id, usuario):
+
+        if not usuario:
+            raise ValidationError("Usuario requerido para ejecutar traslado.")
 
         traslado = (
             Traslado.objects
@@ -26,8 +30,6 @@ class TrasladoService:
         if traslado.origen_id == traslado.destino_id:
             raise ValidationError("Origen y destino no pueden ser iguales.")
 
-        movimientos = []
-
         for detalle in traslado.detalles.all():
 
             variante = detalle.variante
@@ -37,7 +39,7 @@ class TrasladoService:
                 raise ValidationError("Cantidad inválida en traslado.")
 
             # ==========================
-            # STOCK ORIGEN (OBLIGATORIO)
+            # VALIDAR STOCK ORIGEN
             # ==========================
             stock_origen = Stock.objects.select_for_update().filter(
                 variante=variante,
@@ -55,44 +57,28 @@ class TrasladoService:
                 )
 
             # ==========================
-            # STOCK DESTINO
+            # SALIDA (ORIGEN)
             # ==========================
-            stock_destino, _ = Stock.objects.get_or_create(
+            InventoryService.descontar_stock(
                 variante=variante,
-                sucursal=traslado.destino,
-                defaults={"cantidad": Decimal("0")}
+                cantidad=cantidad,
+                sucursal_id=traslado.origen.id,
+                referencia=f"Traslado {traslado.id} SALIDA",
+                tipo="TRASLADO",
+                user=usuario
             )
 
             # ==========================
-            # MOVIMIENTO STOCK
+            # ENTRADA (DESTINO)
             # ==========================
-            stock_origen.cantidad -= cantidad
-            stock_origen.save(update_fields=["cantidad"])
-
-            stock_destino.cantidad += cantidad
-            stock_destino.save(update_fields=["cantidad"])
-
-            movimientos.append(
-                MovimientoStock(
-                    variante=variante,
-                    sucursal=traslado.origen,
-                    tipo="TRASLADO",
-                    cantidad=-cantidad,
-                    referencia=f"Traslado {traslado.id} SALIDA"
-                )
+            InventoryService.agregar_stock(
+                variante=variante,
+                cantidad=cantidad,
+                sucursal_id=traslado.destino.id,
+                referencia=f"Traslado {traslado.id} ENTRADA",
+                tipo="TRASLADO",
+                user=usuario
             )
-
-            movimientos.append(
-                MovimientoStock(
-                    variante=variante,
-                    sucursal=traslado.destino,
-                    tipo="TRASLADO",
-                    cantidad=cantidad,
-                    referencia=f"Traslado {traslado.id} ENTRADA"
-                )
-            )
-
-        MovimientoStock.objects.bulk_create(movimientos)
 
         traslado.ejecutado = True
         traslado.save(update_fields=["ejecutado"])
