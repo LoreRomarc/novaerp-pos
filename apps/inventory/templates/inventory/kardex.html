@@ -1,33 +1,76 @@
-{% extends "base_erp.html" %}
+{% extends "base.html" %}
 
 {% block content %}
 
-<div class="card">
-    <h2>Kardex</h2>
-</div>
+<div class="container-fluid">
 
-<div class="card">
-    <table border="1" width="100%" cellpadding="5">
-        <tr>
-            <th>Fecha</th>
-            <th>Variante</th>
-            <th>Tipo</th>
-            <th>Cantidad</th>
-            <th>Saldo</th>
-            <th>Usuario</th>
-        </tr>
+    <div class="d-flex justify-content-between mb-3">
+        <h2>📊 Kardex</h2>
 
-        {% for m in movimientos %}
-        <tr>
-            <td>{{ m.creado }}</td>
-            <td>{{ m.variante }}</td>
-            <td>{{ m.tipo }}</td>
-            <td>{{ m.cantidad }}</td>
-            <td>{{ m.saldo_post_movimiento }}</td>
-            <td>{{ m.usuario|default:"Sistema" }}</td>
-        </tr>
-        {% endfor %}
-    </table>
+        <form method="get" class="d-flex gap-2">
+            <input type="number" name="variante" placeholder="ID Variante" class="form-control" value="{{ request.GET.variante }}">
+            <button class="btn btn-dark">Filtrar</button>
+        </form>
+    </div>
+
+    <div class="card shadow-sm">
+
+        <div class="table-responsive">
+
+            <table class="table table-sm align-middle">
+
+                <thead class="table-light">
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Producto</th>
+                        <th>Tipo</th>
+                        <th class="text-end">Cantidad</th>
+                        <th class="text-end">Saldo</th>
+                        <th>Usuario</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                {% for m in movimientos %}
+
+                    <tr>
+
+                        <td>{{ m.creado|date:"Y-m-d H:i" }}</td>
+
+                        <td>
+                            {{ m.variante.producto_base.nombre }}
+                            ({{ m.variante.talla }})
+                        </td>
+
+                        <td>
+                            <span class="badge bg-secondary">
+                                {{ m.tipo }}
+                            </span>
+                        </td>
+
+                        <td class="text-end">
+                            {{ m.cantidad }}
+                        </td>
+
+                        <td class="text-end">
+                            <strong>{{ m.saldo_post_movimiento }}</strong>
+                        </td>
+
+                        <td>{{ m.usuario|default:"Sistema" }}</td>
+
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
 </div>
 
 {% endblock %}

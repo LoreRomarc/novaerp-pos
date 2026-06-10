@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}
+Nueva Sucursal
+{% endblock %}
+
+{% block content %}
+
+<div class="card shadow">
+    <div class="card-header">
+        <h4>Crear Sucursal</h4>
+    </div>
+
+    <div class="card-body">
+
+        <form method="post">
+
+            {% csrf_token %}
+
+            {{ form.as_p }}
+
+            <button type="submit"
+                    class="btn btn-primary">
+                Guardar
+            </button>
+
+            <a href="{% url 'administration:sucursal_list' %}"
+               class="btn btn-secondary">
+                Volver
+            </a>
+
+        </form>
+
+    </div>
+</div>
+
+{% endblock %}

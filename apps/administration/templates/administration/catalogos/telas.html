@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="card shadow-sm border-0">
+
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+
+        <h5 class="mb-0">Tipos de Tela</h5>
+
+        <a href="{% url 'administration:tipo_tela_create' %}"
+           class="btn btn-primary btn-sm">
+            ➕ Nueva Tela
+        </a>
+
+    </div>
+
+    <div class="card-body">
+
+        <input type="text"
+               id="searchInput"
+               class="form-control mb-3"
+               placeholder="Buscar tela...">
+
+        <table class="table table-hover" id="dataTable">
+
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Descripción</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for t in telas %}
+                <tr>
+
+                    <td>{{ t.nombre }}</td>
+
+                    <td>{{ t.descripcion }}</td>
+
+                    <td>
+                        {% if t.activo %}
+                            <span class="badge bg-success">Activo</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Inactivo</span>
+                        {% endif %}
+                    </td>
+
+                </tr>
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+{% endblock %}

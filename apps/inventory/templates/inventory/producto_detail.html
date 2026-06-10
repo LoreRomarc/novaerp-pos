@@ -1,0 +1,120 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between mb-4">
+
+    <h2>
+        📦 {{ producto.nombre }}
+    </h2>
+
+    <a
+        href="{% url 'inventory:producto_list' %}"
+        class="btn btn-secondary"
+    >
+        Volver
+    </a>
+
+</div>
+
+<div class="card shadow-sm mb-4">
+
+    <div class="card-body">
+
+        <h5>Descripción</h5>
+
+        <p>
+            {{ producto.descripcion|default:"Sin descripción" }}
+        </p>
+
+        <p>
+
+            Estado:
+
+            {% if producto.activo %}
+                <span class="badge bg-success">
+                    Activo
+                </span>
+            {% else %}
+                <span class="badge bg-danger">
+                    Inactivo
+                </span>
+            {% endif %}
+
+        </p>
+
+    </div>
+
+</div>
+
+<div class="card shadow-sm">
+
+    <div class="card-header">
+        Variantes
+    </div>
+
+    <div class="card-body">
+
+        <table class="table table-hover">
+
+            <thead>
+
+                <tr>
+
+                    <th>SKU</th>
+
+                    <th>Tela</th>
+
+                    <th>Color</th>
+
+                    <th>Talla</th>
+
+                    <th>Stock</th>
+
+                    <th>Precio</th>
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                {% for v in variantes %}
+
+                <tr>
+
+                    <td>{{ v.sku }}</td>
+
+                    <td>{{ v.tipo_tela.nombre }}</td>
+
+                    <td>{{ v.color.nombre }}</td>
+
+                    <td>{{ v.talla.nombre }}</td>
+
+                    <td>{{ v.stock_total }}</td>
+
+                    <td>${{ v.precio_venta }}</td>
+
+                </tr>
+
+                {% empty %}
+
+                <tr>
+
+                    <td colspan="6">
+                        No existen variantes para este producto.
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+{% endblock %}

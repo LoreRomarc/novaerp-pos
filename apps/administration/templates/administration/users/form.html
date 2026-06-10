@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Crear Usuario{% endblock %}
+
+{% block content %}
+
+<div class="card shadow-sm border-0 col-md-6">
+    <div class="card-header bg-white">
+        <h5>Crear Usuario</h5>
+    </div>
+
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+
+            <div class="mb-3">
+                <label>Usuario</label>
+                {{ form.username }}
+            </div>
+
+            <div class="mb-3">
+                <label>Email</label>
+                {{ form.email }}
+            </div>
+
+            <div class="mb-3">
+                <label>Password</label>
+                {{ form.password }}
+            </div>
+
+            <div class="mb-3">
+                <label>Rol</label>
+                {{ form.role }}
+            </div>
+
+            <div class="mb-3">
+                <label>Sucursal</label>
+                {{ form.sucursal }}
+            </div>
+
+            <button class="btn btn-success w-100">
+                💾 Guardar Usuario
+            </button>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

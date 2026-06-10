@@ -1,31 +1,91 @@
 # apps/inventory/urls.py
 from django.urls import path
 
+from apps.inventory.api.search_views import VarianteSearchAPI
+
+from apps.inventory.views_dashboard import InventoryDashboardView
 from apps.inventory.views_kardex import KardexListView
 from apps.inventory.views_produccion import CorteProduccionView
+from apps.inventory.views_rollos import (
+    RolloCreateView,
+    RolloListView
+)
+
+from apps.inventory.views_productos import (
+    ProductoListView,
+    ProductoCreateView,
+    ProductoUpdateView,
+    ProductoDetailView,
+)
+
 from .views import (
-    ProduccionView,
-    ProduccionListView,
+    AjusteStockCreateView,
+    AjusteStockView,
     StockListView,
     TrasladoCreateView,
     TrasladoListView,
-    MovimientoListView,
+    ProduccionListView,
+)
+
+from apps.inventory.views_variantes import (
+    VarianteListView,
+    VarianteCreateView,
+    VarianteUpdateView,
 )
 
 app_name = "inventory"
 
 urlpatterns = [
-    path("produccion/", ProduccionView.as_view(), name="produccion"),
-    path("produccion/list/", ProduccionListView.as_view(), name="produccion_list"),
 
-    path("stock/", StockListView.as_view(), name="stock_list"),
+    # ======================================================
+    # DASHBOARD
+    # ======================================================
+    path("",InventoryDashboardView.as_view(),name="dashboard"),
 
-    path("traslados/", TrasladoListView.as_view(), name="traslado_list"),
-    path("traslados/nuevo/", TrasladoCreateView.as_view(), name="traslado_create"),
+    # ======================================================
+    # PRODUCCION
+    # ======================================================
+    path( "produccion/",ProduccionListView.as_view(),name="produccion_list"),
+    path("produccion/corte/",CorteProduccionView.as_view(), name="corte_produccion"),
 
-    path("movimientos/", MovimientoListView.as_view(), name="movimientos"),
+    # ======================================================
+    # ROLLOS
+    # ======================================================
+    path( "rollos/",RolloListView.as_view(), name="rollo_list"),
+    path("rollos/nuevo/",RolloCreateView.as_view(),name="rollo_create"),
 
-    path("corte-produccion/", CorteProduccionView.as_view(), name="corte_produccion"),
+    # ======================================================
+    # PRODUCTOS
+    # ======================================================
+    path( "productos/",ProductoListView.as_view(),name="producto_list"),
+    path("productos/nuevo/", ProductoCreateView.as_view(), name="producto_create"),
+    path( "productos/<int:pk>/", ProductoDetailView.as_view(), name="producto_detail"),
+    path( "productos/<int:pk>/editar/", ProductoUpdateView.as_view(), name="producto_update"),
 
-    path("kardex/", KardexListView.as_view(), name="kardex"),
+    # ======================================================
+    # STOCK
+    # ======================================================
+    path("api/variantes/search/", VarianteSearchAPI.as_view(), name="variant_search_api" ),
+    path("ajuste-stock/", AjusteStockView.as_view(), name="ajuste_stock" ),
+    path( "stock/", StockListView.as_view(),  name="stock_list" ),
+    path("stock/ajuste/",AjusteStockCreateView.as_view(), name="ajuste_stock_form"),
+
+    # ======================================================
+    # TRASLADOS
+    # ======================================================
+    path( "traslados/", TrasladoListView.as_view(),  name="traslado_list" ),
+    path( "traslados/nuevo/", TrasladoCreateView.as_view(), name="traslado_create"),
+
+    # ======================================================
+    # MOVIMIENTOS
+    # ======================================================
+    path( "movimientos/kardex/", KardexListView.as_view(), name="kardex" ),
+
+    # ======================================================
+    # VARIANTES
+    # ======================================================
+    path( "variantes/", VarianteListView.as_view(),  name="variante_list"),
+    path( "variantes/nuevo/", VarianteCreateView.as_view(), name="variante_create"),
+    path( "variantes/<int:pk>/editar/", VarianteUpdateView.as_view(),  name="variante_update"),
+
 ]

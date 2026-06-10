@@ -105,7 +105,7 @@ class POSService:
         elif termino:
             qs = qs.filter(
                 Q(sku__iexact=termino) |
-                Q(producto_base__nombre__icontains=termino) |
+                Q(codigo_barras__iexact=termino) |
                 Q(talla__icontains=termino) |
                 Q(color__nombre__icontains=termino) |
                 Q(tipo_tela__nombre__icontains=termino)
@@ -146,6 +146,11 @@ class POSService:
     @transaction.atomic
     def agregar_producto(usuario, sucursal, variante_id=None, termino=None, cantidad=Decimal("1")):
 
+        if cantidad is None:
+            cantidad = Decimal("1")
+
+        cantidad = Decimal(str(cantidad))
+
         if cantidad <= 0:
             raise ValidationError("Cantidad inválida.")
 
@@ -175,7 +180,7 @@ class POSService:
             VentaItem.objects.create(
                 venta=venta,
                 variante=variante,
-                cantidad=nueva_cantidad,
+                cantidad=cantidad,
                 precio_unitario=precio
             )
 
@@ -184,7 +189,7 @@ class POSService:
         return serializar_venta(venta)
 
     # =========================
-    # CERRAR VENTA (🔥 CORE)
+    # CERRAR VENTA (CORE)
     # =========================
     @staticmethod
     @transaction.atomic
@@ -217,7 +222,7 @@ class POSService:
 
         venta.ajuste_redondeo = ajuste
 
-        # 🔥 DESCUENTO DE STOCK CENTRALIZADO + USER
+        # DESCUENTO DE STOCK CENTRALIZADO + USER
         for item in venta.items.select_related("variante").select_for_update():
 
             InventoryService.descontar_stock(
@@ -229,7 +234,7 @@ class POSService:
                 tipo="VENTA"
             )
 
-        # 🔥 MOVIMIENTOS FINANCIEROS
+        #  MOVIMIENTOS FINANCIEROS
         CajaService.registrar_movimientos_venta(venta, usuario, pagos)
 
         venta.estado = "CERRADA"
@@ -242,3 +247,75 @@ class POSService:
         ])
 
         return venta
+    
+
+    # =========================
+    # ELIMINAR ITEM (FIX REAL)
+    # =========================
+    @staticmethod
+    @transaction.atomic
+    def eliminar_item(usuario, sucursal, item_id):
+
+        venta = POSService.obtener_venta_abierta(usuario, sucursal)
+
+        if not venta:
+            raise ValidationError("No hay venta activa")
+
+        item = venta.items.filter(id=item_id).first()
+
+        if not item:
+            raise ValidationError("Item no encontrado")
+
+        item.delete()
+
+        venta.recalcular_totales()
+
+        return serializar_venta(venta)
+
+
+    # =========================
+    # ACTUALIZAR CANTIDAD / PRECIO
+    # =========================
+    @staticmethod
+    @transaction.atomic
+    def actualizar_cantidad(usuario, sucursal, item_id, cantidad=None, precio_unitario=None):
+
+        venta = POSService.obtener_venta_abierta(usuario, sucursal)
+
+        if not venta:
+            raise ValidationError("No hay venta abierta")
+
+        item = venta.items.select_for_update().filter(id=item_id).first()
+
+        if not item:
+            raise ValidationError("Item no encontrado")
+
+        # 🔥 actualizar cantidad
+        if cantidad is not None:
+            if cantidad <= 0:
+                item.delete()
+                venta.recalcular_totales()
+                return serializar_venta(venta)
+
+            POSService.validar_stock_disponible(
+                item.variante,
+                cantidad,
+                sucursal.id
+            )
+
+            item.cantidad = cantidad
+
+        # 🔥 actualizar precio manual
+        if precio_unitario is not None:
+            if precio_unitario <= 0:
+                raise ValidationError("Precio inválido")
+
+            item.precio_unitario = Decimal(precio_unitario)
+
+        item.save()
+
+        venta.recalcular_totales()
+
+        return serializar_venta(venta)
+
+    

@@ -1,0 +1,34 @@
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">{{ title }}</h5>
+
+        {% if create_url %}
+            <a href="{{ create_url }}" class="btn btn-primary btn-sm">
+                ➕ Crear
+            </a>
+        {% endif %}
+    </div>
+
+    <div class="card-body">
+
+        <!-- 🔍 BUSCADOR -->
+        <input type="text" id="searchInput" class="form-control mb-3" placeholder="Buscar...">
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle" id="dataTable">
+                {{ table|safe }}
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById("searchInput").addEventListener("keyup", function() {
+    let filter = this.value.toLowerCase();
+    let rows = document.querySelectorAll("#dataTable tbody tr");
+
+    rows.forEach(row => {
+        row.style.display = row.innerText.toLowerCase().includes(filter) ? "" : "none";
+    });
+});
+</script>

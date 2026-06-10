@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="card shadow-sm border-0">
+
+    <div class="card-header d-flex justify-content-between">
+        <h5>Usuarios</h5>
+        <a href="{% url 'administration:user_create' %}" class="btn btn-primary btn-sm">
+            ➕ Crear
+        </a>
+    </div>
+
+    <div class="card-body">
+
+        <input type="text" id="userSearch" class="form-control mb-3" placeholder="Buscar usuario...">
+
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Usuario</th>
+                    <th>Email</th>
+                    <th>Rol</th>
+                    <th>Sucursal</th>
+                    <th></th>
+                </tr>
+            </thead>
+
+            <tbody id="userTable">
+                {% for user in users %}
+                <tr>
+                    <td>{{ user.username }}</td>
+                    <td>{{ user.email }}</td>
+                    <td>{{ user.profile.role }}</td>
+                    <td>{{ user.profile.sucursal|default:"-" }}</td>
+                    <td>
+                        <a href="{% url 'administration:user_update' user.id %}" class="btn btn-sm btn-warning">✏️</a>
+                        <a href="{% url 'administration:user_delete' user.id %}" class="btn btn-sm btn-danger">🗑</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+    </div>
+</div>
+
+{% endblock %}
+
+
+{% block content-script %}
+
+<script>
+const inputUser = document.getElementById("userSearch");
+const tableUser = document.getElementById("userTable");
+
+const originalUserHTML = tableUser.innerHTML;
+
+let timeoutUser;
+
+inputUser.addEventListener("keyup", function () {
+
+    clearTimeout(timeoutUser);
+
+    const q = this.value.trim();
+
+    timeoutUser = setTimeout(async () => {
+
+        if (q.length === 0) {
+            tableUser.innerHTML = originalUserHTML;
+            return;
+        }
+
+        if (q.length < 2) return;
+
+        try {
+            const res = await fetch(`/admin-panel/api/users/search/?q=${q}`);
+            const data = await res.json();
+
+            tableUser.innerHTML = "";
+
+            if (data.length === 0) {
+                tableUser.innerHTML = `
+                    <tr>
+                        <td colspan="5" class="text-center text-muted">
+                            Sin resultados
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            data.forEach(u => {
+                const row = document.createElement("tr");
+
+                row.innerHTML = `
+                    <td>${u.username}</td>
+                    <td>${u.email}</td>
+                    <td>${u.role}</td>
+                    <td>${u.sucursal || "-"}</td>
+                    <td>
+                        <a href="/admin-panel/usuarios/${u.id}/edit/" class="btn btn-sm btn-warning">✏️</a>
+                        <a href="/admin-panel/usuarios/${u.id}/delete/" class="btn btn-sm btn-danger">🗑</a>
+                    </td>
+                `;
+
+                tableUser.appendChild(row);
+            });
+
+        } catch (e) {
+            console.error("Error búsqueda:", e);
+        }
+
+    }, 300);
+});
+</script>
+
+{% endblock %}

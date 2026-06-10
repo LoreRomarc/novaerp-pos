@@ -1,0 +1,189 @@
+{% extends "base.html" %}
+
+{% block title %}Rollos{% endblock %}
+
+{% block content %}
+
+<style>
+.kpi-card {
+    min-height: 120px; /* 🔥 fuerza mismo tamaño */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    transition: all 0.2s ease;
+}
+
+.kpi-content {
+    text-align: center;
+    width: 100%;
+}
+
+.kpi-content h6 {
+    font-size: 13px;
+    color: #6b7280;
+    margin-bottom: 5px;
+}
+
+.kpi-content h3 {
+    margin: 0;
+    font-weight: 600;
+}
+
+.kpi-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+}
+
+</style>
+
+<div class="container-fluid">
+
+    <!-- HEADER -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>🧵 Gestión de Rollos</h2>
+
+        <a href="{% url 'inventory:rollo_create' %}" class="btn btn-primary">
+            ➕ Nuevo Rollo
+        </a>
+    </div>
+
+    <!-- KPIs -->
+    <div class="row mb-4 g-3">
+
+        <div class="col-md-4 d-flex">
+            <div class="card shadow-sm p-3 w-100 kpi-card">
+                <div class="kpi-content">
+                    <h6>Total Rollos</h6>
+                    <h3>{{ total_rollos|default:"0" }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 d-flex">
+            <div class="card shadow-sm p-3 w-100 kpi-card">
+                <div class="kpi-content">
+                    <h6>Disponibles</h6>
+                    <h3>{{ disponibles|default:"0" }}</h3>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4 d-flex">
+            <div class="card shadow-sm p-3 w-100 kpi-card">
+                <div class="kpi-content">
+                    <h6>Consumo Total</h6>
+                    <h3>{{ consumo_total|default:"0" }}</h3>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- TABLA -->
+    <div class="card shadow-sm">
+
+        <div class="table-responsive">
+            <table class="table align-middle">
+
+                <thead class="table-light">
+                    <tr>
+                        <th>Código</th>
+                        <th>Tela</th>
+                        <th>Color</th>
+                        <th>Disponible</th>
+                        <th>Consumo</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                {% for r in rollos %}
+
+                    {% widthratio r.cantidad_disponible r.cantidad_inicial 100 as porcentaje %}
+
+                    <tr>
+
+                        <td>
+                            <strong>{{ r.codigo }}</strong>
+                        </td>
+
+                        <td>{{ r.tipo_tela.nombre }}</td>
+
+                        <td>
+                            <span class="badge"
+                                  style="background: {{ r.color.codigo_hex|default:'#6b7280' }}">
+                                {{ r.color.nombre }}
+                            </span>
+                        </td>
+
+                        <!-- DISPONIBLE -->
+                        <td>
+                            <strong>{{ r.cantidad_disponible }}</strong> / {{ r.cantidad_inicial }}
+                        </td>
+
+                        <!-- BARRA -->
+                        <td style="width: 200px;">
+
+                            <div class="progress" style="height: 8px;">
+
+                                <div class="progress-bar
+                                    {% if porcentaje < 30 %}
+                                        bg-danger
+                                    {% elif porcentaje < 60 %}
+                                        bg-warning
+                                    {% else %}
+                                        bg-success
+                                    {% endif %}
+                                "
+                                style="width: {{ porcentaje }}%;">
+                                </div>
+
+                            </div>
+
+                            {% comment %} <small>{{ porcentaje }}%</small> {% endcomment %}
+                            <small>Consumido: {{ r.consumido|floatformat:2 }}%</small>
+
+
+                        </td>
+
+                        <!-- ESTADO -->
+                        <td>
+
+                            {% if r.estado == "CONSUMIDO" %}
+                                <span class="badge bg-dark">Consumido</span>
+                            {% elif porcentaje < 20 %}
+                                <span class="badge bg-danger">Crítico</span>
+
+                            {% elif porcentaje < 50 %}
+                                <span class="badge bg-warning text-dark">Bajo</span>
+
+                            {% else %}
+                                <span class="badge bg-success">OK</span>
+                            {% endif %}
+
+                        </td>
+
+                    </tr>
+
+                {% empty %}
+
+                    <tr>
+                        <td colspan="6" class="text-center">
+                            No hay rollos registrados
+                        </td>
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

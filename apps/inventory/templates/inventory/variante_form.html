@@ -1,0 +1,233 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="card shadow-sm">
+
+    <div class="card-header">
+
+        <h4>
+
+            {% if object %}
+                ✏️ Editar Variante
+            {% else %}
+                ➕ Nueva Variante
+            {% endif %}
+
+        </h4>
+
+    </div>
+
+    <div class="card-body">
+
+        <form method="POST">
+
+            {% csrf_token %}
+
+            <div class="row">
+
+                <!-- PRODUCTO BASE -->
+                <div class="col-md-6 mb-3">
+
+                    <label class="form-label">
+                        Producto
+                    </label>
+
+                    <div class="input-group">
+
+                        {{ form.producto_base }}
+
+                        {% if perms.inventory.add_productobase %}
+                        <a
+                            href="{% url 'inventory:producto_create' %}"
+                            target="_blank"
+                            class="btn btn-outline-primary"
+                            title="Crear producto"
+                        >
+                            ➕
+                        </a>
+                        {% endif %}
+
+                    </div>
+
+                </div>
+
+                <!-- COLOR -->
+                <div class="col-md-3 mb-3">
+
+                    <label class="form-label">
+                        Color
+                    </label>
+
+                    <div class="input-group">
+
+                        {{ form.color }}
+
+                        <a
+                            href="{% url 'administration:color_create' %}"
+                            target="_blank"
+                            class="btn btn-outline-primary"
+                            title="Crear color"
+                        >
+                            ➕
+                        </a>
+
+                    </div>
+
+                </div>
+
+                <!-- TALLA -->
+                <div class="col-md-3 mb-3">
+
+                    <label class="form-label">
+                        Talla
+                    </label>
+
+                    <div class="input-group">
+
+                        {{ form.talla }}
+
+                        <a
+                            href="{% url 'administration:talla_create' %}"
+                            target="_blank"
+                            class="btn btn-outline-primary"
+                            title="Crear talla"
+                        >
+                            ➕
+                        </a>
+
+                    </div>
+
+                </div>
+
+                <!-- TIPO TELA -->
+                <div class="col-md-6 mb-3">
+
+                    <label class="form-label">
+                        Tipo Tela
+                    </label>
+
+                    <div class="input-group">
+
+                        {{ form.tipo_tela }}
+
+                        <a
+                            href="{% url 'administration:tipo_tela_create' %}"
+                            target="_blank"
+                            class="btn btn-outline-primary"
+                            title="Crear tipo de tela"
+                        >
+                            ➕
+                        </a>
+
+                    </div>
+
+                </div>
+
+                <!-- SKU -->
+                <div class="col-md-6 mb-3">
+
+                    <label class="form-label">
+                        SKU
+                    </label>
+
+                    {{ form.sku }}
+
+                </div>
+
+                <!-- CODIGO BARRAS -->
+                <div class="col-md-6 mb-3">
+
+                    <label class="form-label">
+                        Código Barras
+                    </label>
+
+                    {{ form.codigo_barras }}
+
+                </div>
+
+                <!-- PRECIO -->
+                <div class="col-md-3 mb-3">
+
+                    <label class="form-label">
+                        Precio Venta
+                    </label>
+
+                    {{ form.precio_venta }}
+
+                </div>
+
+                <!-- COSTO -->
+                <div class="col-md-3 mb-3">
+
+                    <label class="form-label">
+                        Costo Unitario
+                    </label>
+
+                    {{ form.costo_unitario }}
+
+                </div>
+
+                <!-- STOCK MINIMO -->
+                <div class="col-md-3 mb-3">
+
+                    <label class="form-label">
+                        Stock Mínimo
+                    </label>
+
+                    {{ form.stock_minimo }}
+
+                </div>
+
+                <!-- ACTIVO -->
+                <div class="col-md-3 mb-3 d-flex align-items-center">
+
+                    <div class="form-check mt-4">
+
+                        {{ form.activo }}
+
+                        <label class="form-check-label">
+                            Activo
+                        </label>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+            {% if form.errors %}
+
+            <div class="alert alert-danger">
+
+                <strong>Errores encontrados:</strong>
+
+                {{ form.errors }}
+
+            </div>
+
+            {% endif %}
+
+            <hr>
+
+            <button
+                type="submit"
+                class="btn btn-primary"
+            >
+                💾 Guardar Variante
+            </button>
+
+            <a
+                href="{% url 'inventory:variante_list' %}"
+                class="btn btn-secondary"
+            >
+                Volver
+            </a>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}

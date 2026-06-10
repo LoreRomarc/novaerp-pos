@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+
+    <h2>🧵 Productos</h2>
+
+    <a
+        href="{% url 'inventory:producto_create' %}"
+        class="btn btn-primary"
+    >
+        ➕ Nuevo Producto
+    </a>
+
+</div>
+
+<div class="card shadow-sm">
+
+    <div class="card-body">
+
+        <form method="GET" class="mb-4">
+
+            <div class="input-group">
+
+                <input
+                    type="text"
+                    name="q"
+                    class="form-control"
+                    placeholder="Buscar producto..."
+                    value="{{ request.GET.q }}"
+                >
+
+                <button class="btn btn-outline-secondary">
+                    Buscar
+                </button>
+
+            </div>
+
+        </form>
+
+        <table class="table table-hover align-middle">
+
+            <thead>
+
+                <tr>
+
+                    <th>ID</th>
+
+                    <th>Nombre</th>
+
+                    <th>Variantes</th>
+
+                    <th>Activo</th>
+
+                    <th width="220"></th>
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                {% for p in productos %}
+
+                <tr>
+
+                    <td>
+                        {{ p.id }}
+                    </td>
+
+                    <td>
+                        <strong>{{ p.nombre }}</strong>
+                    </td>
+
+                    <td>
+                        {{ p.variantes.count }}
+                    </td>
+
+                    <td>
+
+                        {% if p.activo %}
+                            <span class="badge bg-success">
+                                Activo
+                            </span>
+                        {% else %}
+                            <span class="badge bg-danger">
+                                Inactivo
+                            </span>
+                        {% endif %}
+
+                    </td>
+
+                    <td>
+
+                        <a
+                            href="{% url 'inventory:producto_detail' p.id %}"
+                            class="btn btn-sm btn-info"
+                        >
+                            Ver
+                        </a>
+
+                        <a
+                            href="{% url 'inventory:producto_update' p.id %}"
+                            class="btn btn-sm btn-dark"
+                        >
+                            Editar
+                        </a>
+
+                    </td>
+
+                </tr>
+
+                {% empty %}
+
+                <tr>
+
+                    <td colspan="5" class="text-center">
+                        No hay productos registrados
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+{% endblock %}

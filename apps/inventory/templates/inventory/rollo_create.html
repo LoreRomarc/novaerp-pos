@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+
+{% block title %}Crear Rollo{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+        <h2>
+            {% if object %}
+                ✏️ Editar Rollo
+            {% else %}
+                🧵 Crear Rollo de Tela
+            {% endif %}
+        </h2>
+
+        <a
+            href="{% url 'inventory:rollo_list' %}"
+            class="btn btn-secondary"
+        >
+            ← Volver
+        </a>
+
+    </div>
+
+    <div class="card shadow-sm">
+
+        <div class="card-body">
+
+            <form method="post">
+
+                {% csrf_token %}
+
+                <div class="row">
+
+                    <!-- TIPO TELA -->
+                    <div class="col-md-6 mb-3">
+
+                        <label class="form-label">
+                            Tipo de Tela
+                        </label>
+
+                        <div class="input-group">
+
+                            {{ form.tipo_tela }}
+
+                            <a
+                                href="{% url 'administration:tipo_tela_create' %}"
+                                target="_blank"
+                                class="btn btn-outline-primary"
+                                title="Crear nueva tela"
+                            >
+                                ➕
+                            </a>
+
+                        </div>
+
+                    </div>
+
+                    <!-- COLOR -->
+                    <div class="col-md-6 mb-3">
+
+                        <label class="form-label">
+                            Color
+                        </label>
+
+                        <div class="input-group">
+
+                            {{ form.color }}
+
+                            <a
+                                href="{% url 'administration:color_create' %}"
+                                target="_blank"
+                                class="btn btn-outline-primary"
+                                title="Crear nuevo color"
+                            >
+                                ➕
+                            </a>
+
+                        </div>
+
+                    </div>
+
+                    <!-- CODIGO -->
+                    <div class="col-md-6 mb-3">
+
+                        <label class="form-label">
+                            Código
+                        </label>
+
+                        {{ form.codigo }}
+
+                    </div>
+
+                    <!-- CANTIDAD -->
+                    <div class="col-md-6 mb-3">
+
+                        <label class="form-label">
+                            Cantidad Inicial (Metros)
+                        </label>
+
+                        {{ form.cantidad_inicial }}
+
+                    </div>
+
+                    <!-- COSTO -->
+                    <div class="col-md-6 mb-3">
+
+                        <label class="form-label">
+                            Costo por Metro
+                        </label>
+
+                        {{ form.costo_por_metro }}
+
+                    </div>
+
+                </div>
+
+                {% if form.errors %}
+
+                <div class="alert alert-danger">
+
+                    <strong>Errores encontrados:</strong>
+
+                    {{ form.errors }}
+
+                </div>
+
+                {% endif %}
+
+                <hr>
+
+                <button
+                    type="submit"
+                    class="btn btn-success"
+                >
+                    💾 Guardar Rollo
+                </button>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

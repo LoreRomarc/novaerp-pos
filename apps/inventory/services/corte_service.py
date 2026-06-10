@@ -1,6 +1,6 @@
 # apps/inventory/services/corte_service.py
-
 from decimal import Decimal
+import uuid
 from django.db import transaction
 from django.core.exceptions import ValidationError
 
@@ -8,11 +8,11 @@ from apps.inventory.models_produccion import (
     RolloTela,
     ProduccionLote,
     ProduccionDetalle,
-    IngresoProduccion,
-    IngresoProduccionDetalle,
+    MovimientoRollo,
+    CorteRollo
 )
+
 from apps.inventory.models import ProductoVariante
-from apps.core.models import Sucursal
 from apps.inventory.services.stock_service import InventoryService
 
 
@@ -21,210 +21,137 @@ class CorteService:
     @staticmethod
     @transaction.atomic
     def ejecutar_corte(
-        rollo_id,
-        es_completo,
-        metros_usados,
+        rollos,
         items,
         sucursal,
         usuario
     ):
 
-        # ==========================
-        # VALIDACIONES BASE
-        # ==========================
-        if not sucursal:
-            raise ValidationError("Sucursal requerida.")
+        if not rollos:
+            raise ValidationError("Debe seleccionar al menos un rollo.")
 
-        if not usuario:
-            raise ValidationError("Usuario requerido para ejecutar corte.")
-
-        # ==========================
-        # BLOQUEO ROLLO
-        # ==========================
-        rollo = (
-            RolloTela.objects
-            .select_for_update()
-            .select_related("tipo_tela", "color")
-            .get(id=rollo_id)
-        )
-
-        if rollo.estado == "CONSUMIDO":
-            raise ValidationError("El rollo ya está consumido.")
-
-        ProduccionValidator.validar_items(items)
-
-        # ==========================
-        # CONSUMO
-        # ==========================
-        if es_completo:
-            consumo_total = rollo.cantidad_disponible
-        else:
-            consumo_total = Decimal(metros_usados or 0)
-
-            if consumo_total <= 0:
-                raise ValidationError("Metros inválidos.")
-
-            if consumo_total > rollo.cantidad_disponible:
-                raise ValidationError("Excede disponible del rollo.")
+        if not items:
+            raise ValidationError("Debe haber producción.")
 
         total_prendas = sum(int(i["cantidad"]) for i in items)
 
         if total_prendas <= 0:
-            raise ValidationError("Debe haber prendas.")
+            raise ValidationError("Sin producción.")
+
+        consumo_total = Decimal("0")
+        rollos_objs = []
+
+        # ==========================
+        # VALIDAR Y BLOQUEAR ROLLOS
+        # ==========================
+        for r in rollos:
+
+            rollo = RolloTela.objects.select_for_update().get(id=r["rollo_id"])
+            metros = Decimal(r["metros"])
+
+            if metros <= 0:
+                raise ValidationError("Metros inválidos.")
+
+            if metros > rollo.cantidad_disponible:
+                raise ValidationError(f"Excede rollo {rollo.codigo}")
+
+            consumo_total += metros
+
+            rollos_objs.append((rollo, metros))
 
         consumo_unitario = consumo_total / Decimal(total_prendas)
 
-        # ==========================
-        # 🔥 COSTOS Y EFICIENCIA (NIVEL INDUSTRIAL)
-        # ==========================
-        costo_por_metro = Decimal("5000")  # 🔥 luego lo vuelves dinámico
-
-        costo_total = consumo_total * costo_por_metro
-        costo_unitario_real = costo_total / Decimal(total_prendas)
-
-        # MERMA (lo que NO se convirtió en producto útil)
-        merma = Decimal("0")  # puedes mejorar esto luego con lógica real
-
-        eficiencia = Decimal("100")
-        if consumo_total > 0:
-            eficiencia = (consumo_total / (consumo_total + merma)) * 100
+        referencia = f"CORTE-{uuid.uuid4().hex[:8]}"
 
         # ==========================
-        # CREAR LOTE
+        # LOTE
         # ==========================
         lote = ProduccionLote.objects.create(
             sucursal=sucursal,
-            rollo=rollo,
-            tipo_tela=rollo.tipo_tela,
-            color=rollo.color,
             consumo_total=consumo_total,
             consumo_unitario=consumo_unitario,
             total_prendas=total_prendas,
-
-            # 🔥 NUEVO NIVEL
-            merma=merma,
-            eficiencia=eficiencia,
-            costo_total=costo_total,
-            costo_unitario_real=costo_unitario_real,
-            operario=usuario
+            operario=usuario,
+            referencia=referencia
         )
 
-        ingreso = IngresoProduccion.objects.create()
+        # ==========================
+        # CONSUMO DE ROLLOS
+        # ==========================
+        for rollo, metros in rollos_objs:
 
-        # ==========================
-        # SUCURSAL FABRICA
-        # ==========================
-        sucursal_fabrica = Sucursal.objects.filter(
-            nombre__iexact="FABRICA"
-        ).first()
+            costo = metros * rollo.costo_por_metro
 
-        if not sucursal_fabrica:
-            raise ValidationError("No existe sucursal FABRICA")
-
-        # ==========================
-        # CACHE VARIANTES
-        # ==========================
-        variantes_cache = {
-            (v.producto_base_id, v.talla): v
-            for v in ProductoVariante.objects.filter(
-                tipo_tela=rollo.tipo_tela,
-                color=rollo.color,
-                producto_base_id__in=[i["producto_base_id"] for i in items]
+            CorteRollo.objects.create(
+                lote=lote,
+                rollo=rollo,
+                metros_consumidos=metros,
+                costo_total=costo
             )
+
+            rollo.cantidad_disponible -= metros
+
+            MovimientoRollo.objects.create(
+                rollo=rollo,
+                tipo="CONSUMO",
+                cantidad=metros,
+                saldo_post=rollo.cantidad_disponible,
+                referencia=referencia,
+                usuario=usuario
+            )
+
+            if rollo.cantidad_disponible <= 0:
+                rollo.estado = "CONSUMIDO"
+
+            rollo.save()
+
+        # ==========================
+        # DETALLES PRODUCCIÓN
+        # ==========================
+        variantes = ProductoVariante.objects.all()
+
+        variantes_map = {
+            (v.producto_base_id, v.talla.nombre.upper()): v
+            for v in variantes
         }
 
-        detalles_produccion = []
-        detalles_ingreso = []
+        detalles = []
 
-        # ==========================
-        # PROCESAR ITEMS
-        # ==========================
         for item in items:
 
-            producto_base_id = int(item["producto_base_id"])
-            talla = item["talla"]
-            cantidad = Decimal(item["cantidad"])
-
-            variante = variantes_cache.get((producto_base_id, talla))
+            key = (item["producto_base_id"], item["talla"].upper())
+            variante = variantes_map.get(key)
 
             if not variante:
-                raise ValidationError(
-                    f"No existe variante para producto {producto_base_id}, talla {talla}"
-                )
+                raise ValidationError(f"Variante no existe {key}")
 
-            # DETALLE PRODUCCIÓN
-            detalles_produccion.append(
+            cantidad = int(item["cantidad"])
+
+            detalles.append(
                 ProduccionDetalle(
                     lote=lote,
-                    producto_base_id=producto_base_id,
-                    talla=talla,
-                    cantidad=int(cantidad),
-                    tipo_tela=rollo.tipo_tela,
-                    color=rollo.color,
-                    variante=variante
-                )
-            )
-
-            # INGRESO PRODUCCIÓN
-            detalles_ingreso.append(
-                IngresoProduccionDetalle(
-                    ingreso=ingreso,
                     variante=variante,
-                    cantidad=int(cantidad)
+                    cantidad=cantidad,
+                    consumo_unitario=consumo_unitario,
+                    consumo_total=consumo_unitario * cantidad,
+                    costo_unitario=0,
+                    costo_total=0
                 )
             )
 
-            # ==========================
-            # STOCK
-            # ==========================
             InventoryService.agregar_stock(
                 variante=variante,
                 cantidad=cantidad,
-                sucursal_id=sucursal_fabrica.id,
-                referencia=f"Lote {lote.id} - Corte",
+                sucursal_id=sucursal.id,
+                user=usuario,
+                referencia=referencia,
                 tipo="PRODUCCION",
-                user=usuario
+                costo_unitario=0
             )
 
-        # BULK INSERT
-        ProduccionDetalle.objects.bulk_create(detalles_produccion)
-        IngresoProduccionDetalle.objects.bulk_create(detalles_ingreso)
+        ProduccionDetalle.objects.bulk_create(detalles)
 
-        # ==========================
-        # DESCONTAR ROLLO
-        # ==========================
-        rollo.cantidad_disponible -= consumo_total
-
-        if rollo.cantidad_disponible <= 0:
-            rollo.cantidad_disponible = Decimal("0")
-            rollo.estado = "CONSUMIDO"
-
-        rollo.save(update_fields=["cantidad_disponible", "estado"])
-
-        # ==========================
-        # FINALIZAR LOTE
-        # ==========================
         lote.ejecutado = True
         lote.save(update_fields=["ejecutado"])
 
         return lote
-
-
-# ==========================
-# VALIDADOR
-# ==========================
-class ProduccionValidator:
-
-    @staticmethod
-    def validar_items(items):
-
-        if not items:
-            raise ValidationError("Debe ingresar al menos un item.")
-
-        for item in items:
-
-            if Decimal(item["cantidad"]) <= 0:
-                raise ValidationError("Cantidad inválida en items.")
-
-            if not item.get("talla"):
-                raise ValidationError("Talla requerida.")

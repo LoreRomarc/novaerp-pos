@@ -9,11 +9,16 @@ class VentaSelector:
     def venta_con_items(venta_id, sucursal):
         return (
             Venta.objects
-            .select_related("usuario", "sesion_caja")
+            .select_related("usuario", "turno")
             .prefetch_related(
                 Prefetch(
                     "items",
-                    queryset=VentaItem.objects.select_related("producto")
+                    queryset=VentaItem.objects.select_related(
+                        "variante",
+                        "variante__producto_base",
+                        "variante__color",
+                        "variante__tipo_tela",
+                    )
                 )
             )
             .filter(id=venta_id, sucursal=sucursal)

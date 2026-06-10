@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+{% url 'administration:cliente_create' as create_url %}
+
+<div class="card shadow-sm border-0">
+    <div class="card-header d-flex justify-content-between">
+        <h5>Clientes</h5>
+        <a href="{{ create_url }}" class="btn btn-primary btn-sm">➕ Crear</a>
+    </div>
+
+    <div class="card-body">
+
+        <input type="text" id="searchInput" class="form-control mb-3" placeholder="Buscar...">
+
+        <table class="table table-hover" id="dataTable">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Identificación</th>
+                    <th>Tipo</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for c in clientes %}
+                <tr>
+                    <td>{{ c.nombre }}</td>
+                    <td>{{ c.identificacion }}</td>
+                    <td>{{ c.tipo_cliente }}</td>
+                    <td>
+                        {% if c.activo %}
+                            <span class="badge bg-success">Activo</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Inactivo</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+    </div>
+</div>
+
+{% endblock %}

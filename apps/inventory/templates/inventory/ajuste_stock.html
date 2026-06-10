@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Ajuste Stock{% endblock %}
+
+{% block content %}
+
+<div class="container">
+
+    <div class="card shadow-sm">
+
+        <div class="card-header">
+            <h4>📦 Ajuste de Inventario</h4>
+        </div>
+
+        <div class="card-body">
+
+            <form method="post">
+
+                {% csrf_token %}
+
+                <div class="mb-3">
+                    <label>Producto</label>
+                    {{ form.variante }}
+                </div>
+
+                <div class="mb-3">
+                    <label>Cantidad</label>
+                    {{ form.cantidad }}
+                </div>
+
+                <div class="mb-3">
+                    <label>Movimiento</label>
+                    {{ form.tipo }}
+                </div>
+
+                <button class="btn btn-success">
+                    Guardar
+                </button>
+
+                <a href="{% url 'inventory:stock_list' %}"
+                   class="btn btn-secondary">
+                    Volver
+                </a>
+
+            </form>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

@@ -7,11 +7,11 @@ from django.http import JsonResponse
 from django.shortcuts import render, redirect
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
-from django.db.models import Q, Prefetch
+from django.db.models import Q
 
 from apps.core.models import Sucursal
 from apps.core.models import Sucursal
-from apps.inventory.models import ProductoVariante, Stock
+from apps.inventory.models import ProductoVariante
 from apps.sales.models import Caja
 from apps.sales.services.pos_service import POSService
 from apps.sales.services.serializers import serializar_venta
@@ -92,29 +92,33 @@ class POSAgregarProductoView(LoginRequiredMixin, RolePermissionMixin, SucursalIs
             return success(venta)
 
         except Exception as e:
-            return error(e)
+            return error(str(e))
 
 
 # =========================
 # ACTUALIZAR CANTIDAD
 # =========================
 class POSActualizarCantidadView(LoginRequiredMixin, RolePermissionMixin, SucursalIsolationMixin, View):
-    allowed_roles = ["SUPER_ADMIN", "ADMIN_SUCURSAL", "CAJERO"]
 
     def post(self, request):
         try:
             data = json.loads(request.body)
-            cantidad = Decimal(str(data.get("cantidad", 0)))
+
+            cantidad = data.get("cantidad")
+            precio = data.get("precio_unitario")
+
             venta_data = POSService.actualizar_cantidad(
                 usuario=request.user,
                 sucursal=self.get_sucursal(),
                 item_id=data.get("item_id"),
-                cantidad=cantidad
+                cantidad=Decimal(str(cantidad)) if cantidad is not None else None,
+                precio_unitario=Decimal(str(precio)) if precio is not None else None,
             )
+
             return success(venta_data)
 
         except Exception as e:
-            return error(e)
+            return error(str(e))
 
 
 # =========================
@@ -134,7 +138,7 @@ class POSEliminarItemView(LoginRequiredMixin, RolePermissionMixin, SucursalIsola
             return success(venta_data)
 
         except Exception as e:
-            return error(e)
+            return error(str(e))
 
 
 # =========================
@@ -161,7 +165,7 @@ class POSCerrarVentaView(LoginRequiredMixin, RolePermissionMixin, SucursalIsolat
             return success({"reset": True, "total": str(venta.total)})
 
         except Exception as e:
-            return error(e)
+            return error(str(e))
 
 
 # =========================
@@ -178,7 +182,7 @@ class POSCancelarVentaView(LoginRequiredMixin, RolePermissionMixin, SucursalIsol
             )
             return success()
         except Exception as e:
-            return error(e)
+            return error(str(e))
 
 
 # =========================
@@ -237,7 +241,7 @@ class POSCambiarTipoVentaView(LoginRequiredMixin, RolePermissionMixin, SucursalI
             )
             return success(venta_data)
         except Exception as e:
-            return error(e)
+            return error(str(e))
 
 
 # =========================

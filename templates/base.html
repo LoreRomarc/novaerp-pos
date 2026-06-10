@@ -5,84 +5,355 @@
     <title>{% block title %}Sistema{% endblock %}</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    
-    {% block content-link %}
-    {% endblock %}
+
+    {% block content-link %}{% endblock %}
 
     <style>
-        body {
-            overflow-x: hidden;
-        }
+    body {
+        overflow-x: hidden;
+        background: #f4f6f9;
+    }
 
-        .sidebar {
-            height: 100vh;
-            background-color: #1e1e2f;
-            color: white;
-            position: fixed;
-            width: 250px;
-        }
+    .sidebar {
+        height: 100vh;
+        background: linear-gradient(180deg, #1e1e2f, #151521);
+        color: white;
+        position: fixed;
+        width: 260px;
+        display: flex;
+        flex-direction: column;
+    }
 
-        .sidebar a {
-            color: #bdbdbd;
-            text-decoration: none;
-            display: block;
-            padding: 12px 20px;
-        }
+    .sidebar-title {
+        font-size: 22px;
+        padding: 20px;
+        text-align: center;
+        background-color: #111827;
+        font-weight: bold;
+    }
 
-        .sidebar a:hover {
-            background-color: #343454;
-            color: white;
-        }
+    .sidebar-content {
+        flex: 1;
+        overflow-y: auto;
 
-        .content {
-            margin-left: 250px;
-            padding: 20px;
-        }
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255,255,255,.15) transparent;
+    }
 
-        .sidebar-title {
-            font-size: 20px;
-            padding: 20px;
-            text-align: center;
-            background-color: #141421;
-        }
+    .sidebar-content::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .sidebar-content::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .sidebar-content::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,.15);
+        border-radius: 20px;
+    }
+
+    .sidebar-content::-webkit-scrollbar-thumb:hover {
+        background: rgba(255,255,255,.30);
+    }
+
+    .sidebar a {
+        color: #bdbdbd;
+        text-decoration: none;
+        display: block;
+        padding: 12px 20px;
+        border-left: 3px solid transparent;
+        transition: all 0.2s;
+    }
+
+    .sidebar a.active {
+        background-color: #2a2a40;
+        color: white;
+        border-left: 3px solid #6366f1;
+    }
+
+    .sidebar-content::-webkit-scrollbar-thumb {
+        background: linear-gradient(
+            180deg,
+            rgba(99,102,241,.55),
+            rgba(79,70,229,.55)
+        );
+        border-radius: 20px;
+    }
+
+    .sidebar-content::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(
+            180deg,
+            rgba(99,102,241,.85),
+            rgba(79,70,229,.85)
+        );
+    }
+
+    .sidebar a:hover {
+        background-color: #2a2a40;
+        color: white;
+    }
+
+    .section {
+        margin-top: 15px;
+        font-size: 12px;
+        padding: 10px 20px;
+        color: #6b7280;
+    }
+
+    .content {
+        margin-left: 260px;
+        padding: 25px;
+    }
+
+    .user-box {
+        padding: 15px;
+        background: #111827;
+    }
+
+    .global-search-results {
+        position: absolute;
+        width: 220px;
+        background: #1f2937;
+        border-radius: 8px;
+        overflow: hidden;
+        z-index: 999;
+    }
+
+    .global-search-results a {
+        color: white;
+        padding: 10px;
+        display: block;
+    }
+
+    .global-search-results a:hover {
+        background: #374151;
+    }
+
     </style>
 </head>
 
-<body class="bg-light">
+<body>
 
 <div class="sidebar">
+
     <div class="sidebar-title">
-        Algo Mediano
+        🚀 ERP
     </div>
 
-    {% if request.user.groups.first.name == "SUPER_ADMIN" %}
-        <a href="/sales/pos/">🛒 POS</a>
-        <a href="/reports/ventas/">📊 Reportes</a>
-        <a href="/admin/">⚙ Administración</a>
-        <a href="#">🏢 Sucursales</a>
-        <a href="#">👥 Usuarios</a>
-    {% elif request.user.groups.first.name == "ADMIN_SUCURSAL" %}
-        <a href="/sales/pos/">🛒 POS</a>
-        <a href="/reports/ventas/">📊 Reportes</a>
-    {% elif request.user.groups.first.name == "CAJERO" %}
-        <a href="/sales/pos/">🛒 POS</a>
-    {% endif %}
+    <!-- GLOBAL SEARCH -->
+    <div class="p-2 position-relative">
+        <input type="text" id="globalSearch" class="form-control form-control-sm" placeholder="🔍 Buscar...">
+        <div id="globalResults" class="global-search-results"></div>
+    </div>
 
-    <hr class="bg-secondary">
+    <div class="sidebar-content">
 
-    <a href="#">👤 {{ request.user.username }}</a>
-    <a href="/accounts/logout/" class="text-danger">🚪 Cerrar sesión</a>
+        <div class="section">General</div>
+
+        <a href="/sales/pos/">🛒 POS</a>
+
+        {% if request.user.is_authenticated and request.user.profile %}
+            {% if request.user.profile.role != "CAJERO" %}
+                <a href="/reports/ventas/">📊 Reportes</a>
+            {% endif %}
+        {% endif %}
+
+        {% if request.user.is_authenticated and request.user.profile.role == "SUPER_ADMIN" %}
+
+            <div class="section">Administración</div>
+
+            <a href="{% url 'administration:dashboard' %}">🧠 Panel</a>
+            <a href="{% url 'inventory:dashboard' %}">📦 Dashboard</a>
+            <a href="{% url 'administration:sucursal_list' %}">🏢 Sucursales</a>
+            <a href="{% url 'administration:user_list' %}">👥 Usuarios</a>
+            <a href="{% url 'administration:color_list' %}">🎨 Colores</a>
+            <a href="{% url 'administration:tipo_tela_list' %}">🧵 Tipos Tela</a>
+            <a href="{% url 'administration:talla_list' %}">📏 Tallas</a>
+            <a href="{% url 'administration:cliente_list' %}">🧾 Clientes</a>
+
+        {% endif %}
+
+        {% if request.user.is_authenticated and request.user.profile %}
+            {% if request.user.profile.role != "CAJERO" %}
+
+            <div class="section">Inventario</div>
+
+            <a href="{% url 'inventory:producto_list' %}">🧵 Productos</a>
+            <a href="{% url 'inventory:variante_list' %}">🧩 Variantes</a>
+            <a href="{% url 'administration:lista_precio_list' %}">💰 Listas de Precio</a>
+            <a href="{% url 'administration:precio_variante_list' %}">🏷️ Precios Productos</a>
+            <a href="{% url 'inventory:stock_list' %}">📊 Stock</a>
+            <a href="{% url 'inventory:kardex' %}">🔄 Kardex</a>
+            <a href="{% url 'inventory:produccion_list' %}">🏭 Producción</a>
+            <a href="{% url 'inventory:rollo_list' %}">🧶 Rollos</a>
+            <a href="{% url 'inventory:corte_produccion' %}">✂️ Corte</a>
+            <a href="{% url 'inventory:traslado_list' %}">🚚 Traslados</a>
+
+            {% endif %}
+        {% endif %}
+
+    </div>
+
+    <div class="user-box">
+
+        <div>👤 {{ request.user.username }}</div>
+
+        <a href="{% url 'logout' %}" class="btn btn-sm btn-danger mt-2 w-100">
+            Cerrar sesión
+        </a>
+
+    </div>
+
 </div>
 
 <div class="content">
-    {% block content %}
-    {% endblock %}
+    {% block content %}{% endblock %}
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 
-{% block content-script %}
-{% endblock %}
+{% block content-script %}{% endblock %}
+
+<script>
+
+/////////////////////////////////////
+// 🎯 ACTIVE SIDEBAR (FIX REAL)
+/////////////////////////////////////
+
+const currentPath = window.location.pathname.replace(/\/$/, "");
+
+let activeSet = false;
+
+document.querySelectorAll(".sidebar a").forEach(link => {
+
+    let href = link.getAttribute("href");
+
+    if (!href) return;
+
+    href = href.replace(/\/$/, "");
+
+    // EXACT MATCH
+    if (currentPath === href) {
+        link.classList.add("active");
+        activeSet = true;
+        return;
+    }
+
+});
+
+// SOLO SI NO HUBO EXACT MATCH
+if (!activeSet) {
+
+    document.querySelectorAll(".sidebar a").forEach(link => {
+
+        let href = link.getAttribute("href");
+
+        if (!href) return;
+
+        href = href.replace(/\/$/, "");
+
+        if (href !== "/" && currentPath.startsWith(href + "/")) {
+
+            // IMPORTANTE: evita múltiples activos
+            if (!document.querySelector(".sidebar a.active")) {
+                link.classList.add("active");
+            }
+
+        }
+
+    });
+
+}
+
+/////////////////////////////////////
+// 🔎 GLOBAL SEARCH
+/////////////////////////////////////
+
+const input = document.getElementById("globalSearch");
+const results = document.getElementById("globalResults");
+
+let timeout;
+
+input.addEventListener("keyup", function () {
+
+    clearTimeout(timeout);
+
+    let q = this.value.trim();
+
+    if (q.length < 2) {
+        results.innerHTML = "";
+        return;
+    }
+
+    timeout = setTimeout(async () => {
+
+        let res = await fetch(`/admin-panel/api/global-search/?q=${q}`);
+        let data = await res.json();
+
+        results.innerHTML = "";
+
+        data.forEach(item => {
+
+            let a = document.createElement("a");
+            a.href = item.url;
+
+            a.innerHTML = `
+                <strong>${item.label}</strong><br>
+                <small>${item.extra}</small>
+            `;
+
+            results.appendChild(a);
+        });
+
+    }, 200);
+
+});
+
+document.addEventListener("click", function(e){
+
+    if (!input.contains(e.target) && !results.contains(e.target)) {
+        results.innerHTML = "";
+    }
+
+});
+
+/////////////////////////////////////
+// 💾 RECORDAR SCROLL DEL SIDEBAR
+/////////////////////////////////////
+
+const sidebarContent =
+    document.querySelector(".sidebar-content");
+
+if (sidebarContent) {
+
+    // Restaurar posición guardada
+    const savedScroll =
+        localStorage.getItem("sidebar-scroll");
+
+    if (savedScroll !== null) {
+
+        sidebarContent.scrollTop =
+            parseInt(savedScroll);
+
+    }
+
+    // Guardar posición mientras navega
+    sidebarContent.addEventListener(
+        "scroll",
+        function () {
+
+            localStorage.setItem(
+                "sidebar-scroll",
+                sidebarContent.scrollTop
+            );
+
+        }
+    );
+
+}
+
+</script>
 
 </body>
 </html>

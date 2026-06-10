@@ -1,53 +1,78 @@
-{% extends "base_erp.html" %}
+<!-- produccion.html-->
+{% extends "base.html" %}
 
 {% block content %}
 
-<div class="card">
-    <h2>Registrar Producción</h2>
+<h2>🏭 Producción</h2>
 
-    <form method="post">
-        {% csrf_token %}
+<div class="row">
 
-        <!-- BUSCADOR DE VARIANTE -->
-        <label>Buscar Producto</label>
-        <input
-            type="text"
-            id="search"
-            placeholder="Escribe nombre, color o SKU..."
-            onkeyup="filtrarVariantes()"
-        >
+    <!-- KPIs -->
+    <div class="col-md-3">
+        <div class="card p-3">
+            <h5>Total Lotes</h5>
+            <h3>{{ total_lotes }}</h3>
+        </div>
+    </div>
 
-        <!-- SELECT REAL OCULTO UX -->
-        <label>Producto</label>
-        <select name="variante_id" id="varianteSelect" required>
-            {% for v in variantes %}
-                <option value="{{ v.id }}">
-                    {{ v.producto_base.nombre }} - {{ v.color.nombre }} - {{ v.talla }} ({{ v.sku }})
-                </option>
-            {% endfor %}
-        </select>
+    <div class="col-md-3">
+        <div class="card p-3">
+            <h5>Total Prendas</h5>
+            <h3>{{ total_prendas }}</h3>
+        </div>
+    </div>
 
-        <br><br>
+    <div class="col-md-3">
+        <div class="card p-3">
+            <h5>Consumo Tela</h5>
+            <h3>{{ consumo_total }}</h3>
+        </div>
+    </div>
 
-        <label>Cantidad</label>
-        <input type="number" name="cantidad" min="1" required>
-
-        <br><br>
-
-        <button type="submit">Registrar Producción</button>
-    </form>
 </div>
 
-<script>
-function filtrarVariantes() {
-    const input = document.getElementById("search").value.toLowerCase();
-    const select = document.getElementById("varianteSelect");
+<hr>
 
-    for (let option of select.options) {
-        const text = option.text.toLowerCase();
-        option.style.display = text.includes(input) ? "" : "none";
-    }
-}
-</script>
+<h4>🧵 Rollos Disponibles</h4>
+<table class="table table-bordered">
+    <tr>
+        <th>Código</th>
+        <th>Tela</th>
+        <th>Color</th>
+        <th>Disponible</th>
+    </tr>
+    {% for r in rollos %}
+    <tr>
+        <td>{{ r.codigo }}</td>
+        <td>{{ r.tipo_tela.nombre }}</td>
+        <td>{{ r.color.nombre }}</td>
+        <td>{{ r.cantidad_disponible }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<hr>
+
+<h4>📦 Últimos Lotes</h4>
+
+<table class="table table-striped">
+    <tr>
+        <th>Referencia</th>
+        <th>Rollo</th>
+        <th>Prendas</th>
+        <th>Consumo</th>
+        <th>Costo</th>
+    </tr>
+
+    {% for l in lotes %}
+    <tr>
+        <td>{{ l.referencia }}</td>
+        <td>{{ l.rollo.codigo }}</td>
+        <td>{{ l.total_prendas }}</td>
+        <td>{{ l.consumo_total }}</td>
+        <td>{{ l.costo_total }}</td>
+    </tr>
+    {% endfor %}
+</table>
 
 {% endblock %}

@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="card shadow-sm border-0">
+
+    <div class="card-header bg-white d-flex justify-content-between align-items-center">
+
+        <h5 class="mb-0">Colores</h5>
+
+        <a href="{% url 'administration:color_create' %}"
+           class="btn btn-primary btn-sm">
+            ➕ Nuevo Color
+        </a>
+
+    </div>
+
+    <div class="card-body">
+
+        <input type="text"
+               id="searchInput"
+               class="form-control mb-3"
+               placeholder="Buscar color...">
+
+        <table class="table table-hover" id="dataTable">
+
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Color</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for c in colores %}
+                <tr>
+                    <td>{{ c.nombre }}</td>
+
+                    <td>
+                        <div style="
+                            width:30px;
+                            height:30px;
+                            background:{{ c.codigo_hex }};
+                            border:1px solid #ccc;
+                        ">
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+{% endblock %}

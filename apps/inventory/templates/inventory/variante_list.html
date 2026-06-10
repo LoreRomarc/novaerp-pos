@@ -1,0 +1,99 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="d-flex justify-content-between mb-4">
+
+    <h2>📦 Variantes</h2>
+
+    <a
+        href="{% url 'inventory:variante_create' %}"
+        class="btn btn-primary"
+    >
+        + Nueva Variante
+    </a>
+
+</div>
+
+<div class="card shadow-sm">
+
+    <div class="card-body">
+
+        <table class="table table-hover">
+
+            <thead>
+
+                <tr>
+
+                    <th>SKU</th>
+
+                    <th>Producto</th>
+
+                    <th>Color</th>
+
+                    <th>Talla</th>
+
+                    <th>Precio</th>
+
+                    <th>Stock</th>
+
+                    <th></th>
+
+                </tr>
+
+            </thead>
+
+            <tbody>
+
+                {% for v in variantes %}
+
+                <tr>
+
+                    <td>{{ v.sku }}</td>
+
+                    <td>{{ v.producto_base.nombre }}</td>
+
+                    <td>{{ v.color.nombre }}</td>
+
+                    <td>{{ v.talla }}</td>
+
+                    <td>${{ v.precio_venta }}</td>
+
+                    <td>
+
+                        {% if v.stock_total <= v.stock_minimo %}
+                            <span class="badge bg-danger">
+                                {{ v.stock_total }}
+                            </span>
+                        {% else %}
+                            <span class="badge bg-success">
+                                {{ v.stock_total }}
+                            </span>
+                        {% endif %}
+
+                    </td>
+
+                    <td>
+
+                        <a
+                            href="{% url 'inventory:variante_update' v.id %}"
+                            class="btn btn-dark btn-sm"
+                        >
+                            Editar
+                        </a>
+
+                    </td>
+
+                </tr>
+
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+{% endblock %}

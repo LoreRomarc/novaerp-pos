@@ -1,80 +1,348 @@
-<!-- templates/inventory/corte_produccion.html -->
-{% extends "base_erp.html" %}
+{% extends "base.html" %}
 
 {% block content %}
 
-<div class="card">
-    <h2>Proceso de Corte</h2>
+<style>
+.card-erp {
+    background: #fff;
+    border-radius: 12px;
+    padding: 25px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.05);
+}
 
-    <form method="post">
+.grid-item {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 60px;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+input,
+select {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    width: 100%;
+    font-size: 14px;
+}
+
+button {
+    padding: 10px 15px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.btn-primary {
+    background: #2563eb;
+    color: white;
+}
+
+.btn-danger {
+    background: #dc2626;
+    color: white;
+}
+
+.btn-secondary {
+    background: #6b7280;
+    color: white;
+}
+
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.badge {
+    padding: 5px 10px;
+    border-radius: 20px;
+    background: #e5e7eb;
+    font-size: 12px;
+}
+
+.summary {
+    background: #f9fafb;
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 15px;
+}
+
+.context-box {
+    background: #f1f5f9;
+    border-left: 4px solid #2563eb;
+    padding: 12px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    font-size: 14px;
+}
+
+.msg {
+    padding: 10px;
+    border-radius: 6px;
+    margin-bottom: 10px;
+}
+
+.msg-error {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.msg-success {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.table-header {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 60px;
+    gap: 10px;
+    font-weight: bold;
+    margin-bottom: 10px;
+    padding: 8px;
+    background: #f8fafc;
+    border-radius: 6px;
+}
+</style>
+
+<div class="card-erp">
+
+    <!-- CONTEXTO -->
+    <div class="context-box">
+        <strong>Usuario:</strong> {{ request.user.username }}<br>
+        <strong>Sucursal:</strong> {{ request.user.profile.sucursal.nombre|default:"No definida" }}<br>
+        <strong>Fecha:</strong> {% now "Y-m-d H:i" %}
+    </div>
+
+    <!-- MENSAJES -->
+    {% if messages %}
+        {% for message in messages %}
+            <div class="msg {% if message.tags == 'error' %}msg-error{% else %}msg-success{% endif %}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <!-- HEADER -->
+    <div class="header">
+        <h2>✂️ Proceso de Corte</h2>
+        <span class="badge">Producción</span>
+    </div>
+
+    <form method="post" id="formCorte">
         {% csrf_token %}
 
-        <label>Rollo</label>
-        <select name="rollo" required>
-            {% for r in rollos %}
-                <option value="{{ r.id }}">
-                    {{ r.codigo }} - {{ r.tipo_tela }} - {{ r.color }} ({{ r.cantidad_disponible }})
-                </option>
-            {% endfor %}
-        </select>
-
-        <br><br>
+        <!-- ROLLOS -->
 
         <label>
-            <input type="checkbox" name="es_completo">
-            Corte completo
+            <strong>🧵 Rollos Utilizados</strong>
         </label>
 
-        <br><br>
+        <div id="rollosContainer">
 
-        <label>Metros</label>
-        <input type="number" step="0.01" name="metros">
+            <div class="grid-item rollo-item">
+
+                <select name="rollos[]" required>
+
+                    <option value="">
+                        -- Seleccionar rollo --
+                    </option>
+
+                    {% for r in rollos %}
+                        <option value="{{ r.id }}">
+                            {{ r.codigo }}
+                            |
+                            {{ r.tipo_tela.nombre }}
+                            |
+                            {{ r.color.nombre }}
+                            |
+                            {{ r.cantidad_disponible }} mts
+                        </option>
+                    {% endfor %}
+
+                </select>
+
+                <input
+                    type="number"
+                    step="0.01"
+                    name="metros_rollo[]"
+                    placeholder="Metros usados"
+                    required
+                >
+
+                <button
+                    type="button"
+                    class="btn-secondary"
+                    onclick="addRollo()"
+                >
+                    +
+                </button>
+
+            </div>
+
+        </div>
 
         <hr>
 
-        <h3>Producción</h3>
+        <!-- ITEMS -->
+        <div class="header">
+            <h3>👕 Producción por Talla</h3>
 
-        <div id="items">
-            <div class="grid">
-                <select name="producto_base">
-                    {% for p in productos %}
-                        <option value="{{ p.id }}">{{ p.nombre }}</option>
-                    {% endfor %}
-                </select>
+            <button
+                type="button"
+                class="btn-secondary"
+                onclick="addItem()"
+            >
+                + Agregar Línea
+            </button>
+        </div>
 
-                <input type="text" name="talla" placeholder="Talla">
-                <input type="number" name="cantidad" placeholder="Cantidad">
-            </div>
+        <div class="table-header">
+            <div>Producto</div>
+            <div>Talla</div>
+            <div>Cantidad</div>
+            <div></div>
+        </div>
+
+        <div id="items"></div>
+
+        <!-- RESUMEN -->
+        <div class="summary">
+            <strong>Total prendas:</strong>
+            <span id="totalPrendas">0</span>
         </div>
 
         <br>
 
-        <button type="button" onclick="addItem()">Agregar línea</button>
-        <br><br>
+        <button
+            type="submit"
+            class="btn-primary"
+        >
+            Ejecutar Corte
+        </button>
 
-        <button type="submit">Ejecutar Corte</button>
     </form>
+
 </div>
 
 <script>
+
 function addItem() {
+
+    const container = document.getElementById("items");
+
     const div = document.createElement("div");
 
-    div.classList.add("grid");
+    div.classList.add("grid-item");
 
     div.innerHTML = `
-        <select name="producto_base">
+        <select name="producto_base" required>
+
             {% for p in productos %}
-                <option value="{{ p.id }}">{{ p.nombre }}</option>
+                <option value="{{ p.id }}">
+                    {{ p.nombre }}
+                </option>
             {% endfor %}
+
         </select>
 
-        <input type="text" name="talla" placeholder="Talla">
-        <input type="number" name="cantidad" placeholder="Cantidad">
+        <select name="talla" required>
+            <option value="">Talla</option>
+            <option value="XS">XS</option>
+            <option value="S">S</option>
+            <option value="M">M</option>
+            <option value="L">L</option>
+            <option value="XL">XL</option>
+            <option value="XXL">XXL</option>
+        </select>
+
+        <input
+            type="number"
+            name="cantidad"
+            min="1"
+            placeholder="Cantidad"
+            onchange="calcularTotal()"
+            required
+        >
+
+        <button
+            type="button"
+            class="btn-danger"
+            onclick="removeItem(this)"
+        >
+            ✕
+        </button>
     `;
 
-    document.getElementById("items").appendChild(div);
+    container.appendChild(div);
 }
+
+function removeItem(btn) {
+
+    btn.parentElement.remove();
+
+    calcularTotal();
+}
+
+function calcularTotal() {
+
+    let total = 0;
+
+    document.querySelectorAll(
+        "input[name='cantidad']"
+    ).forEach(input => {
+
+        total += parseInt(
+            input.value || 0
+        );
+
+    });
+
+    document.getElementById(
+        "totalPrendas"
+    ).innerText = total;
+}
+
+function toggleMetros() {
+
+    const check =
+        document.getElementById("esCompleto");
+
+    const metros =
+        document.getElementById("metros");
+
+    metros.disabled = check.checked;
+
+    if (check.checked) {
+        metros.value = "";
+    }
+}
+
+function addRollo() {
+
+    const container =
+        document.getElementById("rollosContainer");
+
+    const first =
+        container.querySelector(".rollo-item");
+
+    const clone =
+        first.cloneNode(true);
+
+    clone.querySelector(
+        "select[name='rollos[]']"
+    ).selectedIndex = 0;
+
+    clone.querySelector(
+        "input[name='metros_rollo[]']"
+    ).value = "";
+
+    container.appendChild(clone);
+}
+
+addItem();
+
 </script>
 
 {% endblock %}

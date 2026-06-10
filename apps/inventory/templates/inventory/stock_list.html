@@ -1,19 +1,184 @@
-{% extends "base_erp.html" %}
+{% extends "base.html" %}
+
+{% block title %}Stock{% endblock %}
 
 {% block content %}
 
-<div class="card">
-    <h2>Stock</h2>
-</div>
+<style>
+.kpi-card {
+    min-height: 110px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
 
-<div class="card">
-    <ul>
-        {% for s in stocks %}
-            <li>
-                {{ s.variante }} - {{ s.sucursal }} : {{ s.cantidad }}
-            </li>
-        {% endfor %}
-    </ul>
+.table thead th {
+    font-size: 13px;
+    text-transform: uppercase;
+    color: #6b7280;
+}
+
+.badge-soft {
+    padding: 5px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+}
+</style>
+
+<div class="container-fluid">
+
+    <!-- HEADER -->
+    <div class="d-flex justify-content-between align-items-center mb-3">
+
+        <h2>📦 Stock</h2>
+
+        <div class="d-flex gap-2">
+
+            <a href="{% url 'inventory:ajuste_stock_form' %}"
+            class="btn btn-success">
+                ➕ Ajustar Stock
+            </a>
+
+            <form method="get" class="d-flex gap-2">
+                <input type="text"
+                    name="q"
+                    value="{{ request.GET.q }}"
+                    placeholder="Buscar producto..."
+                    class="form-control">
+
+                <button class="btn btn-dark">
+                    Buscar
+                </button>
+            </form>
+
+        </div>
+
+    </div>
+
+    <!-- KPIs -->
+    <div class="row g-3 mb-4">
+
+        <div class="col-md-3 d-flex">
+            <div class="card w-100 kpi-card shadow-sm">
+                <div class="text-center">
+                    <small>Total Unidades</small>
+                    <h4>{{ total_unidades }}</h4>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 d-flex">
+            <div class="card w-100 kpi-card shadow-sm">
+                <div class="text-center">
+                    <small>Productos</small>
+                    <h4>{{ total_productos }}</h4>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 d-flex">
+            <div class="card w-100 kpi-card shadow-sm">
+                <div class="text-center">
+                    <small>Stock Bajo</small>
+                    <h4 class="text-danger">{{ stock_bajo }}</h4>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3 d-flex">
+            <div class="card w-100 kpi-card shadow-sm">
+                <div class="text-center">
+                    <small>Valor Inventario</small>
+                    <h4>$ {{ valor_total|floatformat:0 }}</h4>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- TABLA -->
+    <div class="card shadow-sm">
+
+        <div class="table-responsive">
+
+            <table class="table align-middle">
+
+                <thead class="table-light">
+                    <tr>
+                        <th>Producto</th>
+                        <th>Tela</th>
+                        <th>Color</th>
+                        <th>Talla</th>
+                        <th>Sucursal</th>
+                        <th class="text-end">Stock</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+
+                {% for s in stocks %}
+
+                    <tr>
+
+                        <td>
+                            <strong>{{ s.variante.producto_base.nombre }}</strong>
+                        </td>
+
+                        <td>{{ s.variante.tipo_tela.nombre }}</td>
+
+                        <td>
+                            <span class="badge"
+                                  style="background: {{ s.variante.color.codigo_hex|default:'#6b7280' }}">
+                                {{ s.variante.color.nombre }}
+                            </span>
+                        </td>
+
+                        <td>{{ s.variante.talla }}</td>
+
+                        <td>{{ s.sucursal.nombre }}</td>
+
+                        <td class="text-end">
+                            <strong>{{ s.cantidad }}</strong>
+                        </td>
+
+                        <td>
+
+                            {% if s.cantidad == 0 %}
+                                <span class="badge bg-dark">Agotado</span>
+
+                            {% elif s.cantidad < 5 %}
+                                <span class="badge bg-danger">Crítico</span>
+
+                            {% elif s.cantidad < 15 %}
+                                <span class="badge bg-warning text-dark">Bajo</span>
+
+                            {% else %}
+                                <span class="badge bg-success">OK</span>
+                            {% endif %}
+
+                        </td>
+
+                    </tr>
+
+                {% empty %}
+
+                    <tr>
+                        <td colspan="7" class="text-center p-4">
+                            No hay stock
+                        </td>
+                    </tr>
+
+                {% endfor %}
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </div>
+
 </div>
 
 {% endblock %}

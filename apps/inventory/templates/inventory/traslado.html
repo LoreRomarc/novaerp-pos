@@ -1,29 +1,177 @@
-{% extends "base_erp.html" %}
+{% extends "base.html" %}
 
 {% block content %}
 
-<div class="card">
-    <h2>Nuevo Traslado</h2>
+<div class="container">
 
-    <form method="post">
-        {% csrf_token %}
+    <div class="card shadow-sm border-0">
 
-        <label>Origen (ID sucursal)</label>
-        <input type="number" name="origen" required>
+        <div class="card-body">
 
-        <label>Destino (ID sucursal)</label>
-        <input type="number" name="destino" required>
+            <h3 class="mb-4">
+                Nuevo movimiento inventario
+            </h3>
 
-        <label>Variante</label>
-        <input type="number" name="variante_id" required>
+            <form method="post">
 
-        <label>Cantidad</label>
-        <input type="number" name="cantidad" required>
+                {% csrf_token %}
 
-        <br><br>
+                <div class="row g-3">
 
-        <button type="submit">Ejecutar traslado</button>
-    </form>
+                    <div class="col-md-4">
+
+                        <label class="form-label">
+                            Tipo movimiento
+                        </label>
+
+                        {{ form.tipo }}
+
+                    </div>
+
+                    <div
+                        class="col-md-4"
+                        id="origen-wrapper"
+                    >
+
+                        <label class="form-label">
+                            Sucursal origen
+                        </label>
+
+                        {{ form.origen }}
+
+                    </div>
+
+                    <div
+                        class="col-md-4"
+                        id="destino-wrapper"
+                    >
+
+                        <label class="form-label">
+                            Sucursal destino
+                        </label>
+
+                        {{ form.destino }}
+
+                    </div>
+
+                    <div class="col-md-6">
+
+                        <label class="form-label">
+                            Producto
+                        </label>
+
+                        {{ form.variante }}
+
+                    </div>
+
+                    <div class="col-md-3">
+
+                        <label class="form-label">
+                            Cantidad
+                        </label>
+
+                        {{ form.cantidad }}
+
+                    </div>
+
+                    <div class="col-md-3">
+
+                        <label class="form-label">
+                            Motivo
+                        </label>
+
+                        {{ form.motivo }}
+
+                    </div>
+
+                    <div class="col-12">
+
+                        <label class="form-label">
+                            Observaciones
+                        </label>
+
+                        {{ form.observaciones }}
+
+                    </div>
+
+                    <div class="col-12">
+
+                        <button class="btn btn-primary">
+
+                            Procesar movimiento
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </form>
+
+        </div>
+
+    </div>
+
 </div>
+
+<script>
+
+const tipoField = document.getElementById("id_tipo");
+
+const origenWrapper = document.getElementById(
+    "origen-wrapper"
+);
+
+const destinoWrapper = document.getElementById(
+    "destino-wrapper"
+);
+
+function toggleFields() {
+
+    const tipo = tipoField.value;
+
+    origenWrapper.style.display = "none";
+    destinoWrapper.style.display = "none";
+
+    // COMPLETO
+    if (tipo === "COMPLETO") {
+
+        origenWrapper.style.display = "block";
+        destinoWrapper.style.display = "block";
+    }
+
+    // SALIDAS
+    else if ([
+        "SALIDA",
+        "AJUSTE_SALIDA",
+        "DANADO",
+        "MERMA",
+        "CONSUMO_INTERNO",
+        "DEVOLUCION_PROVEEDOR"
+    ].includes(tipo)) {
+
+        origenWrapper.style.display = "block";
+    }
+
+    // ENTRADAS
+    else if ([
+        "ENTRADA",
+        "AJUSTE_ENTRADA",
+        "DEVOLUCION_CLIENTE",
+        "INICIAL"
+    ].includes(tipo)) {
+
+        destinoWrapper.style.display = "block";
+    }
+}
+
+tipoField.addEventListener(
+    "change",
+    toggleFields
+);
+
+toggleFields();
+
+</script>
 
 {% endblock %}

@@ -1,9 +1,29 @@
+<!-- produccion_list.html-->
 <h2>Producciones</h2>
 
 <a href="{% url 'produccion' %}">Nueva Producción</a>
 
-<ul>
-    {% for p in producciones %}
-        <li>ID: {{ p.id }}</li>
+<h3>👕 Producción por Talla</h3>
+
+<table class="table">
+    <tr>
+        <th>Producto</th>
+        <th>Talla</th>
+        <th>Cantidad</th>
+    </tr>
+
+    {% for p in productos %}
+    <tr>
+        <td>
+            {{ p.nombre }}
+            <input type="hidden" name="producto_base" value="{{ p.id }}">
+        </td>
+        <td>
+            <input type="text" name="talla" class="form-control" placeholder="S, M, L">
+        </td>
+        <td>
+            <input type="number" name="cantidad" class="form-control">
+        </td>
+    </tr>
     {% endfor %}
-</ul>
+</table>

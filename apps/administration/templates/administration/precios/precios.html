@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="card shadow-sm">
+
+    <div class="card-header bg-white d-flex justify-content-between">
+
+        <h5>Precios por Variante</h5>
+
+        <a href="{% url 'administration:precio_variante_create' %}"
+           class="btn btn-primary">
+            ➕ Nuevo Precio
+        </a>
+
+    </div>
+
+    <div class="card-body">
+
+        <table class="table">
+
+            <thead>
+                <tr>
+                    <th>Producto</th>
+                    <th>Lista</th>
+                    <th>Precio</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                {% for p in precios %}
+                <tr>
+
+                    <td>{{ p.variante }}</td>
+
+                    <td>{{ p.lista }}</td>
+
+                    <td>
+                        $ {{ p.precio|floatformat:0 }}
+                    </td>
+
+                </tr>
+                {% endfor %}
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>
+
+{% endblock %}

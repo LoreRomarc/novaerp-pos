@@ -1,0 +1,254 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container-fluid">
+
+    <h2 class="mb-4">📊 Dashboard de Inventario</h2>
+
+    <!-- ================= KPIs ================= -->
+    <div class="row g-3 mb-4">
+
+        <div class="col-md-3">
+            <div class="card shadow-sm p-3">
+                <small>Total Unidades</small>
+                <h3>{{ total_unidades }}</h3>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm p-3">
+                <small>Productos</small>
+                <h3>{{ productos_unicos }}</h3>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm p-3">
+                <small>Movimientos Hoy</small>
+                <h3>{{ movimientos_hoy }}</h3>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow-sm p-3">
+                <small>Producción (7 días)</small>
+                <h3>{{ produccion_semana }}</h3>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ================= ALERTAS ================= -->
+    <div class="card mb-4 shadow-sm">
+        <div class="card-header bg-danger text-white">
+            ⚠ Stock bajo
+        </div>
+
+        <div class="card-body">
+
+            <table class="table table-sm">
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>Cantidad</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in stock_bajo %}
+                    <tr>
+                        <td>{{ s.variante.producto_base.nombre }}</td>
+                        <td class="text-danger">{{ s.cantidad }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="2">Sin alertas</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+        </div>
+    </div>
+
+    <div class="row">
+
+        <!-- ================= MOVIMIENTOS ================= -->
+        <div class="col-md-8">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    🔄 Actividad reciente
+                </div>
+
+                <div class="card-body">
+
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th>Tipo</th>
+                                <th>Cantidad</th>
+                                <th>Usuario</th>
+                                <th>Fecha</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for m in movimientos %}
+                            <tr>
+                                <td>{{ m.variante.producto_base.nombre }}</td>
+                                <td>{{ m.tipo }}</td>
+                                <td>{{ m.cantidad }}</td>
+                                <td>{{ m.usuario }}</td>
+                                <td>{{ m.creado|date:"d/m H:i" }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= TOP PRODUCTOS ================= -->
+        <div class="col-md-4">
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    🔥 Productos más movidos
+                </div>
+
+                <div class="card-body">
+
+                    <ul class="list-group">
+                        {% for p in top_productos %}
+                        <li class="list-group-item d-flex justify-content-between">
+                            {{ p.variante__producto_base__nombre }}
+                            <span class="badge bg-primary">{{ p.total }}</span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- ================= AJUSTE RÁPIDO PRO ================= -->
+    <div class="card mt-4 shadow-sm">
+        <div class="card-header bg-dark text-white">
+            ⚡ Ajuste inteligente de stock (Shopify Mode)
+        </div>
+
+        <div class="card-body">
+
+            <!-- SEARCH -->
+            <input id="search"
+                class="form-control mb-2"
+                placeholder="Buscar producto, SKU, color..."
+                autocomplete="off">
+
+            <!-- RESULTS -->
+            <div id="results" class="list-group mb-3"></div>
+
+            <form id="ajusteForm" method="POST">
+                {% csrf_token %}
+
+                <input type="hidden" name="variante_id" id="variante_id">
+
+                <div class="row g-2">
+
+                    <div class="col-md-4">
+                        <input name="cantidad"
+                            type="number"
+                            step="1"
+                            class="form-control"
+                            placeholder="+10 o -5">
+                    </div>
+
+                    <div class="col-md-4">
+                        <button class="btn btn-primary w-100">
+                            Aplicar ajuste
+                        </button>
+                    </div>
+
+                </div>
+
+            </form>
+
+            <small class="text-muted">
+                💡 Escribe nombre, SKU o escanea código de barras
+            </small>
+
+        </div>
+    </div>
+
+</div>
+
+<script>
+function initShopifyVariantSearch({ inputId, resultsId, hiddenId, url }) {
+
+    const input = document.getElementById(inputId);
+    const results = document.getElementById(resultsId);
+    const hidden = document.getElementById(hiddenId);
+
+    let timeout = null;
+
+    input.addEventListener("input", function () {
+
+        clearTimeout(timeout);
+
+        const q = this.value.trim();
+
+        if (q.length < 2) {
+            results.innerHTML = "";
+            return;
+        }
+
+        timeout = setTimeout(() => {
+
+            fetch(url + "?q=" + encodeURIComponent(q))
+                .then(r => r.json())
+                .then(data => {
+
+                    results.innerHTML = "";
+
+                    data.forEach(item => {
+
+                        const div = document.createElement("div");
+                        div.className = "list-group-item list-group-item-action";
+
+                        div.innerHTML = `
+                            <strong>${item.text}</strong><br>
+                            <small class="text-muted">${item.sku}</small>
+                        `;
+
+                        div.onclick = () => {
+                            input.value = item.text;
+                            hidden.value = item.id;
+                            results.innerHTML = "";
+                        };
+
+                        results.appendChild(div);
+                    });
+
+                });
+
+        }, 200);
+    });
+
+    document.addEventListener("click", (e) => {
+        if (!results.contains(e.target) && e.target !== input) {
+            results.innerHTML = "";
+        }
+    });
+}
+
+
+// init
+initShopifyVariantSearch({
+    inputId: "search",
+    resultsId: "results",
+    hiddenId: "variante_id",
+    url: "{% url 'inventory:variant_search_api' %}"
+});
+</script>
+
+{% endblock %}

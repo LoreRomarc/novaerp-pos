@@ -1,14 +1,8 @@
 # apps/inventory/models_produccion.py
 from django.db import models
-from decimal import Decimal
-
 from apps.core.models import Sucursal
-from apps.inventory.models import ProductoVariante, TipoTela, Color, ProductoBase
+from apps.inventory.models import ProductoVariante, TipoTela, Color
 
-
-# =========================================================
-# ROLLOS (ACTUALIZADO)
-# =========================================================
 
 class RolloTela(models.Model):
 
@@ -17,7 +11,10 @@ class RolloTela(models.Model):
 
     codigo = models.CharField(max_length=50, unique=True)
 
+    cantidad_inicial = models.DecimalField(max_digits=12, decimal_places=2)
     cantidad_disponible = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    costo_por_metro = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
     ESTADOS = (
         ("DISPONIBLE", "Disponible"),
@@ -26,73 +23,85 @@ class RolloTela(models.Model):
 
     estado = models.CharField(max_length=20, choices=ESTADOS, default="DISPONIBLE")
 
+    creado = models.DateTimeField(auto_now_add=True)
+
     def __str__(self):
         return f"{self.codigo} - {self.tipo_tela} - {self.color}"
 
 
-# =========================================================
-# PRODUCCION DESDE CORTE (NUEVO)
-# =========================================================
+class MovimientoRollo(models.Model):
 
-class ProduccionLote(models.Model):
-    sucursal = models.ForeignKey(Sucursal, on_delete=models.PROTECT)
+    TIPOS = (
+        ("ENTRADA", "Entrada"),
+        ("CONSUMO", "Consumo"),
+        ("AJUSTE", "Ajuste"),
+    )
+
+    rollo = models.ForeignKey(RolloTela, on_delete=models.PROTECT)
+    tipo = models.CharField(max_length=20, choices=TIPOS)
+
+    cantidad = models.DecimalField(max_digits=12, decimal_places=2)
+    saldo_post = models.DecimalField(max_digits=12, decimal_places=2)
+
+    referencia = models.CharField(max_length=100, null=True, blank=True)
+
+    usuario = models.ForeignKey("auth.User", on_delete=models.PROTECT)
+
+    creado = models.DateTimeField(auto_now_add=True)
+
+
+# ======================================================
+# RELACIÓN DE CONSUMO POR ROLLO
+# ======================================================
+
+class CorteRollo(models.Model):
+
+    lote = models.ForeignKey(
+        "ProduccionLote",
+        related_name="rollos",
+        on_delete=models.CASCADE
+    )
 
     rollo = models.ForeignKey(RolloTela, on_delete=models.PROTECT)
 
-    tipo_tela = models.ForeignKey(TipoTela, on_delete=models.PROTECT)
-    color = models.ForeignKey(Color, on_delete=models.PROTECT)
+    metros_consumidos = models.DecimalField(max_digits=12, decimal_places=2)
 
-    # ==========================
-    # CONSUMO
-    # ==========================
+    costo_total = models.DecimalField(max_digits=14, decimal_places=2)
+
+    def __str__(self):
+        return f"{self.lote.referencia} | {self.rollo.codigo}"
+
+
+# ======================================================
+# PRODUCCIÓN
+# ======================================================
+
+class ProduccionLote(models.Model):
+
+    sucursal = models.ForeignKey(Sucursal, on_delete=models.PROTECT)
+
     consumo_total = models.DecimalField(max_digits=12, decimal_places=2)
     consumo_unitario = models.DecimalField(max_digits=12, decimal_places=6)
 
     total_prendas = models.IntegerField()
 
-    # ==========================
-    # INDUSTRIAL (NUEVO)
-    # ==========================
-    merma = models.DecimalField(
-        max_digits=12,
-        decimal_places=2,
-        default=0
-    )
+    merma = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
-    eficiencia = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=100
-    )
+    eficiencia = models.DecimalField(max_digits=5, decimal_places=2, default=100)
 
-    costo_total = models.DecimalField(
-        max_digits=14,
-        decimal_places=2,
-        default=0
-    )
+    costo_total = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    costo_unitario_real = models.DecimalField(max_digits=14, decimal_places=6, default=0)
 
-    costo_unitario_real = models.DecimalField(
-        max_digits=14,
-        decimal_places=4,
-        default=0
-    )
+    operario = models.ForeignKey("auth.User", on_delete=models.PROTECT)
 
-    operario = models.ForeignKey(
-        "auth.User",
-        on_delete=models.PROTECT,
-        null=True,
-        blank=True
-    )
+    referencia = models.CharField(max_length=100, unique=True)
 
-    # ==========================
-    # CONTROL
-    # ==========================
     ejecutado = models.BooleanField(default=False)
 
     creado = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Lote #{self.id} - {self.rollo.codigo}"
+        return self.referencia
 
 
 class ProduccionDetalle(models.Model):
@@ -103,63 +112,15 @@ class ProduccionDetalle(models.Model):
         on_delete=models.CASCADE
     )
 
-    producto_base = models.ForeignKey(ProductoBase, on_delete=models.PROTECT)
-    talla = models.CharField(max_length=10)
-
-    variante = models.ForeignKey(
-        ProductoVariante,
-        on_delete=models.PROTECT,
-        null=True,
-        blank=True
-    )
+    variante = models.ForeignKey(ProductoVariante, on_delete=models.PROTECT)
 
     cantidad = models.IntegerField()
 
-    tipo_tela = models.ForeignKey(TipoTela, on_delete=models.PROTECT)
-    color = models.ForeignKey(Color, on_delete=models.PROTECT)
+    consumo_unitario = models.DecimalField(max_digits=12, decimal_places=6)
+    consumo_total = models.DecimalField(max_digits=12, decimal_places=2)
+
+    costo_unitario = models.DecimalField(max_digits=14, decimal_places=6)
+    costo_total = models.DecimalField(max_digits=14, decimal_places=2)
 
     def __str__(self):
-        return f"{self.producto_base} - {self.talla} x {self.cantidad}"
-
-
-# =========================================================
-# ORDEN CORTE (SE MANTIENE)
-# =========================================================
-
-class OrdenCorte(models.Model):
-
-    sucursal = models.ForeignKey("core.Sucursal", on_delete=models.PROTECT)
-
-    ESTADOS = (
-        ("PENDIENTE", "Pendiente"),
-        ("EN_PROCESO", "En proceso"),
-        ("TERMINADO", "Terminado"),
-    )
-
-    estado = models.CharField(max_length=20, choices=ESTADOS, default="PENDIENTE")
-
-
-class OrdenCorteDetalle(models.Model):
-
-    orden = models.ForeignKey(OrdenCorte, related_name="detalles", on_delete=models.CASCADE)
-
-    variante = models.ForeignKey(ProductoVariante, on_delete=models.PROTECT)
-
-    cantidad = models.IntegerField()
-
-
-# =========================================================
-# INGRESO PRODUCCION (NO MODIFICADO)
-# =========================================================
-
-class IngresoProduccion(models.Model):
-    orden = models.ForeignKey(OrdenCorte, on_delete=models.CASCADE, null=True, blank=True)
-
-
-class IngresoProduccionDetalle(models.Model):
-
-    ingreso = models.ForeignKey(IngresoProduccion, related_name="detalles", on_delete=models.CASCADE)
-
-    variante = models.ForeignKey(ProductoVariante, on_delete=models.PROTECT)
-
-    cantidad = models.IntegerField()
+        return f"{self.variante} x {self.cantidad}"

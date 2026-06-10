@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<div class="card shadow-sm">
+
+    <div class="card-header">
+
+        <h4>
+            {% if object %}
+                ✏️ Editar Producto
+            {% else %}
+                ➕ Nuevo Producto
+            {% endif %}
+        </h4>
+
+    </div>
+
+    <div class="card-body">
+
+        <form method="POST">
+
+            {% csrf_token %}
+
+            {% if form.errors %}
+                <div class="alert alert-danger">
+                    {{ form.errors }}
+                </div>
+            {% endif %}
+
+            <div class="mb-3">
+
+                <label class="form-label">
+                    Nombre
+                </label>
+
+                {{ form.nombre }}
+
+            </div>
+
+            <div class="mb-3">
+
+                <label class="form-label">
+                    Descripción
+                </label>
+
+                {{ form.descripcion }}
+
+            </div>
+
+            <div class="form-check mb-4">
+
+                {{ form.activo }}
+
+                <label class="form-check-label">
+                    Producto activo
+                </label>
+
+            </div>
+
+            <hr>
+
+            <button class="btn btn-primary">
+                💾 Guardar Producto
+            </button>
+
+            <a
+                href="{% url 'inventory:producto_list' %}"
+                class="btn btn-secondary"
+            >
+                Volver
+            </a>
+
+        </form>
+
+    </div>
+
+</div>
+
+{% endblock %}

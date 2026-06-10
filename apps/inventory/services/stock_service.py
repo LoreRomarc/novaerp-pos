@@ -1,26 +1,31 @@
-# apps/inventory/services/stock_service.py
-
-from decimal import Decimal
+# apps
+from decimal import Decimal, ROUND_HALF_UP
 from django.db import transaction
 from django.core.exceptions import ValidationError
 
 from apps.inventory.models import Stock, MovimientoStock
-from apps.inventory.services.base_validators import BaseInventoryValidator
 
 
 class InventoryService:
 
     @staticmethod
-    def _get_user_sucursal(user, sucursal_id=None):
+    def _to_decimal(value):
+        return Decimal(value).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
-        if user:
-            return BaseInventoryValidator.validar_usuario_y_sucursal(user).id
+    @staticmethod
+    def _get_user_sucursal(user, sucursal_id=None):
 
         if sucursal_id:
             return sucursal_id
 
-        raise ValidationError("Debe especificar sucursal o usuario con sucursal.")
+        if user and hasattr(user, "profile") and user.profile.sucursal:
+            return user.profile.sucursal.id
 
+        raise ValidationError("Usuario sin sucursal.")
+
+    # ======================================================
+    # MOVIMIENTO (KARDEX)
+    # ======================================================
     @staticmethod
     def _crear_movimiento(
         variante,
@@ -29,11 +34,9 @@ class InventoryService:
         tipo,
         referencia,
         user,
-        stock_final
+        stock_final,
+        costo_unitario=None
     ):
-
-        if not user:
-            raise ValidationError("Movimiento de inventario requiere usuario.")
 
         MovimientoStock.objects.create(
             variante=variante,
@@ -41,13 +44,14 @@ class InventoryService:
             cantidad=cantidad,
             tipo=tipo,
             referencia=referencia,
-            usuario=user,
-            saldo_post_movimiento=stock_final
+            usuario=user,  # 👈 IMPORTANTE: dejar user directo
+            saldo_post_movimiento=stock_final,
+            costo_unitario=costo_unitario
         )
 
-    # ===============================
-    # AGREGAR STOCK
-    # ===============================
+    # ======================================================
+    # ENTRADA
+    # ======================================================
     @staticmethod
     @transaction.atomic
     def agregar_stock(
@@ -56,10 +60,14 @@ class InventoryService:
         user=None,
         sucursal_id=None,
         referencia=None,
-        tipo="PRODUCCION"
+        tipo="PRODUCCION",
+        costo_unitario=None
     ):
 
-        cantidad = BaseInventoryValidator.validar_cantidad(cantidad, "agregar_stock")
+        cantidad = Decimal(cantidad)
+
+        if cantidad <= 0:
+            raise ValidationError("Cantidad debe ser mayor a 0.")
 
         sucursal_id = InventoryService._get_user_sucursal(user, sucursal_id)
 
@@ -69,8 +77,15 @@ class InventoryService:
             defaults={"cantidad": Decimal("0")}
         )
 
-        stock.cantidad += Decimal(cantidad)
-        stock.save(update_fields=["cantidad"])
+        if costo_unitario is not None:
+            total = stock.cantidad + cantidad
+            stock.costo_promedio = (
+                (stock.costo_promedio * stock.cantidad) +
+                (Decimal(costo_unitario) * cantidad)
+            ) / total if total > 0 else 0
+
+        stock.cantidad += cantidad
+        stock.save()
 
         InventoryService._crear_movimiento(
             variante=variante,
@@ -79,12 +94,13 @@ class InventoryService:
             tipo=tipo,
             referencia=referencia,
             user=user,
-            stock_final=stock.cantidad
+            stock_final=stock.cantidad,
+            costo_unitario=costo_unitario
         )
 
-    # ===============================
-    # DESCONTAR STOCK
-    # ===============================
+    # ======================================================
+    # SALIDA
+    # ======================================================
     @staticmethod
     @transaction.atomic
     def descontar_stock(
@@ -93,10 +109,14 @@ class InventoryService:
         user=None,
         sucursal_id=None,
         referencia=None,
-        tipo="VENTA"
+        tipo="VENTA",
+        costo_unitario=None
     ):
 
-        cantidad = BaseInventoryValidator.validar_cantidad(cantidad, "descontar_stock")
+        cantidad = Decimal(cantidad)
+
+        if cantidad <= 0:
+            raise ValidationError("Cantidad debe ser mayor a 0.")
 
         sucursal_id = InventoryService._get_user_sucursal(user, sucursal_id)
 
@@ -105,21 +125,22 @@ class InventoryService:
             sucursal_id=sucursal_id
         ).first()
 
-        BaseInventoryValidator.validar_stock_disponible(
-            stock,
-            cantidad,
-            "descontar_stock"
-        )
+        if not stock:
+            raise ValidationError("No existe stock.")
 
-        stock.cantidad -= Decimal(cantidad)
-        stock.save(update_fields=["cantidad"])
+        if stock.cantidad < cantidad:
+            raise ValidationError("Stock insuficiente.")
+
+        stock.cantidad -= cantidad
+        stock.save()
 
         InventoryService._crear_movimiento(
             variante=variante,
             sucursal_id=sucursal_id,
-            cantidad=-Decimal(cantidad),
+            cantidad=-cantidad,
             tipo=tipo,
             referencia=referencia,
             user=user,
-            stock_final=stock.cantidad
+            stock_final=stock.cantidad,
+            costo_unitario=costo_unitario
         )

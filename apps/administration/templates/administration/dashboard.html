@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<h3 class="mb-4">Panel de Administración</h3>
+
+<div class="row">
+
+    <div class="col-md-3">
+        <a href="{% url 'administration:user_list' %}" class="card p-3 text-center shadow-sm">
+            👥 Usuarios
+        </a>
+    </div>
+
+    <div class="col-md-3">
+        <a href="{% url 'administration:sucursal_list' %}" class="card p-3 text-center shadow-sm">
+            🏢 Sucursales
+        </a>
+    </div>
+
+    <div class="col-md-3">
+        <a href="{% url 'administration:cliente_list' %}" class="card p-3 text-center shadow-sm">
+            🧾 Clientes
+        </a>
+    </div>
+
+    <div class="col-md-3">
+        <a href="{% url 'administration:tipo_tela_list' %}"
+        class="card p-3 text-center shadow-sm">
+            🧵 Tipos de Tela
+        </a>
+    </div>
+
+    <div class="col-md-3">
+        <a href="{% url 'administration:talla_list' %}"
+        class="card p-3 text-center shadow-sm">
+            📏 Tallas
+        </a>
+    </div>
+
+    <div class="col-md-3">
+        <a href="{% url 'administration:color_list' %}" class="card p-3 text-center shadow-sm">
+            🎨 Colores
+        </a>
+    </div>
+
+</div>
+
+{% endblock %}

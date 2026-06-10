@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="card shadow-sm border-0">
+    <div class="card-header d-flex justify-content-between">
+        <h5>Sucursales</h5>
+        <a href="{% url 'administration:sucursal_create' %}" class="btn btn-primary btn-sm">➕ Crear</a>
+    </div>
+
+    <div class="card-body">
+
+        <input type="text" id="sucursalSearch" class="form-control mb-3" placeholder="Buscar...">
+
+        <table class="table table-hover">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Dirección</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+
+            <tbody id="sucursalTable">
+                {% for s in sucursales %}
+                <tr>
+                    <td>{{ s.nombre }}</td>
+                    <td>{{ s.direccion }}</td>
+                    <td>
+                        {% if s.activa %}
+                            <span class="badge bg-success">Activa</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Inactiva</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+    </div>
+</div>
+
+{% endblock %}
+
+
+{% block content-script %}
+<script>
+const inputSuc = document.getElementById("sucursalSearch");
+const tableSuc = document.getElementById("sucursalTable");
+
+const originalSucHTML = tableSuc.innerHTML;
+
+inputSuc.addEventListener("keyup", function () {
+
+    let q = this.value.toLowerCase();
+
+    if (q.length === 0) {
+        tableSuc.innerHTML = originalSucHTML;
+        return;
+    }
+
+    let rows = tableSuc.querySelectorAll("tr");
+
+    rows.forEach(row => {
+        row.style.display = row.innerText.toLowerCase().includes(q) ? "" : "none";
+    });
+});
+</script>
+{% endblock %}
