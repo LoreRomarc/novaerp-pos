@@ -283,6 +283,21 @@ class ProductoVariante(models.Model):
     @property
     def codigo(self):
         return self.sku
+    
+    @classmethod
+    def generar_sku_unico(
+        cls,
+        producto_base,
+        tipo_tela,
+        color,
+        talla,
+    ):
+        return (
+            f"{producto_base.id}"
+            f"-{tipo_tela.id}"
+            f"-{color.id}"
+            f"-{talla.id}"
+        )
 
 
 # PRODUCTO FINAL

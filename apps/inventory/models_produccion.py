@@ -102,8 +102,7 @@ class ProduccionLote(models.Model):
 
     def __str__(self):
         return self.referencia
-
-
+    
 class ProduccionDetalle(models.Model):
 
     lote = models.ForeignKey(
@@ -112,15 +111,40 @@ class ProduccionDetalle(models.Model):
         on_delete=models.CASCADE
     )
 
-    variante = models.ForeignKey(ProductoVariante, on_delete=models.PROTECT)
+    variante = models.ForeignKey(
+        ProductoVariante,
+        on_delete=models.PROTECT
+    )
+
+    rollo = models.ForeignKey(
+        RolloTela,
+        on_delete=models.PROTECT,
+        related_name="producciones",
+        null=True,
+        blank=True
+    )
 
     cantidad = models.IntegerField()
 
-    consumo_unitario = models.DecimalField(max_digits=12, decimal_places=6)
-    consumo_total = models.DecimalField(max_digits=12, decimal_places=2)
+    consumo_unitario = models.DecimalField(
+        max_digits=12,
+        decimal_places=6
+    )
 
-    costo_unitario = models.DecimalField(max_digits=14, decimal_places=6)
-    costo_total = models.DecimalField(max_digits=14, decimal_places=2)
+    consumo_total = models.DecimalField(
+        max_digits=12,
+        decimal_places=2
+    )
+
+    costo_unitario = models.DecimalField(
+        max_digits=14,
+        decimal_places=6
+    )
+
+    costo_total = models.DecimalField(
+        max_digits=14,
+        decimal_places=2
+    )
 
     def __str__(self):
         return f"{self.variante} x {self.cantidad}"

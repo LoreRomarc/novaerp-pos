@@ -1,3 +1,5 @@
+<!-- apps/inventory/templates/inventory/corte_produccion.html -->
+
 {% extends "base.html" %}
 
 {% block content %}
@@ -12,7 +14,12 @@
 
 .grid-item {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr 60px;
+    grid-template-columns:  2fr
+        1fr
+        1fr
+        1fr
+        1fr
+        60px;
     gap: 10px;
     margin-bottom: 10px;
 }
@@ -200,6 +207,8 @@ button {
 
         <div class="table-header">
             <div>Producto</div>
+            <div>Tela</div>
+            <div>Color</div>
             <div>Talla</div>
             <div>Cantidad</div>
             <div></div>
@@ -237,7 +246,8 @@ function addItem() {
     div.classList.add("grid-item");
 
     div.innerHTML = `
-        <select name="producto_base" required>
+
+        <select name="producto_base[]" required>
 
             {% for p in productos %}
                 <option value="{{ p.id }}">
@@ -247,19 +257,40 @@ function addItem() {
 
         </select>
 
-        <select name="talla" required>
+        <select name="tipo_tela[]" required>
+
+            {% for t in telas %}
+                <option value="{{ t.id }}">
+                    {{ t.nombre }}
+                </option>
+            {% endfor %}
+
+        </select>
+
+        <select name="color[]" required>
+
+            {% for c in colores %}
+                <option value="{{ c.id }}">
+                    {{ c.nombre }}
+                </option>
+            {% endfor %}
+
+        </select>
+
+        <select name="talla[]" required>
             <option value="">Talla</option>
-            <option value="XS">XS</option>
-            <option value="S">S</option>
-            <option value="M">M</option>
-            <option value="L">L</option>
-            <option value="XL">XL</option>
-            <option value="XXL">XXL</option>
+
+            {% for t in tallas %}
+                <option value="{{ t.nombre }}">
+                    {{ t.nombre }}
+                </option>
+            {% endfor %}
+
         </select>
 
         <input
             type="number"
-            name="cantidad"
+            name="cantidad[]"
             min="1"
             placeholder="Cantidad"
             onchange="calcularTotal()"
@@ -289,19 +320,13 @@ function calcularTotal() {
 
     let total = 0;
 
-    document.querySelectorAll(
-        "input[name='cantidad']"
-    ).forEach(input => {
+    document.querySelectorAll("input[name='cantidad[]']").forEach(input => {
 
-        total += parseInt(
-            input.value || 0
-        );
+        total += parseInt(input.value || 0);
 
     });
 
-    document.getElementById(
-        "totalPrendas"
-    ).innerText = total;
+    document.getElementById("totalPrendas").innerText = total;
 }
 
 function toggleMetros() {

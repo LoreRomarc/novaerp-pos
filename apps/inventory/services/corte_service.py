@@ -4,6 +4,10 @@ import uuid
 from django.db import transaction
 from django.core.exceptions import ValidationError
 
+from apps.inventory.models import ProductoBase, TipoTela, Color
+from apps.inventory.services.variant_service import VariantService
+from apps.inventory.services.stock_service import InventoryService
+
 from apps.inventory.models_produccion import (
     RolloTela,
     ProduccionLote,
@@ -11,9 +15,6 @@ from apps.inventory.models_produccion import (
     MovimientoRollo,
     CorteRollo
 )
-
-from apps.inventory.models import ProductoVariante
-from apps.inventory.services.stock_service import InventoryService
 
 
 class CorteService:
@@ -56,7 +57,6 @@ class CorteService:
                 raise ValidationError(f"Excede rollo {rollo.codigo}")
 
             consumo_total += metros
-
             rollos_objs.append((rollo, metros))
 
         consumo_unitario = consumo_total / Decimal(total_prendas)
@@ -108,24 +108,31 @@ class CorteService:
         # ==========================
         # DETALLES PRODUCCIÓN
         # ==========================
-        variantes = ProductoVariante.objects.all()
+        detalles = []
 
-        variantes_map = {
-            (v.producto_base_id, v.talla.nombre.upper()): v
-            for v in variantes
+        productos_map = {
+            p.id: p
+            for p in ProductoBase.objects.filter(
+                id__in=[i["producto_base_id"] for i in items]
+            )
         }
 
-        detalles = []
+        telas_map = {t.id: t for t in TipoTela.objects.filter(id__in=[i["tipo_tela_id"] for i in items])}
+        colores_map = {c.id: c for c in Color.objects.filter(id__in=[i["color_id"] for i in items])}
 
         for item in items:
 
-            key = (item["producto_base_id"], item["talla"].upper())
-            variante = variantes_map.get(key)
-
-            if not variante:
-                raise ValidationError(f"Variante no existe {key}")
-
+            producto_base = productos_map[item["producto_base_id"]]
+            tipo_tela = telas_map[item["tipo_tela_id"]]
+            color = colores_map[item["color_id"]]
             cantidad = int(item["cantidad"])
+
+            variante = VariantService.obtener_o_crear(
+                producto_base=producto_base,
+                tipo_tela=tipo_tela,
+                color=color,
+                talla_nombre=item["talla"],
+            )
 
             detalles.append(
                 ProduccionDetalle(
@@ -135,7 +142,7 @@ class CorteService:
                     consumo_unitario=consumo_unitario,
                     consumo_total=consumo_unitario * cantidad,
                     costo_unitario=0,
-                    costo_total=0
+                    costo_total=0,
                 )
             )
 
@@ -146,7 +153,7 @@ class CorteService:
                 user=usuario,
                 referencia=referencia,
                 tipo="PRODUCCION",
-                costo_unitario=0
+                costo_unitario=0,
             )
 
         ProduccionDetalle.objects.bulk_create(detalles)

@@ -1,13 +1,19 @@
 # apps/inventory/views_produccion.py
 from django.contrib import messages
 from django.views import View
+from django.shortcuts import redirect, render
 
-from apps.inventory.models import ProductoBase
 from apps.inventory.models_produccion import RolloTela
 from apps.inventory.services.base_validators import BaseInventoryValidator
 from apps.inventory.services.corte_service import CorteService
 from apps.sales.mixins import SucursalIsolationMixin
-from django.shortcuts import redirect, render
+
+from apps.inventory.models import (
+    ProductoBase,
+    TipoTela,
+    Color,
+    Talla,
+)
 
 
 class CorteProduccionView(SucursalIsolationMixin, View):
@@ -17,7 +23,10 @@ class CorteProduccionView(SucursalIsolationMixin, View):
     def get(self, request):
         return render(request, self.template_name, {
             "rollos": RolloTela.objects.filter(estado="DISPONIBLE"),
-            "productos": ProductoBase.objects.filter(activo=True)
+            "productos": ProductoBase.objects.filter(activo=True),
+            "telas": TipoTela.objects.filter(activo=True),
+            "colores": Color.objects.all(),
+            "tallas": Talla.objects.filter(activo=True),
         })
 
     def post(self, request):
@@ -28,13 +37,15 @@ class CorteProduccionView(SucursalIsolationMixin, View):
             rollos_ids = request.POST.getlist("rollos[]")
             metros = request.POST.getlist("metros_rollo[]")
 
-            productos = request.POST.getlist("producto_base")
-            tallas = request.POST.getlist("talla")
-            cantidades = request.POST.getlist("cantidad")
+            productos = request.POST.getlist("producto_base[]")
+            telas = request.POST.getlist("tipo_tela[]")
+            colores = request.POST.getlist("color[]")
+            tallas = request.POST.getlist("talla[]")
+            cantidades = request.POST.getlist("cantidad[]")
 
             rollos_data = []
 
-            for i in range(len(rollos_ids)):
+            for i in range(min(len(rollos_ids), len(metros))):
                 if not metros[i]:
                     continue
 
@@ -44,14 +55,19 @@ class CorteProduccionView(SucursalIsolationMixin, View):
                 })
 
             items = []
-            for i in range(len(productos)):
+
+            for i in range(
+                min(len(productos), len(telas), len(colores), len(tallas), len(cantidades))
+            ):
                 if not cantidades[i]:
                     continue
 
                 items.append({
                     "producto_base_id": int(productos[i]),
+                    "tipo_tela_id": int(telas[i]),
+                    "color_id": int(colores[i]),
                     "talla": tallas[i],
-                    "cantidad": cantidades[i]
+                    "cantidad": cantidades[i],
                 })
 
             lote = CorteService.ejecutar_corte(
