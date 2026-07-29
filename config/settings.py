@@ -49,6 +49,10 @@ INSTALLED_APPS = [
     'apps.sales',
     'apps.core',
     'apps.administration',
+    'apps.setup',
+
+    # Third-party apps
+    "django.contrib.humanize",
 ]
 
 MIDDLEWARE = [
@@ -58,6 +62,10 @@ MIDDLEWARE = [
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+
+     # NUEVO
+    'apps.setup.middleware.SetupWizardMiddleware',
+    
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 

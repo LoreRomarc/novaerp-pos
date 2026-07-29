@@ -16,4 +16,6 @@ urlpatterns = [
 
     path('admin-panel/', include('apps.administration.urls')),
 
+    path("setup/", include("apps.setup.urls")),
+
 ]

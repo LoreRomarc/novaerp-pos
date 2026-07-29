@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<style>
+
+.error-card{
+    max-width:700px;
+    margin:70px auto;
+    background:#fff;
+    border-radius:12px;
+    box-shadow:0 10px 30px rgba(0,0,0,.08);
+    padding:40px;
+}
+
+.error-icon{
+    font-size:70px;
+    text-align:center;
+}
+
+.error-title{
+    text-align:center;
+    margin-top:15px;
+    color:#dc2626;
+}
+
+.error-desc{
+    text-align:center;
+    color:#555;
+    margin:20px 0;
+}
+
+.error-list{
+    background:#f8fafc;
+    border-left:4px solid #2563eb;
+    padding:20px;
+    border-radius:8px;
+}
+
+.error-list li{
+    margin-bottom:8px;
+}
+
+.error-btn{
+
+    display:inline-block;
+
+    margin-top:25px;
+
+    background:#2563eb;
+
+    color:white;
+
+    padding:12px 20px;
+
+    border-radius:8px;
+
+    text-decoration:none;
+
+}
+
+.center{
+
+    text-align:center;
+
+}
+
+</style>
+
+
+<div class="error-card">
+
+<div class="error-icon">
+
+🚫
+
+</div>
+
+<h2 class="error-title">
+
+Acceso no disponible
+
+</h2>
+
+<p class="error-desc">
+
+{{ exception }}
+
+</p>
+
+
+<div class="error-list">
+
+<b>Verifique lo siguiente:</b>
+
+<ul>
+
+<li>El usuario tiene un perfil creado.</li>
+
+<li>Existe una sucursal registrada.</li>
+
+<li>El usuario tiene asignada una sucursal.</li>
+
+<li>Si la base de datos fue reiniciada, ejecute nuevamente la configuración inicial.</li>
+
+</ul>
+
+</div>
+
+
+<div class="center">
+
+<a
+href="/"
+class="error-btn">
+
+Volver al inicio
+
+</a>
+
+</div>
+
+</div>
+
+{% endblock %}

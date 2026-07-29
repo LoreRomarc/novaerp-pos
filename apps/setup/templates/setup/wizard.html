@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+
+
+{% block content %}
+
+
+<style>
+
+.wizard-card{
+
+max-width:700px;
+
+margin:60px auto;
+
+background:white;
+
+padding:40px;
+
+border-radius:15px;
+
+box-shadow:0 10px 30px rgba(0,0,0,.08);
+
+}
+
+
+.step{
+
+background:#f8fafc;
+
+padding:15px;
+
+border-radius:10px;
+
+margin-bottom:12px;
+
+}
+
+
+.ok{
+
+color:#16a34a;
+
+font-weight:bold;
+
+}
+
+
+.pending{
+
+color:#dc2626;
+
+font-weight:bold;
+
+}
+
+
+.btn{
+
+display:inline-block;
+
+background:#2563eb;
+
+color:white;
+
+padding:12px 20px;
+
+border-radius:8px;
+
+text-decoration:none;
+
+}
+
+</style>
+
+
+
+<div class="wizard-card">
+
+
+<h1>
+⚙ Configuración inicial
+</h1>
+
+
+<p>
+Estado actual del sistema
+</p>
+
+
+
+<div class="step">
+
+🏢 Empresa
+
+{% if estado.empresa %}
+
+<span class="ok">
+✔ Completo
+</span>
+
+{% else %}
+
+<span class="pending">
+Pendiente
+</span>
+
+{% endif %}
+
+</div>
+
+
+
+<div class="step">
+
+🏬 Sucursal
+
+{% if estado.sucursal %}
+
+<span class="ok">
+✔ Completo
+</span>
+
+{% else %}
+
+<span class="pending">
+Pendiente
+</span>
+
+{% endif %}
+
+</div>
+
+
+
+
+<div class="step">
+
+👤 Usuario administrador
+
+{% if estado.usuario %}
+
+<span class="ok">
+✔ Completo
+</span>
+
+{% else %}
+
+<span class="pending">
+Pendiente
+</span>
+
+{% endif %}
+
+</div>
+
+
+
+
+<div class="step">
+
+💰 Caja física
+
+{% if estado.caja %}
+
+<span class="ok">
+✔ Completo
+</span>
+
+{% else %}
+
+<span class="pending">
+Pendiente
+</span>
+
+{% endif %}
+
+</div>
+
+
+
+<div class="step">
+
+🔓 Turno abierto
+
+{% if estado.turno %}
+
+<span class="ok">
+✔ Caja abierta
+</span>
+
+{% else %}
+
+<span class="pending">
+Pendiente
+</span>
+
+{% endif %}
+
+</div>
+
+
+
+<div class="step">
+
+📦 Datos maestros
+
+{% if estado.datos_base %}
+
+<span class="ok">
+✔ Cargados
+</span>
+
+{% else %}
+
+<span class="pending">
+Pendiente
+</span>
+
+{% endif %}
+
+</div>
+
+
+
+<br>
+
+
+<a href="{% url 'setup:wizard' %}" class="btn">
+Configurar sistema
+</a>
+
+
+
+</div>
+
+
+{% endblock %}

@@ -1,6 +1,7 @@
 # apps/sales/models.py
 
 from decimal import Decimal
+import uuid
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -145,6 +146,15 @@ class Venta(models.Model):
         ("MAYORISTA", "Mayorista"),
     )
 
+    uuid = models.UUIDField(
+        default=uuid.uuid4,
+        editable=False,
+        unique=True,
+        db_index=True,
+    )
+
+
+
     sucursal = models.ForeignKey(
         "core.Sucursal",
         on_delete=models.PROTECT,
@@ -161,6 +171,17 @@ class Venta(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name="ventas"
+    )
+
+    cliente = models.CharField(
+        max_length=150,
+        blank=True,
+        null=True
+    )
+
+    observaciones = models.TextField(
+        blank=True,
+        null=True
     )
 
     tipo_venta = models.CharField(
@@ -255,15 +276,10 @@ class Venta(models.Model):
 
         ordering = ["-creada", "-id"]
 
-        constraints = [
-            models.UniqueConstraint(
-                fields=["usuario"],
-                condition=Q(estado="ABIERTA"),
-                name="unique_open_sale_per_user"
-            )
-        ]
+        constraints = []
 
         indexes = [
+            models.Index(fields=["uuid"]),
             models.Index(fields=["sucursal", "estado"]),
             models.Index(fields=["sucursal", "creada"]),
             models.Index(fields=["estado"]),
@@ -626,7 +642,8 @@ class VentaItem(models.Model):
             )
 
             self.talla = (
-                self.variante.talla or ""
+                self.variante.talla.nombre
+                if self.variante.talla else ""
             )
 
             self.tipo_tela = (

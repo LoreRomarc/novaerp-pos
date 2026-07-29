@@ -155,7 +155,7 @@
 
         {% if request.user.is_authenticated and request.user.profile %}
             {% if request.user.profile.role != "CAJERO" %}
-                <a href="/reports/ventas/">📊 Reportes</a>
+                <a href="{% url 'sales:reportes' %}">📊 Reportes</a>
             {% endif %}
         {% endif %}
 
@@ -165,6 +165,7 @@
 
             <a href="{% url 'administration:dashboard' %}">🧠 Panel</a>
             <a href="{% url 'inventory:dashboard' %}">📦 Dashboard</a>
+            <a href="{% url 'administration:empresa_list' %}">🏭 Empresa</a>
             <a href="{% url 'administration:sucursal_list' %}">🏢 Sucursales</a>
             <a href="{% url 'administration:user_list' %}">👥 Usuarios</a>
             <a href="{% url 'administration:color_list' %}">🎨 Colores</a>
@@ -199,9 +200,17 @@
 
         <div>👤 {{ request.user.username }}</div>
 
-        <a href="{% url 'logout' %}" class="btn btn-sm btn-danger mt-2 w-100">
-            Cerrar sesión
-        </a>
+        <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+
+            <button 
+                type="submit" 
+                class="btn btn-sm btn-danger mt-2 w-100">
+                Cerrar sesión
+            </button>
+
+        </form>
+
 
     </div>
 

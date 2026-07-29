@@ -119,12 +119,12 @@ class ProduccionDetalle(models.Model):
     rollo = models.ForeignKey(
         RolloTela,
         on_delete=models.PROTECT,
-        related_name="producciones",
-        null=True,
-        blank=True
+        related_name="producciones"
     )
 
     cantidad = models.IntegerField()
+
+    orden = models.PositiveIntegerField(default=1)
 
     consumo_unitario = models.DecimalField(
         max_digits=12,

@@ -23,26 +23,42 @@ class POSService:
     # OBTENER VENTA ABIERTA
     # =========================
     @staticmethod
-    def obtener_venta_abierta(usuario, sucursal):
+    def obtener_venta_abierta(usuario, sucursal, venta_uuid=None):
+
+        if not venta_uuid:
+            return None
+
         return Venta.objects.filter(
+            uuid=venta_uuid,
             usuario=usuario,
             sucursal=sucursal,
             estado="ABIERTA"
         ).first()
+
 
     # =========================
     # CREAR OBTENER VENTA
     # =========================
     @staticmethod
     @transaction.atomic
-    def obtener_o_crear_venta(usuario, sucursal):
+    def obtener_o_crear_venta(usuario, sucursal, venta_uuid=None):
 
-        venta = (
-            Venta.objects
-            .select_for_update()
-            .filter(usuario=usuario, sucursal=sucursal, estado="ABIERTA")
-            .first()
-        )
+        venta = None
+
+        if venta_uuid:
+
+            venta = (
+                Venta.objects
+                .select_for_update()
+                .filter(
+                    uuid=venta_uuid,
+                    usuario=usuario,
+                    sucursal=sucursal,
+                    estado="ABIERTA"
+                )
+                .first()
+            )
+
 
         if venta:
             return venta
@@ -55,6 +71,31 @@ class POSService:
             sucursal=sucursal,
             turno=turno,
             usuario=usuario
+        )
+
+
+    # =========================
+    # CREAR NUEVA VENTA REAL
+    # =========================
+    @staticmethod
+    @transaction.atomic
+    def crear_nueva_venta(usuario, sucursal):
+
+        turno = CajaService.obtener_turno_abierto(
+            sucursal
+        )
+
+        if not turno:
+            raise ValidationError(
+                "Debe abrir caja antes de vender."
+            )
+
+
+        return Venta.objects.create(
+            sucursal=sucursal,
+            turno=turno,
+            usuario=usuario,
+            estado="ABIERTA"
         )
 
     # =========================
@@ -106,6 +147,7 @@ class POSService:
             qs = qs.filter(
                 Q(sku__iexact=termino) |
                 Q(codigo_barras__iexact=termino) |
+                Q(producto_base__nombre__icontains=termino) |
                 Q(talla__icontains=termino) |
                 Q(color__nombre__icontains=termino) |
                 Q(tipo_tela__nombre__icontains=termino)
@@ -144,7 +186,7 @@ class POSService:
     # =========================
     @staticmethod
     @transaction.atomic
-    def agregar_producto(usuario, sucursal, variante_id=None, termino=None, cantidad=Decimal("1")):
+    def agregar_producto(usuario,sucursal, variante_id=None, termino=None, cantidad=Decimal("1"), venta_uuid=None):
 
         if cantidad is None:
             cantidad = Decimal("1")
@@ -159,7 +201,7 @@ class POSService:
         if not variante:
             raise ValidationError("Producto no encontrado.")
 
-        venta = POSService.obtener_o_crear_venta(usuario, sucursal)
+        venta = POSService.obtener_o_crear_venta(usuario, sucursal, venta_uuid)
 
         precio = POSService.obtener_precio_variante(variante, venta)
 
@@ -193,12 +235,23 @@ class POSService:
     # =========================
     @staticmethod
     @transaction.atomic
-    def cerrar_venta(usuario, sucursal, pagos: dict):
+    def cerrar_venta(usuario, sucursal, pagos: dict, cliente="", observaciones="", venta_uuid=None):
+  
+        if not venta_uuid:
+            raise ValidationError(
+                "UUID de venta requerido."
+            )
+
 
         venta = (
             Venta.objects
             .select_for_update()
-            .filter(usuario=usuario, sucursal=sucursal, estado="ABIERTA")
+            .filter(
+                uuid=venta_uuid,
+                usuario=usuario,
+                sucursal=sucursal,
+                estado="ABIERTA"
+            )
             .first()
         )
 
@@ -208,6 +261,9 @@ class POSService:
         venta.monto_efectivo = Decimal(pagos.get("EFECTIVO", 0))
         venta.monto_tarjeta = Decimal(pagos.get("TARJETA", 0))
         venta.monto_transferencia = Decimal(pagos.get("TRANSFERENCIA", 0))
+        venta.cliente = cliente
+        venta.observaciones = observaciones
+
 
         if not venta.puede_cerrar():
             raise ValidationError("Pago insuficiente.")
@@ -235,7 +291,12 @@ class POSService:
             )
 
         #  MOVIMIENTOS FINANCIEROS
-        CajaService.registrar_movimientos_venta(venta, usuario, pagos)
+        CajaService.registrar_movimientos_venta(
+            venta,
+            usuario,
+            pagos
+        )
+
 
         venta.estado = "CERRADA"
         venta.cerrada = timezone.now()
@@ -243,7 +304,8 @@ class POSService:
         venta.save(update_fields=[
             "estado", "cerrada",
             "total", "ajuste_redondeo",
-            "monto_efectivo", "monto_tarjeta", "monto_transferencia"
+            "monto_efectivo", "monto_tarjeta", "monto_transferencia",
+            "cliente", "observaciones"
         ])
 
         return venta
@@ -254,19 +316,49 @@ class POSService:
     # =========================
     @staticmethod
     @transaction.atomic
-    def eliminar_item(usuario, sucursal, item_id):
+    def eliminar_item(usuario, sucursal, item_id, venta_uuid=None):
 
-        venta = POSService.obtener_venta_abierta(usuario, sucursal)
+        venta = POSService.obtener_venta_abierta(
+            usuario,
+            sucursal,
+            venta_uuid
+        )
 
         if not venta:
-            raise ValidationError("No hay venta activa")
+            raise ValidationError("No hay venta activa.")
 
-        item = venta.items.filter(id=item_id).first()
+        item = (
+            venta.items
+            .select_for_update()
+            .filter(id=item_id)
+            .first()
+        )
 
         if not item:
-            raise ValidationError("Item no encontrado")
+            raise ValidationError("Item no encontrado.")
 
         item.delete()
+
+        # Si ya no quedan productos, eliminar completamente la venta
+        if not venta.items.exists():
+
+            venta.delete()
+
+            return {
+                "id": None,
+                "uuid": None,
+                "estado": None,
+                "tipo_venta": "DETAL",
+                "cliente": "",
+                "observaciones": "",
+                "efectivo": "0",
+                "transferencia": "0",
+                "tarjeta": "0",
+                "subtotal": "0",
+                "iva": "0",
+                "total": "0",
+                "items": [],
+            }
 
         venta.recalcular_totales()
 
@@ -278,9 +370,9 @@ class POSService:
     # =========================
     @staticmethod
     @transaction.atomic
-    def actualizar_cantidad(usuario, sucursal, item_id, cantidad=None, precio_unitario=None):
+    def actualizar_cantidad(usuario, sucursal, item_id, cantidad=None, precio_unitario=None, venta_uuid=None):
 
-        venta = POSService.obtener_venta_abierta(usuario, sucursal)
+        venta = POSService.obtener_venta_abierta(usuario, sucursal, venta_uuid)
 
         if not venta:
             raise ValidationError("No hay venta abierta")
@@ -290,7 +382,7 @@ class POSService:
         if not item:
             raise ValidationError("Item no encontrado")
 
-        # 🔥 actualizar cantidad
+        # actualizar cantidad
         if cantidad is not None:
             if cantidad <= 0:
                 item.delete()
@@ -305,7 +397,7 @@ class POSService:
 
             item.cantidad = cantidad
 
-        # 🔥 actualizar precio manual
+        # actualizar precio manual
         if precio_unitario is not None:
             if precio_unitario <= 0:
                 raise ValidationError("Precio inválido")
@@ -318,4 +410,104 @@ class POSService:
 
         return serializar_venta(venta)
 
-    
+    # =========================
+    # CAMBIAR TIPO DE VENTA
+    # =========================
+    @staticmethod
+    @transaction.atomic
+    def cambiar_tipo_venta(usuario, sucursal, tipo, venta_uuid=None):
+
+        if tipo not in ["DETAL", "MAYORISTA"]:
+            raise ValidationError("Tipo de venta inválido.")
+
+        venta = POSService.obtener_o_crear_venta(
+            usuario=usuario,
+            sucursal=sucursal,
+            venta_uuid=venta_uuid
+        )
+
+        venta.tipo_venta = tipo
+        venta.save(update_fields=["tipo_venta"])
+
+        for item in venta.items.select_related("variante"):
+
+            item.precio_unitario = POSService.obtener_precio_variante(
+                item.variante,
+                venta
+            )
+
+            item.save(update_fields=["precio_unitario"])
+
+        venta.recalcular_totales()
+
+        return serializar_venta(venta)
+
+
+    # =========================
+    # CANCELAR VENTA
+    # =========================
+
+    @staticmethod
+    @transaction.atomic
+    def cancelar_venta(
+        usuario,
+        sucursal,
+        venta_uuid=None
+    ):
+
+        if not venta_uuid:
+            raise ValidationError("UUID requerido.")
+
+        venta = (
+            Venta.objects
+            .select_for_update()
+            .filter(
+                uuid=venta_uuid,
+                usuario=usuario,
+                sucursal=sucursal,
+                estado="ABIERTA"
+            )
+            .first()
+        )
+
+        if not venta:
+            raise ValidationError("Venta abierta no encontrada.")
+
+        # Elimina también todos los VentaItem (CASCADE)
+        venta.delete()
+
+        return True
+
+
+    @staticmethod
+    @transaction.atomic
+    def guardar_estado(
+        usuario,
+        sucursal,
+        venta_uuid,
+        cliente,
+        observaciones,
+        efectivo,
+        transferencia,
+        tarjeta,
+    ):
+
+        venta = POSService.obtener_venta_abierta(
+            usuario,
+            sucursal,
+            venta_uuid
+        )
+
+        if not venta:
+            raise ValidationError("Venta no encontrada")
+
+        venta.cliente = cliente
+        venta.observaciones = observaciones
+
+        venta.monto_efectivo = Decimal(str(efectivo or 0))
+        venta.monto_transferencia = Decimal(str(transferencia or 0))
+        venta.monto_tarjeta = Decimal(str(tarjeta or 0))
+
+        venta.save()
+
+        return serializar_venta(venta)

@@ -157,6 +157,37 @@
 
                 </div>
 
+                <!-- LISTAS DE PRECIOS -->
+
+                <div class="col-12">
+
+                    <hr>
+
+                    <h5>
+                        💰 Listas de precios
+                    </h5>
+
+                </div>
+
+
+                {% for campo in form %}
+
+                    {% if "precio_lista_" in campo.name %}
+
+                    <div class="col-md-3 mb-3">
+
+                        <label class="form-label">
+                            {{ campo.label }}
+                        </label>
+
+                        {{ campo }}
+
+                    </div>
+
+                    {% endif %}
+
+                {% endfor %}
+
                 <!-- COSTO -->
                 <div class="col-md-3 mb-3">
 

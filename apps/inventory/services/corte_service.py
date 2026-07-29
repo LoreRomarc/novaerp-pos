@@ -23,7 +23,6 @@ class CorteService:
     @transaction.atomic
     def ejecutar_corte(
         rollos,
-        items,
         sucursal,
         usuario
     ):
@@ -31,10 +30,16 @@ class CorteService:
         if not rollos:
             raise ValidationError("Debe seleccionar al menos un rollo.")
 
-        if not items:
-            raise ValidationError("Debe haber producción.")
+        total_prendas = 0
 
-        total_prendas = sum(int(i["cantidad"]) for i in items)
+
+        for r in rollos:
+
+            for item in r["items"]:
+
+                total_prendas += int(
+                    item["cantidad"]
+                )
 
         if total_prendas <= 0:
             raise ValidationError("Sin producción.")
@@ -105,56 +110,114 @@ class CorteService:
 
             rollo.save()
 
-        # ==========================
-        # DETALLES PRODUCCIÓN
-        # ==========================
+        
         detalles = []
+
+        # ==========================
+        # CARGAR CATÁLOGOS NECESARIOS
+        # ==========================
+
+        producto_ids = set()
+        tela_ids = set()
+        color_ids = set()
+
+        for rollo in rollos:
+
+            for item in rollo["items"]:
+
+                producto_ids.add(item["producto_base_id"])
+                tela_ids.add(item["tipo_tela_id"])
+                color_ids.add(item["color_id"])
+
 
         productos_map = {
             p.id: p
             for p in ProductoBase.objects.filter(
-                id__in=[i["producto_base_id"] for i in items]
+                id__in=producto_ids
             )
         }
 
-        telas_map = {t.id: t for t in TipoTela.objects.filter(id__in=[i["tipo_tela_id"] for i in items])}
-        colores_map = {c.id: c for c in Color.objects.filter(id__in=[i["color_id"] for i in items])}
+        telas_map = {
+            t.id: t
+            for t in TipoTela.objects.filter(
+                id__in=tela_ids
+            )
+        }
 
-        for item in items:
+        colores_map = {
+            c.id: c
+            for c in Color.objects.filter(
+                id__in=color_ids
+            )
+        }
 
-            producto_base = productos_map[item["producto_base_id"]]
-            tipo_tela = telas_map[item["tipo_tela_id"]]
-            color = colores_map[item["color_id"]]
-            cantidad = int(item["cantidad"])
 
-            variante = VariantService.obtener_o_crear(
-                producto_base=producto_base,
-                tipo_tela=tipo_tela,
-                color=color,
-                talla_nombre=item["talla"],
+        for r in rollos:
+
+            rollo_actual = next(
+                rollo
+                for rollo, _ in rollos_objs
+                if rollo.id == int(r["rollo_id"])
             )
 
-            detalles.append(
-                ProduccionDetalle(
-                    lote=lote,
+            for item in r["items"]:
+
+
+                producto_base = productos_map[
+                    item["producto_base_id"]
+                ]
+
+                tipo_tela = telas_map[
+                    item["tipo_tela_id"]
+                ]
+
+                color = colores_map[
+                    item["color_id"]
+                ]
+
+                cantidad = int(item["cantidad"])
+
+                variante = VariantService.obtener_o_crear(
+                    producto_base=producto_base,
+                    tipo_tela=tipo_tela,
+                    color=color,
+                    talla_nombre=item["talla"],
+                )
+
+                detalles.append(
+                    ProduccionDetalle(
+                        lote=lote,
+                        rollo=rollo_actual,
+                        variante=variante,
+                        cantidad=cantidad,
+                        consumo_unitario=consumo_unitario,
+                        consumo_total=consumo_unitario * cantidad,
+                        costo_unitario=0,
+                        costo_total=0,
+                    )
+                )
+
+
+                InventoryService.agregar_stock(
                     variante=variante,
                     cantidad=cantidad,
-                    consumo_unitario=consumo_unitario,
-                    consumo_total=consumo_unitario * cantidad,
+                    sucursal_id=sucursal.id,
+                    user=usuario,
+                    referencia=referencia,
+                    tipo="PRODUCCION",
                     costo_unitario=0,
-                    costo_total=0,
                 )
+
+        for d in detalles:
+            print(
+                "ROLLO:",
+                d.rollo,
+                "ROLLO_ID:",
+                d.rollo_id,
+                "VARIANTE:",
+                d.variante_id
             )
 
-            InventoryService.agregar_stock(
-                variante=variante,
-                cantidad=cantidad,
-                sucursal_id=sucursal.id,
-                user=usuario,
-                referencia=referencia,
-                tipo="PRODUCCION",
-                costo_unitario=0,
-            )
 
         ProduccionDetalle.objects.bulk_create(detalles)
 

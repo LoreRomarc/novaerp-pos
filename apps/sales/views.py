@@ -1,6 +1,7 @@
 # apps/sales/views.py
 import json
 from decimal import Decimal
+from django.shortcuts import get_object_or_404
 
 from django.views import View
 from django.http import JsonResponse
@@ -47,8 +48,16 @@ class POSView(LoginRequiredMixin, RolePermissionMixin, SucursalIsolationMixin, V
             # Redirigir a abrir caja si no hay turno activo
             return redirect("sales:abrir_caja")
 
-        venta = POSService.obtener_venta_abierta(usuario=request.user, sucursal=sucursal)
+        venta_uuid = request.GET.get("venta")
+
+        venta = POSService.obtener_venta_abierta(
+            usuario=request.user,
+            sucursal=sucursal,
+            venta_uuid=venta_uuid
+        )
+
         venta_data = serializar_venta(venta) if venta else {
+            "uuid": None,
             "id": None,
             "subtotal": 0,
             "iva": 0,
@@ -58,7 +67,7 @@ class POSView(LoginRequiredMixin, RolePermissionMixin, SucursalIsolationMixin, V
 
         return render(request, "sales/pos.html", {
             "turno": turno,
-            "venta": venta_data,
+            "venta": json.dumps(venta_data),
             "sucursal": sucursal
         })
 
@@ -72,7 +81,9 @@ class POSAgregarProductoView(LoginRequiredMixin, RolePermissionMixin, SucursalIs
     def post(self, request):
         try:
             data = json.loads(request.body)
+
             variante_id = data.get("variante_id")
+            venta_uuid = data.get("venta_uuid")
 
             try:
                 cantidad = Decimal(str(data.get("cantidad") or "1"))
@@ -84,6 +95,7 @@ class POSAgregarProductoView(LoginRequiredMixin, RolePermissionMixin, SucursalIs
             venta = POSService.agregar_producto(
                 usuario=request.user,
                 sucursal=self.get_sucursal(),
+                venta_uuid=venta_uuid,
                 variante_id=variante_id,
                 termino=termino,
                 cantidad=cantidad
@@ -93,7 +105,6 @@ class POSAgregarProductoView(LoginRequiredMixin, RolePermissionMixin, SucursalIs
 
         except Exception as e:
             return error(str(e))
-
 
 # =========================
 # ACTUALIZAR CANTIDAD
@@ -110,6 +121,7 @@ class POSActualizarCantidadView(LoginRequiredMixin, RolePermissionMixin, Sucursa
             venta_data = POSService.actualizar_cantidad(
                 usuario=request.user,
                 sucursal=self.get_sucursal(),
+                venta_uuid=data.get("venta_uuid"),
                 item_id=data.get("item_id"),
                 cantidad=Decimal(str(cantidad)) if cantidad is not None else None,
                 precio_unitario=Decimal(str(precio)) if precio is not None else None,
@@ -133,6 +145,7 @@ class POSEliminarItemView(LoginRequiredMixin, RolePermissionMixin, SucursalIsola
             venta_data = POSService.eliminar_item(
                 usuario=request.user,
                 sucursal=self.get_sucursal(),
+                venta_uuid=data.get("venta_uuid"),
                 item_id=data.get("item_id")
             )
             return success(venta_data)
@@ -150,6 +163,7 @@ class POSCerrarVentaView(LoginRequiredMixin, RolePermissionMixin, SucursalIsolat
     def post(self, request):
         try:
             data = json.loads(request.body)
+            
             pagos = {
                 "EFECTIVO": Decimal(str(data.get("efectivo", 0))),
                 "TARJETA": Decimal(str(data.get("tarjeta", 0))),
@@ -159,7 +173,10 @@ class POSCerrarVentaView(LoginRequiredMixin, RolePermissionMixin, SucursalIsolat
             venta = POSService.cerrar_venta(
                 usuario=request.user,
                 sucursal=self.get_sucursal(),
-                pagos=pagos
+                venta_uuid=data.get("venta_uuid"),
+                pagos=pagos,
+                cliente=data.get("cliente", ""),
+                observaciones=data.get("observaciones", "")
             )
 
             return success({"reset": True, "total": str(venta.total)})
@@ -176,53 +193,116 @@ class POSCancelarVentaView(LoginRequiredMixin, RolePermissionMixin, SucursalIsol
 
     def post(self, request):
         try:
+            data = json.loads(request.body)
+
             POSService.cancelar_venta(
                 usuario=request.user,
-                sucursal=self.get_sucursal()
+                sucursal=self.get_sucursal(),
+                venta_uuid=data.get("venta_uuid")
             )
+
             return success()
+
         except Exception as e:
             return error(str(e))
-
 
 # =========================
 # AUTOCOMPLETE DE PRODUCTO
 # =========================
 class ProductoAutocompleteView(LoginRequiredMixin, SucursalIsolationMixin, View):
     def get(self, request):
-        q = request.GET.get("q", "").strip()
+        try:
+            q = request.GET.get("q", "").strip()
 
-        if len(q) < 2:
-            return JsonResponse({"results": []})
+            if len(q) < 2:
+                return JsonResponse({"results": []})
 
-        sucursal = self.get_sucursal()
+            sucursal = self.get_sucursal()
 
-        variantes = (
-            ProductoVariante.objects
-            .select_related("producto_base", "color", "tipo_tela")
-            .filter(
-                Q(producto_base__nombre__icontains=q) |
-                Q(sku__icontains=q) |
-                Q(talla__icontains=q) |
-                Q(color__nombre__icontains=q) |
-                Q(tipo_tela__nombre__icontains=q)
-            )[:25]
-        )
+            variantes = (
+                ProductoVariante.objects
+                .select_related(
+                    "producto_base",
+                    "color",
+                    "tipo_tela",
+                    "talla",
+                )
+                .prefetch_related(
+                    "stocks__sucursal"
+                )
+                .filter(
+                    Q(sku__icontains=q) |
+                    Q(codigo_barras__icontains=q) |
+                    Q(producto_base__nombre__icontains=q) |
+                    Q(color__nombre__icontains=q) |
+                    Q(tipo_tela__nombre__icontains=q) |
+                    Q(talla__nombre__icontains=q)
+                )
+                .distinct()[:25]
+            )
 
-        results = []
+            results = []
 
-        for v in variantes:
-            stock = v.stocks.filter(sucursal=sucursal).first()
-            cantidad = stock.cantidad if stock else 0
+            for v in variantes:
+                stock_actual = (
+                    v.stocks
+                    .filter(
+                        sucursal=sucursal
+                    )
+                    .first()
+                )
 
-            results.append({
-                "id": v.id,
-                "nombre": f"{v.producto_base.nombre} - {v.color.nombre} - {v.talla}",
-                "sku": v.sku,
-                "stock": float(cantidad),
-            })
 
-        return JsonResponse({"results": results})
+                stock_sucursal_actual = (
+                    stock_actual.cantidad
+                    if stock_actual
+                    else 0
+                )
+
+
+                stocks_otras_sucursales = []
+
+                for stock in v.stocks.all():
+
+                    if stock.sucursal_id != sucursal.id:
+
+                        stocks_otras_sucursales.append({
+                            "sucursal": stock.sucursal.nombre,
+                            "cantidad": float(stock.cantidad)
+                        })
+
+
+                results.append({
+
+                    "id": v.id,
+
+                    "nombre": (
+                        f"{v.producto_base.nombre} - "
+                        f"{v.tipo_tela.nombre} - "
+                        f"{v.color.nombre} - "
+                        f"{v.talla.nombre}"
+                    ),
+
+                    "sku": v.sku,
+
+                    "stock": float(stock_sucursal_actual),
+
+                    "sin_stock": (
+                        stock_sucursal_actual <= 0
+                    ),
+
+                    "otras_sucursales": stocks_otras_sucursales
+                })
+
+
+            return JsonResponse({"results": results})
+
+        except Exception as e:
+            import traceback
+            return JsonResponse({
+                "error": str(e),
+                "trace": traceback.format_exc()
+            }, status=500)
 
 
 # =========================
@@ -237,6 +317,7 @@ class POSCambiarTipoVentaView(LoginRequiredMixin, RolePermissionMixin, SucursalI
             venta_data = POSService.cambiar_tipo_venta(
                 usuario=request.user,
                 sucursal=self.get_sucursal(),
+                venta_uuid=data.get("venta_uuid"),
                 tipo=data.get("tipo")
             )
             return success(venta_data)
@@ -244,6 +325,93 @@ class POSCambiarTipoVentaView(LoginRequiredMixin, RolePermissionMixin, SucursalI
             return error(str(e))
 
 
+# =========================
+# CARGAR VENTA POR UUID
+# =========================
+
+class POSCargarVentaView(
+    LoginRequiredMixin,
+    RolePermissionMixin,
+    SucursalIsolationMixin,
+    View
+):
+
+    allowed_roles = [
+        "SUPER_ADMIN",
+        "ADMIN_SUCURSAL",
+        "CAJERO"
+    ]
+
+
+    def get(self, request):
+
+        venta_uuid = request.GET.get(
+            "uuid"
+        )
+
+
+        if not venta_uuid:
+            return error(
+                "UUID requerido"
+            )
+
+
+        venta = POSService.obtener_venta_abierta(
+            usuario=request.user,
+            sucursal=self.get_sucursal(),
+            venta_uuid=venta_uuid
+        )
+
+
+        if not venta:
+            return error(
+                "La venta ya no está disponible."
+            )
+
+
+        return success(
+            serializar_venta(venta)
+        )
+
+class POSGuardarEstadoView(
+    LoginRequiredMixin,
+    RolePermissionMixin,
+    SucursalIsolationMixin,
+    View
+):
+
+    allowed_roles=[
+        "SUPER_ADMIN",
+        "ADMIN_SUCURSAL",
+        "CAJERO"
+    ]
+
+    def post(self,request):
+
+        data=json.loads(request.body)
+
+        venta=POSService.guardar_estado(
+
+            usuario=request.user,
+
+            sucursal=self.get_sucursal(),
+
+            venta_uuid=data["venta_uuid"],
+
+            cliente=data.get("cliente",""),
+
+            observaciones=data.get("observaciones",""),
+
+            efectivo=data.get("efectivo",0),
+
+            transferencia=data.get("transferencia",0),
+
+            tarjeta=data.get("tarjeta",0)
+
+        )
+
+        return success(venta)
+    
 # =========================
 # ABRIR CAJA
 # =========================

@@ -3,6 +3,7 @@ from django.urls import path
 
 from apps.administration.api.user_search_api import UserSearchAPI
 from apps.administration.views.dashboard import AdminDashboardView
+from apps.administration.views.empresa_views import EmpresaListView
 from apps.administration.views.sucursal_views import (
     SucursalListView,
     SucursalCreateView
@@ -42,6 +43,8 @@ urlpatterns = [
 
     path("", AdminDashboardView.as_view(), name="dashboard"),
     path("api/users/search/", UserSearchAPI.as_view(), name="user_search_api"),
+
+    path("empresas/", EmpresaListView.as_view(), name="empresa_list"),
 
     # ======================
     # SUCURSALES

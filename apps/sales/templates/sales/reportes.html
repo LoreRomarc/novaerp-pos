@@ -1,0 +1,260 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Reporte de Ventas{% endblock %}
+
+{% block content %}
+
+<style>
+.page-title{font-size:28px;font-weight:700;color:#1e293b;margin-bottom:25px}
+.filtros{background:white;padding:20px;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,.05);margin-bottom:20px}
+.filtros-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:15px}
+.filtros label{display:block;font-size:13px;margin-bottom:6px;color:#64748b;font-weight:600}
+.filtros input,.filtros select{width:100%;padding:10px;border:1px solid #dbe4ee;border-radius:10px;background:#f8fafc}
+.btn-filtrar{margin-top:28px;width:100%}
+
+.cards{display:grid;grid-template-columns:repeat(6,1fr);gap:18px;margin-bottom:25px}
+.card-dashboard{background:white;border-radius:16px;padding:18px;box-shadow:0 4px 18px rgba(0,0,0,.05)}
+.card-dashboard h6{color:#64748b;margin-bottom:10px;font-size:13px}
+.card-dashboard h3{font-size:22px;margin:0;color:#111827}
+
+.tabla{background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.05)}
+.table{margin:0}
+.table thead{background:#111827;color:white}
+.table thead th{border:none;font-size:13px}
+.table td{vertical-align:middle}
+
+.badge-abierta{background:#facc15;color:#111}
+</style>
+
+
+<h2 class="page-title">📊 Reporte de Ventas</h2>
+
+
+<form method="get" class="filtros">
+
+<div class="filtros-grid">
+
+<div>
+<label>Fecha inicial</label>
+<input type="date" name="inicio" value="{{ inicio }}">
+</div>
+
+<div>
+<label>Fecha final</label>
+<input type="date" name="fin" value="{{ fin }}">
+</div>
+
+<div>
+<label>Estado</label>
+<select name="estado">
+<option value="">Todos</option>
+<option value="ABIERTA" {% if estado == "ABIERTA" %}selected{% endif %}>Abierta</option>
+<option value="CERRADA" {% if estado == "CERRADA" %}selected{% endif %}>Cerrada</option>
+<option value="ANULADA" {% if estado == "ANULADA" %}selected{% endif %}>Anulada</option>
+</select>
+</div>
+
+<div>
+<label>Tipo pago</label>
+<select name="tipo_pago">
+<option value="">Todos</option>
+<option value="EFECTIVO" {% if tipo_pago == "EFECTIVO" %}selected{% endif %}>Efectivo</option>
+<option value="TRANSFERENCIA" {% if tipo_pago == "TRANSFERENCIA" %}selected{% endif %}>Transferencia</option>
+<option value="TARJETA" {% if tipo_pago == "TARJETA" %}selected{% endif %}>Tarjeta</option>
+<option value="MIXTO" {% if tipo_pago == "MIXTO" %}selected{% endif %}>Mixto</option>
+</select>
+</div>
+
+<div>
+<label>Usuario</label>
+<select name="usuario">
+<option value="">Todos</option>
+{% for u in usuarios %}
+<option value="{{u.usuario__id}}" {% if usuario_id == u.usuario__id|stringformat:"s" %}selected{% endif %}>
+{{u.usuario__first_name}} {{u.usuario__last_name}}
+</option>
+{% endfor %}
+</select>
+</div>
+
+
+<div>
+<label>Buscar</label>
+<input type="text"  name="buscar" value="{{buscar}}" placeholder="venta, cliente, producto, SKU...">
+
+<button class="btn btn-primary btn-filtrar">Filtrar</button>
+</div>
+
+</div>
+
+</form>
+
+
+
+<div class="cards">
+
+<div class="card-dashboard"><h6>Total General</h6><h3>${{resumen.total_general|floatformat:0|intcomma}}</h3></div>
+<div class="card-dashboard"><h6>Efectivo</h6><h3>${{resumen.total_efectivo|floatformat:0|intcomma}}</h3></div>
+<div class="card-dashboard"><h6>Transferencia</h6><h3>${{resumen.total_transferencia|floatformat:0|intcomma}}</h3></div>
+<div class="card-dashboard"><h6>Tarjeta</h6><h3>${{resumen.total_tarjeta|floatformat:0|intcomma}}</h3></div>
+<div class="card-dashboard"><h6>Ventas</h6><h3>{{resumen.cantidad_ventas}}</h3></div>
+<div class="card-dashboard"><h6>Promedio</h6><h3>${{resumen.promedio|floatformat:0|intcomma}}</h3></div>
+
+</div>
+
+
+
+<div class="tabla">
+
+<table class="table table-hover">
+
+<thead>
+<tr>
+<th>#</th>
+<th>Fecha</th>
+<th>Usuario</th>
+<th>Cliente</th>
+<th>Observación</th>
+<th>Sucursal</th>
+<th>Estado</th>
+<th>Efectivo</th>
+<th>Transferencia</th>
+<th>Tarjeta</th>
+<th>Total</th>
+<th></th>
+</tr>
+</thead>
+
+
+<tbody>
+
+{% for venta in ventas %}
+
+<tr>
+
+<td>{{venta.id}}</td>
+
+<td>{{venta.creada|date:"d/m/Y H:i"}}</td>
+
+<td>{{venta.usuario.get_full_name|default:venta.usuario.username}}</td>
+
+<td>{{ venta.cliente|default:"-" }}</td>
+
+<td>{{ venta.observaciones|default:"-"|truncatechars:40 }}</td>
+
+<td>{{venta.sucursal.nombre}}</td>
+
+
+<td>
+{% if venta.estado == "ABIERTA" %}
+<span class="badge badge-abierta">Abierta</span>
+{% elif venta.estado == "CERRADA" %}
+<span class="badge bg-success">Cerrada</span>
+{% else %}
+<span class="badge bg-danger">Anulada</span>
+{% endif %}
+</td>
+
+
+<td>${{venta.monto_efectivo|floatformat:0|intcomma}}</td>
+<td>${{venta.monto_transferencia|floatformat:0|intcomma}}</td>
+<td>${{venta.monto_tarjeta|floatformat:0|intcomma}}</td>
+
+<td><strong>${{venta.total|floatformat:0|intcomma}}</strong></td>
+
+
+<td>
+<button class="btn btn-sm btn-outline-primary ver-venta" data-id="{{venta.id}}">
+Ver
+</button>
+</td>
+
+</tr>
+
+
+{% empty %}
+
+<tr>
+<td colspan="10" class="text-center p-5">
+No existen ventas.
+</td>
+</tr>
+
+{% endfor %}
+
+</tbody>
+
+</table>
+
+</div>
+
+
+
+<!-- MODAL GRANDE -->
+
+<div class="modal fade" id="modalVenta">
+
+<div class="modal-dialog modal-xl modal-dialog-centered">
+
+<div class="modal-content">
+
+<div class="modal-header bg-dark text-white">
+
+<h5 class="modal-title">
+Detalle venta
+</h5>
+
+<button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+
+</div>
+
+
+<div class="modal-body" id="contenidoVenta">
+Cargando...
+</div>
+
+
+</div>
+
+</div>
+
+</div>
+
+
+
+<script>
+
+document.querySelectorAll(".ver-venta").forEach(btn=>{
+
+    btn.addEventListener("click",async()=>{
+
+    let id=btn.dataset.id;
+
+    let modal=new bootstrap.Modal(
+    document.getElementById("modalVenta")
+    );
+
+    document.getElementById("contenidoVenta").innerHTML="Cargando...";
+
+    modal.show();
+
+
+    let response=await fetch(`/sales/venta/${id}/`);
+
+    let html=await response.text();
+
+
+    document.getElementById("contenidoVenta").innerHTML=html;
+
+
+    });
+
+
+});
+
+
+</script>
+
+
+{% endblock %}

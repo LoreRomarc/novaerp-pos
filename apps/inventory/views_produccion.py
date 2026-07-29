@@ -32,54 +32,121 @@ class CorteProduccionView(SucursalIsolationMixin, View):
     def post(self, request):
 
         try:
-            sucursal = BaseInventoryValidator.validar_usuario_y_sucursal(request.user)
 
-            rollos_ids = request.POST.getlist("rollos[]")
-            metros = request.POST.getlist("metros_rollo[]")
+            print("DEBUG USUARIO CORTE")
+            print(request.user)
+            print(request.user.is_authenticated)
 
-            productos = request.POST.getlist("producto_base[]")
-            telas = request.POST.getlist("tipo_tela[]")
-            colores = request.POST.getlist("color[]")
-            tallas = request.POST.getlist("talla[]")
-            cantidades = request.POST.getlist("cantidad[]")
+            sucursal = BaseInventoryValidator.validar_usuario_y_sucursal(
+                request.user
+            )
+
+
 
             rollos_data = []
 
-            for i in range(min(len(rollos_ids), len(metros))):
-                if not metros[i]:
+
+            rollos_ids = request.POST.getlist("rollo_id[]")
+
+
+            for rollo_id in rollos_ids:
+
+
+                if not rollo_id:
                     continue
+
+
+                metros = request.POST.get(
+                    f"metros_{rollo_id}"
+                )
+
+
+                productos = request.POST.getlist(
+                    f"producto_{rollo_id}[]"
+                )
+
+                telas = request.POST.getlist(
+                    f"tela_{rollo_id}[]"
+                )
+
+                colores = request.POST.getlist(
+                    f"color_{rollo_id}[]"
+                )
+
+                tallas = request.POST.getlist(
+                    f"talla_{rollo_id}[]"
+                )
+
+                cantidades = request.POST.getlist(
+                    f"cantidad_{rollo_id}[]"
+                )
+
+
+                items=[]
+
+
+                for i in range(len(productos)):
+
+
+                    if not cantidades[i]:
+                        continue
+
+
+                    items.append({
+
+                        "producto_base_id":
+                            int(productos[i]),
+
+                        "tipo_tela_id":
+                            int(telas[i]),
+
+                        "color_id":
+                            int(colores[i]),
+
+                        "talla":
+                            tallas[i],
+
+                        "cantidad":
+                            int(cantidades[i])
+
+                    })
+
 
                 rollos_data.append({
-                    "rollo_id": rollos_ids[i],
-                    "metros": metros[i]
+
+                    "rollo_id":
+                        rollo_id,
+
+                    "metros":
+                        metros,
+
+                    "items":
+                        items
+
                 })
 
-            items = []
-
-            for i in range(
-                min(len(productos), len(telas), len(colores), len(tallas), len(cantidades))
-            ):
-                if not cantidades[i]:
-                    continue
-
-                items.append({
-                    "producto_base_id": int(productos[i]),
-                    "tipo_tela_id": int(telas[i]),
-                    "color_id": int(colores[i]),
-                    "talla": tallas[i],
-                    "cantidad": cantidades[i],
-                })
 
             lote = CorteService.ejecutar_corte(
                 rollos=rollos_data,
-                items=items,
                 sucursal=sucursal,
                 usuario=request.user
             )
 
-            messages.success(request, f"Lote generado: {lote.referencia}")
+
+            messages.success(
+                request,
+                f"Lote generado {lote.referencia}"
+            )
+
 
         except Exception as e:
-            messages.error(request, str(e))
 
-        return redirect("inventory:corte_produccion")
+            messages.error(
+                request,
+                str(e)
+            )
+
+
+        return redirect(
+            "inventory:corte_produccion"
+        )

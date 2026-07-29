@@ -8,7 +8,7 @@
     height: calc(100vh - 50px);
   }
 
-  /* 🔥 SOLO POS, NO GLOBAL */
+  /* SOLO POS, NO GLOBAL */
   .pos-left,
   .pos-right {
     font-size: 14px;
@@ -112,11 +112,86 @@
     font-size: 20px;
     font-weight: 700;
   }
+
+  .pos-tabs{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:8px;
+
+    padding:8px 15px;
+
+    border-bottom:1px solid #ddd;
+
+    background:white;
+
+}
+
+.tabs-container{
+
+    display:flex;
+
+    gap:6px;
+
+    overflow-x:auto;
+
+}
+
+.tab-venta{
+
+    display:flex;
+
+    align-items:center;
+
+    gap:8px;
+
+    padding:8px 15px;
+
+    background:#efefef;
+
+    border-radius:10px 10px 0 0;
+
+    cursor:pointer;
+
+    white-space:nowrap;
+
+}
+
+.tab-venta.active{
+
+    background:#0d6efd;
+
+    color:white;
+
+}
+
+.tab-venta .cerrar{
+
+    cursor:pointer;
+
+    font-weight:bold;
+
+} 
 </style>
 
 <script type="module">
 import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
 </script>
+
+<div class="pos-tabs">
+
+    <button class="btn btn-success btn-sm"
+            onclick="crearNuevaVenta()">
+        +
+    </button>
+
+    <div id="tabsVentas" class="tabs-container">
+
+    </div>
+
+</div>
 
 <div class="pos-wrapper">
   <div class="pos-left">
@@ -292,6 +367,36 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
       </button>
     </div>
 
+    <hr>
+
+    <div class="mb-2">
+        <label class="small text-muted">
+            Cliente
+        </label>
+
+        <input
+        type="text"
+        id="cliente"
+        class="form-control form-control-sm"
+        placeholder="Nombre cliente">
+    </div>
+
+
+    <div class="mb-2">
+
+    <label class="small text-muted">
+        Observaciones
+    </label>
+
+    <textarea
+    id="observaciones"
+    class="form-control form-control-sm"
+    rows="2"
+    placeholder="Notas de la venta"></textarea>
+
+    </div>
+
+
     <div class="mb-2">Subtotal: <span id="subtotal">0.00</span></div>
     <div class="mb-2">IVA: <span id="iva">0.00</span></div>
     <div class="total-final mb-2">Total: <span id="total">0.00</span></div>
@@ -312,14 +417,17 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
       placeholder="Transferencia"
     />
 
-    <input
-      type="text"
-      id="tarjeta"
-      class="form-control form-control-sm mb-2"
-      placeholder="Tarjeta"
-    />
+    <div class="mb-2 d-none">
+      <input
+        type="text"
+        id="tarjeta"
+        class="form-control form-control-sm mb-2"
+        placeholder="Tarjeta"
+      />
+  </div>
 
-    <div>Total Pagado: $<span id="total_pagado">0.00</span></div>
+
+    <div>Total Pagado:<span id="total_pagado">0.00</span></div>
     <div id="info_pago" class="fw-bold text-danger mb-2">Faltan $0.00</div>
 
     <div class="d-flex gap-2">
@@ -363,6 +471,9 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
       let pagoEditadoManualmente = false;
       let usandoKeypad = false;
       let tipoVentaActual = "DETAL";
+      let ventaActualUUID=null;
+      let ventasAbiertas=[];
+
 
       /* =========================================================
        REFERENCIAS DOM
@@ -376,6 +487,9 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
       const inputEfectivo = $("efectivo");
       const inputTransferencia = $("transferencia");
       const inputTarjeta = $("tarjeta");
+      const inputCliente = $("cliente");
+      const inputObservaciones = $("observaciones");
+
 
       const btnCerrar = $("btnCerrar");
       const tablaItems = $("tabla_items");
@@ -384,22 +498,25 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
        HELPERS
     ========================================================= */
       const toNumber = (v) => {
-        if (!v) return 0;
+        if (v === null || v === undefined || v === "") return 0;
         if (typeof v === "number") return v;
 
-        v = v.toString().trim();
+        v = String(v).trim();
 
-        // Si ya es número limpio (sin formato)
-        if (/^\d+$/.test(v)) return Number(v);
+        // Si viene del backend como "12000.00"
+        if (/^\d+(\.\d+)?$/.test(v)) {
+            return parseFloat(v);
+        }
 
-        return Number(
-          v
-            .replace(/\$/g, "")
-            .replace(/\s/g, "")
-            .replace(/\./g, "")   // miles
-            .replace(/,/g, ".")   // decimal
+        // Si viene formateado como "$12.000"
+        return parseFloat(
+            v
+                .replace(/\$/g, "")
+                .replace(/\s/g, "")
+                .replace(/\./g, "")
+                .replace(",", ".")
         ) || 0;
-      };
+    };
 
       const moneyFormatter = new Intl.NumberFormat("es-CO", {
         style: "currency",
@@ -414,11 +531,208 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
 
       // Inicializa la venta desde el backend
       const ventaInicial = {{ venta|safe }};
+
+      if(ventaInicial.uuid){
+
+    ventasAbiertas.push({
+
+        uuid:ventaInicial.uuid
+
+    });
+
+}
+
+function guardarEstadoVenta(){
+
+    if(!ventaActualUUID)
+        return Promise.resolve();
+
+    return postJSON("{% url 'sales:pos_guardar' %}",{
+
+        venta_uuid:ventaActualUUID,
+
+        cliente:inputCliente.value,
+
+        observaciones:inputObservaciones.value,
+
+        efectivo:toNumber(inputEfectivo.value),
+
+        transferencia:toNumber(inputTransferencia.value),
+
+        tarjeta:toNumber(inputTarjeta.value)
+
+    });
+
+}
+
+      if(ventaInicial){
+        ventaActualUUID = ventaInicial.uuid;
+      }
       document.addEventListener("DOMContentLoaded", function () {
         if (ventaInicial && ventaInicial.items) {
           actualizarTabla(ventaInicial);
         }
+        renderTabs();
       });
+
+
+      function renderTabs(){
+
+    const cont=document.getElementById("tabsVentas");
+
+    cont.innerHTML="";
+
+    ventasAbiertas.forEach((v,index)=>{
+
+        const tab=document.createElement("div");
+
+        tab.className="tab-venta";
+
+        if(v.uuid===ventaActualUUID)
+            tab.classList.add("active");
+
+        tab.innerHTML=`
+            Venta ${index+1}
+
+            <span class="cerrar"
+                  onclick="cerrarTab(event,'${v.uuid}')">
+            ×
+            </span>
+        `;
+
+        tab.onclick = () => {
+
+            if (v.uuid === ventaActualUUID)
+                return;
+
+            guardarEstadoVenta().then(() => {
+
+                cargarVenta(v.uuid);
+
+            });
+
+        };
+
+        cont.appendChild(tab);
+
+    });
+
+}
+
+function crearNuevaVenta(){
+
+    guardarEstadoVenta().then(()=>{
+
+        fetch("{% url 'sales:pos_nueva_venta' %}",{
+
+            method:"POST",
+
+            headers:{
+                "X-CSRFToken":csrf
+            }
+
+        })
+        .then(r=>r.json())
+        .then(data=>{
+
+            if(!data.success)
+                return;
+
+            ventasAbiertas.push(data.venta);
+
+            ventaActualUUID=data.venta.uuid;
+
+            actualizarTabla({
+                subtotal:0,
+                iva:0,
+                total:0,
+                items:[]
+            });
+
+            inputCliente.value="";
+            inputObservaciones.value="";
+            inputEfectivo.value="";
+            inputTransferencia.value="";
+            inputTarjeta.value="";
+
+            renderTabs();
+
+        });
+
+    });
+
+}
+
+function cargarVenta(uuid){
+
+    fetch("{% url 'sales:pos_cargar' %}?uuid="+uuid)
+
+    .then(r=>r.json())
+
+    .then(res=>{
+
+        if(!res.success){
+
+            alert(res.error);
+
+            return;
+
+        }
+
+        const venta=res.data;
+
+        ventaActualUUID=venta.uuid;
+
+        actualizarTabla(venta);
+
+        inputCliente.value=venta.cliente;
+
+        inputObservaciones.value=venta.observaciones;
+
+        inputEfectivo.value=venta.efectivo;
+
+        inputTransferencia.value=venta.transferencia;
+
+        inputTarjeta.value=venta.tarjeta;
+
+        setTipoVentaUI(venta.tipo_venta);
+
+        actualizarTotalesPago();
+
+        renderTabs();
+
+        inputBuscar.focus();
+
+    });
+
+}
+
+function cerrarTab(e,uuid){
+
+    e.stopPropagation();
+
+    ventasAbiertas=
+        ventasAbiertas.filter(x=>x.uuid!=uuid);
+
+    if(ventaActualUUID==uuid){
+
+        if(ventasAbiertas.length){
+
+            cargarVenta(ventasAbiertas[0].uuid);
+
+        }else{
+
+            crearNuevaVenta();
+
+        }
+
+    }
+
+    renderTabs();
+
+}
+
+
 
       function confirmarCantidadInput(input) {
         const id = input.dataset.id;
@@ -465,6 +779,18 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
           item.className =
             "list-group-item list-group-item-action d-flex justify-content-between align-items-center";
 
+          if (prod.sin_stock) {
+
+              item.classList.add(
+                  "text-muted"
+              );
+
+              item.style.backgroundColor =
+                  "#eeeeee";
+
+          }
+
+
           if (index === indiceSeleccionado) {
             item.classList.add("active");
           }
@@ -477,7 +803,31 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
 
           const codigo = document.createElement("small");
           codigo.className = "text-muted";
-          codigo.textContent = prod.sku + (prod.stock <= 0 ? " (SIN STOCK)" : ""); 
+          codigo.textContent = prod.sku + " | Stock: " + prod.stock;
+          if(prod.otras_sucursales.length){
+
+              const infoSucursal =
+                  document.createElement("small");
+
+              infoSucursal.className =
+                  "text-primary ms-2";
+
+
+              infoSucursal.textContent =
+                  " Otras: " +
+                  prod.otras_sucursales
+                  .map(
+                    x =>
+                    x.sucursal +
+                    " (" +
+                    x.cantidad +
+                    ")"
+                  )
+                  .join(", ");
+
+
+              item.appendChild(infoSucursal);
+          }
 
           item.appendChild(nombre);
           item.appendChild(codigo);
@@ -506,20 +856,15 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
         }
 
         debounceTimer = setTimeout(() => {
-          fetch("{% url 'inventory:variant_search_api' %}?q=" + encodeURIComponent(valor))
+          fetch("{% url 'sales:pos_autocomplete' %}?q=" + encodeURIComponent(valor))
           .then(res => res.json())
           .then(data => {
 
-            productosAutocomplete = data.map(item => ({
-              id: item.id,
-              nombre: item.text,
-              sku: item.sku,
-            }));
+              productosAutocomplete = data.results;
 
-            // 🔥 comportamiento tipo dashboard
-            indiceSeleccionado = data.length > 0 ? 0 : -1;
+              indiceSeleccionado = productosAutocomplete.length ? 0 : -1;
 
-            renderSugerencias();
+              renderSugerencias();
           })
           .catch(err => {
             console.error("ERROR BUSCANDO PRODUCTOS:", err);
@@ -619,8 +964,9 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
         const cantidad = parseFloat(inputCantidad.value || "1");
 
         postJSON("{% url 'sales:pos_agregar' %}", {
-          variante_id: producto_id,
-          cantidad: isNaN(cantidad) ? 1 : cantidad,
+            variante_id: producto_id,
+            cantidad: cantidad,
+            venta_uuid: ventaActualUUID
         }).then(handleTablaResponse);
       }
 
@@ -709,14 +1055,6 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
         $("total").innerText = money(data.total);
         $("total").dataset.raw = toNumber(data.total);
 
-
-        if (data.items.length === 0) {
-          inputEfectivo.value = "";
-          inputTransferencia.value = "";
-          inputTarjeta.value = "";
-          pagoEditadoManualmente = false;
-        }
-
         actualizarTotalesPago();
       }
 
@@ -729,6 +1067,7 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
         postJSON("{% url 'sales:pos_actualizar' %}", {
           item_id: id,
           cantidad: cantidad,
+          venta_uuid:ventaActualUUID
         }).then((response) => {
           if (response.success) {
             actualizarTabla(response.data);
@@ -741,6 +1080,7 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
       function eliminarItem(id) {
         postJSON("{% url 'sales:pos_eliminar' %}", {
           item_id: id,
+          venta_uuid:ventaActualUUID
         }).then((response) => {
           if (response.success) actualizarTabla(response.data);
           else alert(response.error);
@@ -792,9 +1132,14 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
     ========================================================= */
       function cerrarVenta() {
       postJSON("{% url 'sales:pos_cerrar' %}", {
+        venta_uuid:ventaActualUUID,
         efectivo: toNumber(inputEfectivo.value),
         transferencia: toNumber(inputTransferencia.value),
         tarjeta: toNumber(inputTarjeta.value),
+
+        cliente: inputCliente.value,
+        observaciones: inputObservaciones.value
+
       }).then((response) => {
         if (!response.success) {
           alert(response.error);
@@ -906,6 +1251,7 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
 
         postJSON("{% url 'sales:pos_cambiar_tipo' %}", {
           tipo: tipo,
+          venta_uuid:ventaActualUUID
         }).then((response) => {
           if (!response.success) {
             alert(response.error);

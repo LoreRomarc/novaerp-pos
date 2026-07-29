@@ -1,0 +1,378 @@
+{% load humanize %}
+
+<style>
+.detalle-card{
+    border:0;
+    border-radius:12px;
+    box-shadow:0 2px 10px rgba(0,0,0,.08);
+}
+
+.detalle-card .card-body{
+    padding:12px 15px;
+}
+
+.detalle-label{
+    font-size:12px;
+    color:#64748b;
+    margin-bottom:4px;
+    font-weight:600;
+}
+
+.detalle-value{
+    font-size:16px;
+    font-weight:700;
+    color:#111827;
+    margin:0;
+}
+
+.detalle-total{
+    font-size:22px;
+}
+
+.tabla-detalle th{
+    font-size:12px;
+    background:#111827!important;
+    color:white;
+    padding:8px;
+}
+
+.tabla-detalle td{
+    font-size:13px;
+    padding:8px;
+    vertical-align:middle;
+}
+
+.resumen-box{
+    padding:12px;
+    border-radius:12px;
+    font-size:14px;
+}
+</style>
+
+
+<div class="container-fluid px-2">
+
+
+<!-- INFORMACION PRINCIPAL -->
+
+<div class="row g-2 mb-3">
+
+<div class="col-md-4">
+<div class="card detalle-card">
+<div class="card-body">
+<div class="detalle-label">Venta</div>
+<div class="detalle-value">#{{ venta.id }}</div>
+</div>
+</div>
+</div>
+
+
+<div class="col-md-4">
+<div class="card detalle-card">
+<div class="card-body">
+<div class="detalle-label">Usuario</div>
+<div class="detalle-value">
+{{ venta.usuario.get_full_name|default:venta.usuario.username }}
+</div>
+</div>
+</div>
+</div>
+
+
+<div class="col-md-4">
+<div class="card detalle-card">
+<div class="card-body">
+<div class="detalle-label">Fecha</div>
+<div class="detalle-value">
+{{ venta.creada|date:"d/m/Y H:i" }}
+</div>
+</div>
+</div>
+</div>
+
+</div>
+
+<div class="row g-2 mb-2">
+
+
+<div class="col-md-4">
+
+<div class="card shadow-sm">
+
+<div class="card-body p-2">
+
+<small class="text-muted">
+Cliente
+</small>
+
+<div class="fw-bold">
+{{ venta.cliente|default:"Consumidor final" }}
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+
+
+<div class="col-md-4">
+
+<div class="card shadow-sm">
+
+<div class="card-body p-2">
+
+<small class="text-muted">
+Vendedor
+</small>
+
+<div class="fw-bold">
+
+{{ venta.usuario.get_full_name|default:venta.usuario.username }}
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+
+<div class="col-md-4">
+
+<div class="card shadow-sm">
+
+<div class="card-body p-2">
+
+<small class="text-muted">
+Observaciones
+</small>
+
+<div>
+
+{{ venta.observaciones|default:"Sin observaciones" }}
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+</div>
+
+<!-- RESUMEN PAGO -->
+
+<div class="row g-2 mb-3">
+
+<div class="col-md-3">
+<div class="card detalle-card bg-light">
+<div class="card-body">
+
+<div class="detalle-label">
+Estado
+</div>
+
+{% if venta.estado == "CERRADA" %}
+<span class="badge bg-success">
+Cerrada
+</span>
+
+{% elif venta.estado == "ABIERTA" %}
+<span class="badge bg-warning text-dark">
+Abierta
+</span>
+
+{% else %}
+<span class="badge bg-danger">
+Anulada
+</span>
+
+{% endif %}
+
+</div>
+</div>
+</div>
+
+
+
+<div class="col-md-3">
+<div class="card detalle-card bg-light">
+<div class="card-body">
+
+<div class="detalle-label">
+Total
+</div>
+
+<div class="detalle-value detalle-total">
+${{ venta.total|floatformat:0|intcomma }}
+</div>
+
+</div>
+</div>
+</div>
+
+
+
+<div class="col-md-3">
+<div class="card detalle-card bg-light">
+<div class="card-body">
+
+<div class="detalle-label">
+Efectivo
+</div>
+
+<div class="detalle-value">
+${{ venta.monto_efectivo|floatformat:0|intcomma }}
+</div>
+
+</div>
+</div>
+</div>
+
+
+
+<div class="col-md-3">
+<div class="card detalle-card bg-light">
+<div class="card-body">
+
+<div class="detalle-label">
+Transferencia
+</div>
+
+<div class="detalle-value">
+${{ venta.monto_transferencia|floatformat:0|intcomma }}
+</div>
+
+</div>
+</div>
+</div>
+
+
+</div>
+
+
+
+
+<h6 class="fw-bold mb-2">
+🛒 Productos vendidos
+</h6>
+
+
+<div class="table-responsive">
+
+<table class="table table-hover table-bordered tabla-detalle mb-3">
+
+<thead>
+
+<tr>
+<th>Producto</th>
+<th>SKU</th>
+<th>Color</th>
+<th>Talla</th>
+<th>Cant.</th>
+<th>Precio</th>
+<th>Total</th>
+</tr>
+
+</thead>
+
+
+<tbody>
+
+
+{% for item in venta.items.all %}
+
+<tr>
+
+<td>
+<strong>{{ item.nombre_producto }}</strong>
+</td>
+
+<td>
+{{ item.sku }}
+</td>
+
+<td>
+{{ item.color }}
+</td>
+
+<td>
+{{ item.talla }}
+</td>
+
+<td>
+{{ item.cantidad }}
+</td>
+
+<td>
+${{ item.precio_unitario|floatformat:0|intcomma }}
+</td>
+
+<td>
+<strong>
+${{ item.total_linea|floatformat:0|intcomma }}
+</strong>
+</td>
+
+</tr>
+
+
+{% empty %}
+
+<tr>
+<td colspan="7" class="text-center">
+No hay productos
+</td>
+</tr>
+
+{% endfor %}
+
+
+</tbody>
+
+</table>
+
+</div>
+
+
+
+
+<!-- TOTALES -->
+
+<div class="row g-2">
+
+
+<div class="col-md-4">
+<div class="alert alert-secondary resumen-box mb-0">
+<strong>Subtotal</strong><br>
+${{ venta.subtotal|floatformat:0|intcomma }}
+</div>
+</div>
+
+
+<div class="col-md-4">
+<div class="alert alert-secondary resumen-box mb-0">
+<strong>IVA</strong><br>
+${{ venta.total_iva|floatformat:0|intcomma }}
+</div>
+</div>
+
+
+<div class="col-md-4">
+<div class="alert alert-success resumen-box mb-0">
+<strong>Total venta</strong><br>
+<h5 class="mb-0">
+${{ venta.total|floatformat:0|intcomma }}
+</h5>
+</div>
+</div>
+
+
+</div>
+
+
+</div>
