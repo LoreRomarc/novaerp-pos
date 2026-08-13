@@ -1,51 +1,356 @@
 {% extends "base.html" %}
+
 {% block content %}
 
-<div class="container mt-4">
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-lg-9 col-xl-8">
 
-    <h3>Abrir Caja</h3>
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="bg-primary bg-opacity-10 text-primary rounded p-2">
+                            <i class="bi bi-unlock fs-4"></i>
+                        </div>
 
-    {% if error %}
-        <div class="alert alert-danger">
-            {{ error }}
-        </div>
-    {% endif %}
+                        <div>
+                            <h4 class="mb-1">Apertura de turno de caja</h4>
+                            <div class="text-muted small">
+                                {{ sucursal.nombre }} · Seleccione responsables y efectivo inicial.
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-    {% if cajas %}
-        <form method="post">
-            {% csrf_token %}
+                <div class="card-body p-4">
 
-            <div class="mb-3">
-                <label>Caja</label>
-                <select name="caja_id" class="form-control" required>
-                    {% for caja in cajas %}
-                        <option value="{{ caja.id }}">
-                            {{ caja.nombre }}
-                        </option>
-                    {% endfor %}
-                </select>
+                    {% if error %}
+                        <div class="alert alert-danger d-flex align-items-start gap-2" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill"></i>
+                            <div>{{ error }}</div>
+                        </div>
+                    {% endif %}
+
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags|default:'info' }}" role="alert">
+                                {{ message }}
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+
+                    {% if cajas %}
+
+                        <form
+                            action="{% url 'sales:abrir_caja' %}"
+                            id="formAbrirCaja"
+                            method="post">
+
+                            {% csrf_token %}
+
+                            <div class="row g-4">
+
+                                <div class="col-12">
+                                    <div class="d-flex align-items-center gap-2 mb-2">
+                                        <span class="badge rounded-pill text-bg-primary">1</span>
+                                        <label class="form-label fw-semibold mb-0">
+                                            Caja física
+                                        </label>
+                                    </div>
+
+                                    <div class="row g-3">
+                                        {% for caja in cajas %}
+                                            <div class="col-12 col-md-6">
+                                                <input
+                                                    class="btn-check js-caja-radio"
+                                                    id="caja{{ caja.id }}"
+                                                    name="caja_id"
+                                                    required
+                                                    type="radio"
+                                                    value="{{ caja.id }}"
+                                                    {% if caja_seleccionada == caja.id|stringformat:"s" %}checked{% endif %}>
+
+                                                <label
+                                                    class="btn btn-outline-primary text-start w-100 h-100 p-3"
+                                                    for="caja{{ caja.id }}">
+
+                                                    <div class="d-flex align-items-center gap-3">
+                                                        <div class="rounded-circle bg-primary bg-opacity-10 text-primary p-2">
+                                                            <i class="bi bi-cash-register fs-5"></i>
+                                                        </div>
+
+                                                        <div class="flex-grow-1">
+                                                            <span class="d-block fw-semibold">
+                                                                {{ caja.nombre }}
+                                                            </span>
+
+                                                            <span class="d-block small opacity-75">
+                                                                Código: {{ caja.codigo }}
+                                                            </span>
+                                                        </div>
+
+                                                        <i class="bi bi-check-circle-fill fs-5 d-none js-caja-check"></i>
+                                                    </div>
+                                                </label>
+                                            </div>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+
+                                <div class="col-12">
+                                    <div class="d-flex align-items-center gap-2 mb-2">
+                                        <span class="badge rounded-pill text-bg-primary">2</span>
+                                        <label
+                                            class="form-label fw-semibold mb-0"
+                                            for="supervisorId">
+                                            Supervisión del turno
+                                        </label>
+                                    </div>
+
+                                    {% if supervisor_requerido %}
+
+                                        <select
+                                            class="form-select form-select-lg"
+                                            id="supervisorId"
+                                            name="supervisor_id"
+                                            required>
+
+                                            <option value="">
+                                                Seleccione un supervisor
+                                            </option>
+
+                                            {% for supervisor in supervisores %}
+                                                <option
+                                                    value="{{ supervisor.user.id }}"
+                                                    {% if supervisor_seleccionado == supervisor.user.id|stringformat:"s" %}selected{% endif %}>
+
+                                                    {% if supervisor.user.get_full_name %}
+                                                        {{ supervisor.user.get_full_name }}
+                                                    {% else %}
+                                                        {{ supervisor.user.username }}
+                                                    {% endif %}
+                                                    · {{ supervisor.get_role_display }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+
+                                        <div class="form-text">
+                                            El supervisor seleccionado revisará y aprobará el arqueo final.
+                                        </div>
+
+                                    {% else %}
+
+                                        <div class="alert alert-primary mb-0">
+                                            <div class="d-flex align-items-start gap-2">
+                                                <i class="bi bi-shield-check fs-5"></i>
+
+                                                <div>
+                                                    <strong>Supervisión asumida por Super Administrador.</strong>
+                                                    No necesita seleccionar otro supervisor para abrir este turno.
+                                                    La aprobación del arqueo quedará registrada con su usuario.
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                    {% endif %}
+                                </div>
+
+                                <div class="col-12">
+                                    <div class="d-flex align-items-center gap-2 mb-2">
+                                        <span class="badge rounded-pill text-bg-primary">3</span>
+                                        <label
+                                            class="form-label fw-semibold mb-0"
+                                            for="montoInicial">
+                                            Base inicial en efectivo
+                                        </label>
+                                    </div>
+
+                                    <div class="input-group input-group-lg">
+                                        <span class="input-group-text">$</span>
+
+                                        <input
+                                            aria-describedby="ayudaMontoInicial"
+                                            class="form-control"
+                                            id="montoInicial"
+                                            min="0"
+                                            name="monto_inicial"
+                                            required
+                                            step="0.01"
+                                            type="number"
+                                            value="{{ monto_inicial }}">
+                                    </div>
+
+                                    <div
+                                        class="invalid-feedback"
+                                        id="montoInicialError">
+                                        El monto inicial no puede ser negativo.
+                                    </div>
+
+                                    <div
+                                        class="form-text"
+                                        id="ayudaMontoInicial">
+                                        Registre únicamente el efectivo físico entregado al cajero para iniciar el turno.
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-info d-flex align-items-start gap-2 small mt-4 mb-4">
+                                <i class="bi bi-shield-check mt-1"></i>
+
+                                <div>
+                                    <strong>Responsabilidades registradas automáticamente:</strong>
+                                    <ul class="mb-0 mt-1 ps-3">
+                                        <li>Apertura: {{ request.user.get_full_name|default:request.user.username }}</li>
+                                        <li>Supervisor: usuario seleccionado en esta pantalla</li>
+                                        <li>Arqueo: usuario que registre el conteo físico</li>
+                                        <li>Cierre y aprobación: usuarios autenticados que ejecuten cada acción</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="form-check mb-4">
+                                <input
+                                    class="form-check-input"
+                                    id="confirmarApertura"
+                                    required
+                                    type="checkbox">
+
+                                <label
+                                    class="form-check-label"
+                                    for="confirmarApertura">
+                                    Confirmo que la base inicial corresponde al efectivo físico entregado.
+                                </label>
+                            </div>
+
+                            <button
+                                class="btn btn-primary btn-lg w-100"
+                                id="btnAbrirCaja"
+                                type="submit">
+
+                                <span
+                                    aria-hidden="true"
+                                    class="spinner-border spinner-border-sm d-none"
+                                    id="spinnerAbrirCaja"></span>
+
+                                <i
+                                    class="bi bi-unlock"
+                                    id="iconoAbrirCaja"></i>
+
+                                <span id="textoAbrirCaja">
+                                    Abrir turno de caja
+                                </span>
+                            </button>
+                        </form>
+
+                    {% elif not cajas %}
+
+                        <div class="text-center py-5">
+                            <div class="text-warning mb-3">
+                                <i class="bi bi-exclamation-triangle display-4"></i>
+                            </div>
+
+                            <h4>No existen cajas físicas activas</h4>
+
+                            <p class="text-muted mb-0">
+                                Solicite al administrador crear o activar una caja para esta sucursal.
+                            </p>
+                        </div>
+
+                    {% else %}
+
+                        <div class="text-center py-5">
+                            <div class="text-warning mb-3">
+                                <i class="bi bi-person-exclamation display-4"></i>
+                            </div>
+
+                            <h4>No hay supervisores disponibles</h4>
+
+                            <p class="text-muted mb-0">
+                                Solicite al administrador asignar un usuario con rol Supervisor, Administrador de sucursal o Super administrador.
+                            </p>
+                        </div>
+
+                    {% endif %}
+
+                </div>
             </div>
 
-            <div class="mb-3">
-                <label>Monto inicial</label>
-                <input type="number"
-                       name="monto_inicial"
-                       step="0.01"
-                       class="form-control"
-                       required>
-            </div>
-
-            <button type="submit" class="btn btn-success">
-                Abrir Caja
-            </button>
-        </form>
-    {% else %}
-        <div class="alert alert-warning">
-            No hay cajas registradas para esta sucursal.
-            Registra una caja desde el panel de administración.
         </div>
-    {% endif %}
-
+    </div>
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const formulario = document.getElementById("formAbrirCaja");
+
+    if (!formulario) {
+        return;
+    }
+
+    const monto = document.getElementById("montoInicial");
+    const confirmar = document.getElementById("confirmarApertura");
+    const boton = document.getElementById("btnAbrirCaja");
+    const spinner = document.getElementById("spinnerAbrirCaja");
+    const icono = document.getElementById("iconoAbrirCaja");
+    const texto = document.getElementById("textoAbrirCaja");
+    const radios = document.querySelectorAll(".js-caja-radio");
+
+    function actualizarCajaSeleccionada() {
+        document.querySelectorAll(".js-caja-check").forEach(function (check) {
+            check.classList.add("d-none");
+        });
+
+        const seleccionada = document.querySelector(".js-caja-radio:checked");
+
+        if (!seleccionada) {
+            return;
+        }
+
+        const etiqueta = document.querySelector(
+            'label[for="' + seleccionada.id + '"]'
+        );
+
+        if (etiqueta) {
+            const check = etiqueta.querySelector(".js-caja-check");
+
+            if (check) {
+                check.classList.remove("d-none");
+            }
+        }
+    }
+
+    radios.forEach(function (radio) {
+        radio.addEventListener("change", actualizarCajaSeleccionada);
+    });
+
+    actualizarCajaSeleccionada();
+
+    formulario.addEventListener("submit", function (evento) {
+        const valor = Number(monto.value);
+
+        if (!Number.isFinite(valor) || valor < 0) {
+            evento.preventDefault();
+            monto.classList.add("is-invalid");
+            monto.focus();
+            return;
+        }
+
+        if (!confirmar.checked) {
+            evento.preventDefault();
+            confirmar.focus();
+            return;
+        }
+
+        boton.disabled = true;
+        spinner.classList.remove("d-none");
+        icono.classList.add("d-none");
+        texto.textContent = "Abriendo turno...";
+    });
+
+    monto.addEventListener("input", function () {
+        monto.classList.remove("is-invalid");
+    });
+});
+</script>
 
 {% endblock %}

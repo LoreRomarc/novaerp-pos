@@ -1,336 +1,290 @@
-from decimal import Decimal
-from django.db import transaction
-from django.core.exceptions import ValidationError
-from django.db.models import Q
-from django.utils import timezone
+from decimal import Decimal, InvalidOperation
 
+from django.core.exceptions import ValidationError
+from django.db import transaction
+
+from apps.inventory.models import Stock
 from apps.sales.models import (
-    Venta,
-    VentaItem,
+    Carrito,
+    CarritoItem,
     ListaPrecio,
     PrecioVariante,
-    redondear_a_peso_colombiano,
 )
-from apps.inventory.models import ProductoVariante, Stock
-from apps.inventory.services.stock_service import InventoryService
-from apps.sales.services.serializers import serializar_venta
+from apps.sales.services.carrito_service import CarritoService
+from apps.sales.services.serializers import serializar_carrito
 from .caja_service import CajaService
 
 
 class POSService:
+    MEDIOS_PAGO = {
+        "EFECTIVO",
+        "TARJETA",
+        "TRANSFERENCIA",
+    }
 
-    # =========================
-    # OBTENER VENTA ABIERTA
-    # =========================
+    TIPOS_VENTA = {
+        "DETAL",
+        "MAYORISTA",
+    }
+
     @staticmethod
-    def obtener_venta_abierta(usuario, sucursal, venta_uuid=None):
+    def _decimal(valor, mensaje):
+        try:
+            return Decimal(str(valor or 0))
+        except (
+            InvalidOperation,
+            TypeError,
+            ValueError,
+        ) as error:
+            raise ValidationError(mensaje) from error
 
+    @staticmethod
+    def _obtener_carrito_bloqueado(
+        usuario,
+        sucursal,
+        venta_uuid,
+    ):
         if not venta_uuid:
-            return None
+            raise ValidationError("Carrito inválido.")
 
-        return Venta.objects.filter(
-            uuid=venta_uuid,
-            usuario=usuario,
-            sucursal=sucursal,
-            estado="ABIERTA"
-        ).first()
-
-
-    # =========================
-    # CREAR OBTENER VENTA
-    # =========================
-    @staticmethod
-    @transaction.atomic
-    def obtener_o_crear_venta(usuario, sucursal, venta_uuid=None):
-
-        venta = None
-
-        if venta_uuid:
-
-            venta = (
-                Venta.objects
-                .select_for_update()
-                .filter(
-                    uuid=venta_uuid,
-                    usuario=usuario,
-                    sucursal=sucursal,
-                    estado="ABIERTA"
-                )
-                .first()
-            )
-
-
-        if venta:
-            return venta
-
-        turno = CajaService.obtener_turno_abierto(sucursal)
-        if not turno:
-            raise ValidationError("Debe abrir caja antes de vender.")
-
-        return Venta.objects.create(
-            sucursal=sucursal,
-            turno=turno,
-            usuario=usuario
-        )
-
-
-    # =========================
-    # CREAR NUEVA VENTA REAL
-    # =========================
-    @staticmethod
-    @transaction.atomic
-    def crear_nueva_venta(usuario, sucursal):
-
-        turno = CajaService.obtener_turno_abierto(
-            sucursal
-        )
-
-        if not turno:
-            raise ValidationError(
-                "Debe abrir caja antes de vender."
-            )
-
-
-        return Venta.objects.create(
-            sucursal=sucursal,
-            turno=turno,
-            usuario=usuario,
-            estado="ABIERTA"
-        )
-
-    # =========================
-    # PRECIO POR VARIANTE
-    # =========================
-    @staticmethod
-    def obtener_precio_variante(variante, venta):
-
-        lista = ListaPrecio.objects.filter(
-            sucursal=venta.sucursal,
-            tipo_venta=venta.tipo_venta,
-            activa=True
-        ).first()
-
-        if not lista:
-            lista = ListaPrecio.objects.filter(
-                sucursal=venta.sucursal,
-                tipo_venta="DETAL",
-                activa=True
-            ).first()
-
-        if not lista:
-            raise ValidationError("No existe lista de precios configurada.")
-
-        precio_obj = PrecioVariante.objects.filter(
-            variante=variante,
-            lista=lista
-        ).first()
-
-        if not precio_obj:
-            raise ValidationError(f"Sin precio para {variante}")
-
-        return precio_obj.precio
-
-    # =========================
-    # BUSCAR VARIANTE
-    # =========================
-    @staticmethod
-    def buscar_variante(variante_id=None, termino=None, sucursal_id=None):
-
-        qs = ProductoVariante.objects.select_related(
-            "producto_base", "color", "tipo_tela"
-        )
-
-        if variante_id:
-            qs = qs.filter(id=variante_id)
-
-        elif termino:
-            qs = qs.filter(
-                Q(sku__iexact=termino) |
-                Q(codigo_barras__iexact=termino) |
-                Q(producto_base__nombre__icontains=termino) |
-                Q(talla__icontains=termino) |
-                Q(color__nombre__icontains=termino) |
-                Q(tipo_tela__nombre__icontains=termino)
-            )
-        else:
-            return None
-
-        if sucursal_id:
-            qs = qs.filter(
-                stocks__sucursal_id=sucursal_id,
-                stocks__cantidad__gt=0
-            )
-
-        return qs.first()
-
-    # =========================
-    # VALIDAR STOCK (LOCK REAL)
-    # =========================
-    @staticmethod
-    def validar_stock_disponible(variante, cantidad, sucursal_id):
-
-        stock = (
-            Stock.objects
-            .select_for_update()
-            .filter(variante=variante, sucursal_id=sucursal_id)
-            .first()
-        )
-
-        if not stock or stock.cantidad < cantidad:
-            raise ValidationError(
-                f"Stock insuficiente de {variante}. Disponible: {stock.cantidad if stock else 0}"
-            )
-
-    # =========================
-    # AGREGAR PRODUCTO
-    # =========================
-    @staticmethod
-    @transaction.atomic
-    def agregar_producto(usuario,sucursal, variante_id=None, termino=None, cantidad=Decimal("1"), venta_uuid=None):
-
-        if cantidad is None:
-            cantidad = Decimal("1")
-
-        cantidad = Decimal(str(cantidad))
-
-        if cantidad <= 0:
-            raise ValidationError("Cantidad inválida.")
-
-        variante = POSService.buscar_variante(variante_id, termino, sucursal.id)
-
-        if not variante:
-            raise ValidationError("Producto no encontrado.")
-
-        venta = POSService.obtener_o_crear_venta(usuario, sucursal, venta_uuid)
-
-        precio = POSService.obtener_precio_variante(variante, venta)
-
-        item = VentaItem.objects.filter(
-            venta=venta,
-            variante=variante
-        ).first()
-
-        nueva_cantidad = cantidad + (item.cantidad if item else 0)
-
-        POSService.validar_stock_disponible(variante, nueva_cantidad, sucursal.id)
-
-        if item:
-            item.cantidad = nueva_cantidad
-            item.precio_unitario = precio
-            item.save()
-        else:
-            VentaItem.objects.create(
-                venta=venta,
-                variante=variante,
-                cantidad=cantidad,
-                precio_unitario=precio
-            )
-
-        venta.recalcular_totales()
-
-        return serializar_venta(venta)
-
-    # =========================
-    # CERRAR VENTA (CORE)
-    # =========================
-    @staticmethod
-    @transaction.atomic
-    def cerrar_venta(usuario, sucursal, pagos: dict, cliente="", observaciones="", venta_uuid=None):
-  
-        if not venta_uuid:
-            raise ValidationError(
-                "UUID de venta requerido."
-            )
-
-
-        venta = (
-            Venta.objects
+        carrito = (
+            Carrito.objects
             .select_for_update()
             .filter(
                 uuid=venta_uuid,
                 usuario=usuario,
                 sucursal=sucursal,
-                estado="ABIERTA"
+                estado="BORRADOR",
             )
             .first()
         )
 
-        if not venta:
-            raise ValidationError("No hay venta abierta.")
-
-        venta.monto_efectivo = Decimal(pagos.get("EFECTIVO", 0))
-        venta.monto_tarjeta = Decimal(pagos.get("TARJETA", 0))
-        venta.monto_transferencia = Decimal(pagos.get("TRANSFERENCIA", 0))
-        venta.cliente = cliente
-        venta.observaciones = observaciones
-
-
-        if not venta.puede_cerrar():
-            raise ValidationError("Pago insuficiente.")
-
-        total_original = venta.total
-        ajuste = Decimal("0.00")
-
-        if venta.monto_efectivo > 0 and venta.monto_tarjeta == 0:
-            total_redondeado = redondear_a_peso_colombiano(total_original)
-            ajuste = total_redondeado - total_original
-            venta.total = total_redondeado
-
-        venta.ajuste_redondeo = ajuste
-
-        # DESCUENTO DE STOCK CENTRALIZADO + USER
-        for item in venta.items.select_related("variante").select_for_update():
-
-            InventoryService.descontar_stock(
-                variante=item.variante,
-                cantidad=item.cantidad,
-                user=usuario,
-                sucursal_id=sucursal.id,
-                referencia=f"Venta {venta.id}",
-                tipo="VENTA"
+        if not carrito:
+            raise ValidationError(
+                "El carrito no existe o ya fue procesado."
             )
 
-        #  MOVIMIENTOS FINANCIEROS
-        CajaService.registrar_movimientos_venta(
-            venta,
-            usuario,
-            pagos
+        return carrito
+
+    @staticmethod
+    def validar_stock_disponible(
+        variante,
+        cantidad,
+        sucursal_id,
+    ):
+        cantidad = POSService._decimal(
+            cantidad,
+            "La cantidad es inválida.",
         )
 
+        if cantidad <= 0:
+            raise ValidationError(
+                "La cantidad debe ser mayor a cero."
+            )
 
-        venta.estado = "CERRADA"
-        venta.cerrada = timezone.now()
+        stock = (
+            Stock.objects
+            .select_for_update()
+            .filter(
+                variante=variante,
+                sucursal_id=sucursal_id,
+            )
+            .first()
+        )
 
-        venta.save(update_fields=[
-            "estado", "cerrada",
-            "total", "ajuste_redondeo",
-            "monto_efectivo", "monto_tarjeta", "monto_transferencia",
-            "cliente", "observaciones"
-        ])
+        if not stock or stock.cantidad < cantidad:
+            raise ValidationError(
+                "Cantidad supera el inventario disponible."
+            )
 
-        return venta
-    
+        return stock
 
-    # =========================
-    # ELIMINAR ITEM (FIX REAL)
-    # =========================
     @staticmethod
     @transaction.atomic
-    def eliminar_item(usuario, sucursal, item_id, venta_uuid=None):
-
-        venta = POSService.obtener_venta_abierta(
-            usuario,
-            sucursal,
-            venta_uuid
+    def crear_carrito(usuario, sucursal):
+        return CarritoService.crear(
+            usuario=usuario,
+            sucursal=sucursal,
         )
 
-        if not venta:
-            raise ValidationError("No hay venta activa.")
+    @staticmethod
+    def obtener_carrito(usuario, sucursal):
+        return (
+            Carrito.objects
+            .prefetch_related("items")
+            .filter(
+                usuario=usuario,
+                sucursal=sucursal,
+                estado="BORRADOR",
+            )
+            .order_by("-actualizado")
+            .first()
+        )
+
+    @staticmethod
+    def obtener_carrito_por_uuid(
+        usuario,
+        sucursal,
+        carrito_uuid,
+    ):
+        return (
+            Carrito.objects
+            .prefetch_related(
+                "items",
+                "items__variante",
+                "items__variante__producto_base",
+                "items__variante__color",
+                "items__variante__talla",
+            )
+            .filter(
+                uuid=carrito_uuid,
+                usuario=usuario,
+                sucursal=sucursal,
+                estado="BORRADOR",
+            )
+            .first()
+        )
+
+    @staticmethod
+    def obtener_carritos_abiertos(usuario, sucursal):
+        return (
+            Carrito.objects
+            .prefetch_related("items")
+            .filter(
+                usuario=usuario,
+                sucursal=sucursal,
+                estado="BORRADOR",
+            )
+            .order_by("-actualizado")
+        )
+
+    @staticmethod
+    @transaction.atomic
+    def agregar_producto(
+        usuario,
+        sucursal,
+        venta_uuid,
+        variante_id,
+        cantidad=Decimal("1"),
+    ):
+        if venta_uuid:
+            carrito = POSService._obtener_carrito_bloqueado(
+                usuario=usuario,
+                sucursal=sucursal,
+                venta_uuid=venta_uuid,
+            )
+        else:
+            carrito = CarritoService.crear(
+                usuario=usuario,
+                sucursal=sucursal,
+            )
+
+        CarritoService.agregar_item(
+            carrito=carrito,
+            variante_id=variante_id,
+            cantidad=POSService._decimal(
+                cantidad,
+                "La cantidad es inválida.",
+            ),
+        )
+
+        return serializar_carrito(carrito)
+
+    @staticmethod
+    @transaction.atomic
+    def actualizar_cantidad(
+        usuario,
+        sucursal,
+        item_id,
+        cantidad=None,
+        precio_unitario=None,
+        venta_uuid=None,
+    ):
+        carrito = POSService._obtener_carrito_bloqueado(
+            usuario=usuario,
+            sucursal=sucursal,
+            venta_uuid=venta_uuid,
+        )
 
         item = (
-            venta.items
+            CarritoItem.objects
             .select_for_update()
-            .filter(id=item_id)
+            .select_related("variante")
+            .filter(
+                pk=item_id,
+                carrito=carrito,
+            )
+            .first()
+        )
+
+        if not item:
+            raise ValidationError("Item no encontrado.")
+
+        actualizar_item = False
+
+        if cantidad is not None:
+            cantidad = POSService._decimal(
+                cantidad,
+                "La cantidad es inválida.",
+            )
+
+            if cantidad <= 0:
+                item.delete()
+                return serializar_carrito(carrito)
+
+            POSService.validar_stock_disponible(
+                variante=item.variante,
+                cantidad=cantidad,
+                sucursal_id=sucursal.id,
+            )
+
+            item.cantidad = cantidad
+            actualizar_item = True
+
+        if precio_unitario is not None:
+            precio_unitario = POSService._decimal(
+                precio_unitario,
+                "El precio es inválido.",
+            )
+
+            if precio_unitario <= 0:
+                raise ValidationError(
+                    "El precio debe ser mayor a cero."
+                )
+
+            item.precio_unitario = precio_unitario
+            actualizar_item = True
+
+        if not actualizar_item:
+            raise ValidationError(
+                "Debe indicar cantidad o precio para actualizar."
+            )
+
+        item.save()
+
+        return serializar_carrito(carrito)
+
+    @staticmethod
+    @transaction.atomic
+    def eliminar_item(
+        usuario,
+        sucursal,
+        item_id,
+        venta_uuid=None,
+    ):
+        carrito = POSService._obtener_carrito_bloqueado(
+            usuario=usuario,
+            sucursal=sucursal,
+            venta_uuid=venta_uuid,
+        )
+
+        item = (
+            CarritoItem.objects
+            .select_for_update()
+            .filter(
+                pk=item_id,
+                carrito=carrito,
+            )
             .first()
         )
 
@@ -339,145 +293,87 @@ class POSService:
 
         item.delete()
 
-        # Si ya no quedan productos, eliminar completamente la venta
-        if not venta.items.exists():
-
-            venta.delete()
-
-            return {
-                "id": None,
-                "uuid": None,
-                "estado": None,
-                "tipo_venta": "DETAL",
-                "cliente": "",
-                "observaciones": "",
-                "efectivo": "0",
-                "transferencia": "0",
-                "tarjeta": "0",
-                "subtotal": "0",
-                "iva": "0",
-                "total": "0",
-                "items": [],
-            }
-
-        venta.recalcular_totales()
-
-        return serializar_venta(venta)
-
-
-    # =========================
-    # ACTUALIZAR CANTIDAD / PRECIO
-    # =========================
-    @staticmethod
-    @transaction.atomic
-    def actualizar_cantidad(usuario, sucursal, item_id, cantidad=None, precio_unitario=None, venta_uuid=None):
-
-        venta = POSService.obtener_venta_abierta(usuario, sucursal, venta_uuid)
-
-        if not venta:
-            raise ValidationError("No hay venta abierta")
-
-        item = venta.items.select_for_update().filter(id=item_id).first()
-
-        if not item:
-            raise ValidationError("Item no encontrado")
-
-        # actualizar cantidad
-        if cantidad is not None:
-            if cantidad <= 0:
-                item.delete()
-                venta.recalcular_totales()
-                return serializar_venta(venta)
-
-            POSService.validar_stock_disponible(
-                item.variante,
-                cantidad,
-                sucursal.id
-            )
-
-            item.cantidad = cantidad
-
-        # actualizar precio manual
-        if precio_unitario is not None:
-            if precio_unitario <= 0:
-                raise ValidationError("Precio inválido")
-
-            item.precio_unitario = Decimal(precio_unitario)
-
-        item.save()
-
-        venta.recalcular_totales()
-
-        return serializar_venta(venta)
-
-    # =========================
-    # CAMBIAR TIPO DE VENTA
-    # =========================
-    @staticmethod
-    @transaction.atomic
-    def cambiar_tipo_venta(usuario, sucursal, tipo, venta_uuid=None):
-
-        if tipo not in ["DETAL", "MAYORISTA"]:
-            raise ValidationError("Tipo de venta inválido.")
-
-        venta = POSService.obtener_o_crear_venta(
-            usuario=usuario,
-            sucursal=sucursal,
-            venta_uuid=venta_uuid
-        )
-
-        venta.tipo_venta = tipo
-        venta.save(update_fields=["tipo_venta"])
-
-        for item in venta.items.select_related("variante"):
-
-            item.precio_unitario = POSService.obtener_precio_variante(
-                item.variante,
-                venta
-            )
-
-            item.save(update_fields=["precio_unitario"])
-
-        venta.recalcular_totales()
-
-        return serializar_venta(venta)
-
-
-    # =========================
-    # CANCELAR VENTA
-    # =========================
+        return serializar_carrito(carrito)
 
     @staticmethod
     @transaction.atomic
-    def cancelar_venta(
+    def cambiar_tipo_venta(
         usuario,
         sucursal,
-        venta_uuid=None
+        tipo,
+        venta_uuid=None,
     ):
-
-        if not venta_uuid:
-            raise ValidationError("UUID requerido.")
-
-        venta = (
-            Venta.objects
-            .select_for_update()
-            .filter(
-                uuid=venta_uuid,
-                usuario=usuario,
-                sucursal=sucursal,
-                estado="ABIERTA"
+        if tipo not in POSService.TIPOS_VENTA:
+            raise ValidationError(
+                "Tipo de venta inválido."
             )
+
+        carrito = POSService._obtener_carrito_bloqueado(
+            usuario=usuario,
+            sucursal=sucursal,
+            venta_uuid=venta_uuid,
+        )
+
+        lista = (
+            ListaPrecio.objects
+            .filter(
+                sucursal=sucursal,
+                tipo_venta=tipo,
+                activa=True,
+            )
+            .order_by("id")
             .first()
         )
 
-        if not venta:
-            raise ValidationError("Venta abierta no encontrada.")
+        if not lista:
+            raise ValidationError(
+                "No existe una lista de precios activa "
+                "para este tipo de venta."
+            )
 
-        # Elimina también todos los VentaItem (CASCADE)
-        venta.delete()
+        items = list(
+            CarritoItem.objects
+            .select_for_update()
+            .select_related("variante")
+            .filter(carrito=carrito)
+        )
 
-        return True
+        precios = {
+            precio.variante_id: precio.precio
+            for precio in PrecioVariante.objects.filter(
+                lista=lista,
+                variante_id__in=[
+                    item.variante_id
+                    for item in items
+                ],
+            )
+        }
 
+        faltantes = [
+            item.variante.sku
+            for item in items
+            if item.variante_id not in precios
+        ]
+
+        if faltantes:
+            raise ValidationError(
+                "Productos sin precio en la lista seleccionada: "
+                + ", ".join(faltantes)
+            )
+
+        carrito.tipo_venta = tipo
+        carrito.save(
+            update_fields=[
+                "tipo_venta",
+                "actualizado",
+            ]
+        )
+
+        for item in items:
+            item.precio_unitario = precios[item.variante_id]
+            item.save()
+
+        return serializar_carrito(carrito)
 
     @staticmethod
     @transaction.atomic
@@ -485,29 +381,208 @@ class POSService:
         usuario,
         sucursal,
         venta_uuid,
-        cliente,
-        observaciones,
-        efectivo,
-        transferencia,
-        tarjeta,
+        cliente="",
+        observaciones="",
+        efectivo=0,
+        transferencia=0,
+        tarjeta=0,
     ):
-
-        venta = POSService.obtener_venta_abierta(
-            usuario,
-            sucursal,
-            venta_uuid
+        carrito = POSService._obtener_carrito_bloqueado(
+            usuario=usuario,
+            sucursal=sucursal,
+            venta_uuid=venta_uuid,
         )
 
-        if not venta:
-            raise ValidationError("Venta no encontrada")
+        pagos = {
+            "EFECTIVO": POSService._decimal(
+                efectivo,
+                "El monto de efectivo es inválido.",
+            ),
+            "TRANSFERENCIA": POSService._decimal(
+                transferencia,
+                "El monto de transferencia es inválido.",
+            ),
+            "TARJETA": POSService._decimal(
+                tarjeta,
+                "El monto de tarjeta es inválido.",
+            ),
+        }
 
-        venta.cliente = cliente
-        venta.observaciones = observaciones
+        if any(monto < 0 for monto in pagos.values()):
+            raise ValidationError(
+                "Los montos de pago no pueden ser negativos."
+            )
 
-        venta.monto_efectivo = Decimal(str(efectivo or 0))
-        venta.monto_transferencia = Decimal(str(transferencia or 0))
-        venta.monto_tarjeta = Decimal(str(tarjeta or 0))
+        carrito.cliente = (cliente or "").strip()
+        carrito.observaciones = (
+            observaciones or ""
+        ).strip()
+        carrito.monto_efectivo = pagos["EFECTIVO"]
+        carrito.monto_transferencia = pagos[
+            "TRANSFERENCIA"
+        ]
+        carrito.monto_tarjeta = pagos["TARJETA"]
 
-        venta.save()
+        carrito.save(
+            update_fields=[
+                "cliente",
+                "observaciones",
+                "monto_efectivo",
+                "monto_transferencia",
+                "monto_tarjeta",
+                "actualizado",
+            ]
+        )
 
-        return serializar_venta(venta)
+        return serializar_carrito(carrito)
+
+    @staticmethod
+    @transaction.atomic
+    def cerrar_venta(
+        usuario,
+        sucursal,
+        turno_id,
+        pagos,
+        cliente="",
+        observaciones="",
+        venta_uuid=None,
+    ):
+        if not turno_id:
+            raise ValidationError(
+                "Debe abrir una caja antes de finalizar una venta."
+            )
+
+        if not isinstance(pagos, dict):
+            raise ValidationError(
+                "Los pagos de la venta son inválidos."
+            )
+
+        medios_no_permitidos = (
+            set(pagos.keys()) - POSService.MEDIOS_PAGO
+        )
+
+        if medios_no_permitidos:
+            raise ValidationError(
+                "La venta contiene medios de pago no permitidos."
+            )
+
+        pagos_normalizados = {
+            medio: POSService._decimal(
+                pagos.get(medio, 0),
+                f"El monto para {medio} es inválido.",
+            )
+            for medio in POSService.MEDIOS_PAGO
+        }
+
+        if any(
+            monto < 0
+            for monto in pagos_normalizados.values()
+        ):
+            raise ValidationError(
+                "Los montos de pago no pueden ser negativos."
+            )
+
+        carrito = POSService._obtener_carrito_bloqueado(
+            usuario=usuario,
+            sucursal=sucursal,
+            venta_uuid=venta_uuid,
+        )
+
+        if not carrito.items.exists():
+            raise ValidationError(
+                "No hay productos en la venta."
+            )
+
+        turno = CajaService.obtener_turno_bloqueado(
+            turno_id=turno_id,
+            sucursal=sucursal,
+        )
+
+        CajaService.validar_operador_turno(
+            turno=turno,
+            usuario=usuario,
+        )
+
+        carrito.cliente = (cliente or "").strip()
+        carrito.observaciones = (
+            observaciones or ""
+        ).strip()
+        carrito.monto_efectivo = pagos_normalizados[
+            "EFECTIVO"
+        ]
+        carrito.monto_tarjeta = pagos_normalizados[
+            "TARJETA"
+        ]
+        carrito.monto_transferencia = pagos_normalizados[
+            "TRANSFERENCIA"
+        ]
+
+        carrito.save(
+            update_fields=[
+                "cliente",
+                "observaciones",
+                "monto_efectivo",
+                "monto_tarjeta",
+                "monto_transferencia",
+                "actualizado",
+            ]
+        )
+
+        if (
+            sum(
+                pagos_normalizados.values(),
+                Decimal("0.00"),
+            )
+            < carrito.total
+        ):
+            raise ValidationError(
+                "El pago no cubre el total de la venta."
+            )
+
+        return CarritoService.finalizar(
+            carrito=carrito,
+            turno=turno,
+            usuario=usuario,
+            pagos=pagos_normalizados,
+        )
+
+    @staticmethod
+    @transaction.atomic
+    def cancelar_venta(
+        usuario,
+        sucursal,
+        venta_uuid=None,
+    ):
+        carrito = POSService._obtener_carrito_bloqueado(
+            usuario=usuario,
+            sucursal=sucursal,
+            venta_uuid=venta_uuid,
+        )
+
+        carrito.estado = "CANCELADO"
+        carrito.save(
+            update_fields=[
+                "estado",
+                "actualizado",
+            ]
+        )
+
+        carritos = list(
+            POSService.obtener_carritos_abiertos(
+                usuario=usuario,
+                sucursal=sucursal,
+            )
+        )
+
+        if not carritos:
+            carritos = [
+                CarritoService.crear(
+                    usuario=usuario,
+                    sucursal=sucursal,
+                )
+            ]
+
+        return [
+            serializar_carrito(carrito_abierto)
+            for carrito_abierto in carritos
+        ]

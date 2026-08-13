@@ -508,7 +508,7 @@ function addRollo() {
 
         </div>
 
-        <iv class="rollo-form">
+        <div class="rollo-form">
 
             <select 
                 class="form-select"
@@ -657,52 +657,36 @@ function actualizarNombres(select){
 
     const card = select.closest(".rollo-card");
 
-    const rollo = select.value;
-
-    if(!rollo){
+    if(!select.value){
         return;
     }
 
-    card.querySelector(".metros-input").name=`metros_${rollo}`;
+    const rollo = select.value;
 
-    card
-        .querySelectorAll(".item-row")
-        .forEach(x=>renombrarFila(x,rollo));
+    card.querySelector(".metros-input").name = `metros_${rollo}`;
 
     const option = select.selectedOptions[0];
 
     card.querySelectorAll(".item-row").forEach(function(fila){
 
-        fila.querySelector(".tela-view").value =
-            option.dataset.telaNombre;
+        renombrarFila(fila, rollo);
 
-        fila.querySelector(".tela-hidden").value =
-            option.dataset.tela;
+        fila.querySelector(".tela-view").value = option.dataset.telaNombre;
+        fila.querySelector(".tela-hidden").value = option.dataset.tela;
 
-        fila.querySelector(".color-view").value =
-            option.dataset.colorNombre;
-
-        fila.querySelector(".color-hidden").value =
-            option.dataset.color;
+        fila.querySelector(".color-view").value = option.dataset.colorNombre;
+        fila.querySelector(".color-hidden").value = option.dataset.color;
 
     });
 
-
     const info = card.querySelector(".rollo-info");
 
-    info.style.display="block";
+    info.style.display = "block";
 
-    info.querySelector(".info-tela").innerHTML =
-        option.dataset.telaNombre;
-
-    info.querySelector(".info-color").innerHTML =
-        option.dataset.colorNombre;
-
-    info.querySelector(".info-stock").innerHTML =
-        option.dataset.disponible;
-
-    info.querySelector(".info-costo").innerHTML =
-        option.dataset.costo;
+    info.querySelector(".info-tela").textContent = option.dataset.telaNombre;
+    info.querySelector(".info-color").textContent = option.dataset.colorNombre;
+    info.querySelector(".info-stock").textContent = option.dataset.disponible;
+    info.querySelector(".info-costo").textContent = option.dataset.costo;
 
     actualizarRestante(card);
 
@@ -710,8 +694,14 @@ function actualizarNombres(select){
 
 function actualizarRestante(card){
 
-    const disponible=parseFloat(
-        card.querySelector("option:checked").dataset.disponible
+    const select = card.querySelector("select[name='rollo_id[]']");
+
+    if(!select.value){
+        return;
+    }
+
+    const disponible = parseFloat(
+        select.selectedOptions[0].dataset.disponible
     );
 
     const usados=parseFloat(
@@ -740,10 +730,9 @@ function addItem(btn){
 
     const card = btn.closest(".rollo-card");
 
-    const rollo =
-        card.querySelector("select").value;
+    const rolloSelect = card.querySelector("select[name='rollo_id[]']");
 
-    if(!rollo){
+    if(!rolloSelect.value){
 
         alert("Seleccione primero el rollo");
 
@@ -751,99 +740,87 @@ function addItem(btn){
 
     }
 
-    const div=document.createElement("div");
+    const rollo = rolloSelect.value;
 
-    div.className="grid-item item-row";
+    const option = rolloSelect.selectedOptions[0];
 
-    div.innerHTML=`
+    const div = document.createElement("div");
 
-<select>
+    div.className = "grid-item item-row";
 
-{% for p in productos %}
+    div.innerHTML = `
 
-<option value="{{p.id}}">
+        <select>
 
-{{p.nombre}}
+        {% for p in productos %}
 
-</option>
+        <option value="{{p.id}}">
+        {{p.nombre}}
+        </option>
 
-{% endfor %}
+        {% endfor %}
 
-</select>
+        </select>
 
-<input
-type="text"
-class="tela-view"
-readonly>
+        <input
+        type="text"
+        class="tela-view"
+        readonly>
 
-<input
-type="hidden"
-class="tela-hidden">
+        <input
+        type="hidden"
+        class="tela-hidden">
 
-<input
-type="text"
-class="color-view"
-readonly>
+        <input
+        type="text"
+        class="color-view"
+        readonly>
 
-<input
-type="hidden"
-class="color-hidden">
+        <input
+        type="hidden"
+        class="color-hidden">
 
+        <select>
 
-<select>
+        {% for t in tallas %}
 
-{% for t in tallas %}
+        <option value="{{t.nombre}}">
+        {{t.nombre}}
+        </option>
 
-<option value="{{t.nombre}}">
+        {% endfor %}
 
-{{t.nombre}}
+        </select>
 
-</option>
+        <input
+        type="number"
+        min="1"
+        step="1"
+        value="1"
+        oninput="calcularTotal()">
 
-{% endfor %}
+        <button
+        type="button"
+        class="btn-danger"
+        onclick="this.parentElement.remove();calcularTotal();">
 
-</select>
+        ✕
 
-<input
-type="number"
-min="1"
-step="1"
-value="1"
-oninput="calcularTotal()">
+        </button>
 
+        `;
 
-<button
-type="button"
-class="btn-danger"
-onclick="this.parentElement.remove();calcularTotal();">
+    card.querySelector(".items").appendChild(div);
 
-✕
+    renombrarFila(div, rollo);
 
-</button>
+    div.querySelector(".tela-view").value = option.dataset.telaNombre;
+    div.querySelector(".tela-hidden").value = option.dataset.tela;
 
-`;
+    div.querySelector(".color-view").value = option.dataset.colorNombre;
+    div.querySelector(".color-hidden").value = option.dataset.color;
 
-    card
-        .querySelector(".items")
-        .appendChild(div);
-
-    renombrarFila(div,rollo);
-
-    const option =
-    card.querySelector("select[name='rollo_id[]']").selectedOptions[0];
-
-    div.querySelector(".tela-view").value =
-        option.dataset.telaNombre;
-
-    div.querySelector(".tela-hidden").value =
-        option.dataset.tela;
-
-    div.querySelector(".color-view").value =
-        option.dataset.colorNombre;
-
-    div.querySelector(".color-hidden").value =
-        option.dataset.color;
-
+    calcularTotal();
 
 }
 

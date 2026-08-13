@@ -1,237 +1,660 @@
+<!--apps/setup/templates/setup/wizard.html-->
 {% extends "base.html" %}
-
 
 {% block content %}
 
+<div class="container py-5">
 
-<style>
+<div class="row justify-content-center">
+    <div class="col-12 col-lg-9 col-xl-8">
 
-.wizard-card{
+        <div class="card border-0 shadow-sm">
 
-max-width:700px;
+            <div class="card-header bg-primary text-white py-4">
 
-margin:60px auto;
+                <div class="d-flex align-items-center gap-3">
 
-background:white;
+                    <i class="bi bi-gear-fill fs-2"></i>
 
-padding:40px;
+                    <div>
+                        <h2 class="mb-1">
+                            Configuración del sistema
+                        </h2>
 
-border-radius:15px;
+                        <p class="mb-0 opacity-75">
+                            Estado de instalación y configuración inicial.
+                        </p>
+                    </div>
 
-box-shadow:0 10px 30px rgba(0,0,0,.08);
+                </div>
 
-}
-
-
-.step{
-
-background:#f8fafc;
-
-padding:15px;
-
-border-radius:10px;
-
-margin-bottom:12px;
-
-}
+            </div>
 
 
-.ok{
-
-color:#16a34a;
-
-font-weight:bold;
-
-}
+            <div class="card-body p-4 p-lg-5">
 
 
-.pending{
+                <!-- ================================================= -->
+                <!-- SISTEMA YA INSTALADO -->
+                <!-- ================================================= -->
 
-color:#dc2626;
+                {% if sistema_instalado %}
 
-font-weight:bold;
+                    <div class="text-center py-4">
 
-}
+                        <div class="mb-4">
 
+                            <div
+                                class="rounded-circle bg-success bg-opacity-10 d-inline-flex align-items-center justify-content-center"
+                                style="width: 90px; height: 90px;"
+                            >
+                                <i class="bi bi-check-circle-fill text-success fs-1"></i>
+                            </div>
 
-.btn{
-
-display:inline-block;
-
-background:#2563eb;
-
-color:white;
-
-padding:12px 20px;
-
-border-radius:8px;
-
-text-decoration:none;
-
-}
-
-</style>
+                        </div>
 
 
-
-<div class="wizard-card">
-
-
-<h1>
-⚙ Configuración inicial
-</h1>
+                        <h3 class="fw-bold">
+                            Sistema configurado
+                        </h3>
 
 
-<p>
-Estado actual del sistema
-</p>
+                        <p class="text-muted mb-4">
+                            La configuración inicial del sistema
+                            ya fue completada correctamente.
+                        </p>
 
 
+                        <div class="alert alert-success text-start">
 
-<div class="step">
+                            <div class="fw-semibold mb-2">
+                                <i class="bi bi-check-circle"></i>
+                                Instalación completada
+                            </div>
 
-🏢 Empresa
+                            <div class="small">
+                                La empresa, sucursal, caja, usuario administrador
+                                y datos maestros iniciales ya fueron creados.
+                            </div>
 
-{% if estado.empresa %}
+                        </div>
 
-<span class="ok">
-✔ Completo
-</span>
 
-{% else %}
+                        <!-- ========================================= -->
+                        <!-- ESTADO -->
+                        <!-- ========================================= -->
 
-<span class="pending">
-Pendiente
-</span>
+                        <div class="text-start mt-4">
 
-{% endif %}
+                            <h5 class="fw-bold mb-3">
+                                Estado actual
+                            </h5>
 
+
+                            <div class="row g-3">
+
+
+                                <div class="col-12 col-md-6">
+
+                                    <div class="border rounded p-3">
+
+                                        <div class="fw-semibold">
+                                            <i class="bi bi-building"></i>
+                                            Empresa
+                                        </div>
+
+                                        {% if estado.empresa %}
+
+                                            <span class="badge text-bg-success mt-2">
+                                                <i class="bi bi-check"></i>
+                                                Completo
+                                            </span>
+
+                                        {% else %}
+
+                                            <span class="badge text-bg-danger mt-2">
+                                                Pendiente
+                                            </span>
+
+                                        {% endif %}
+
+                                    </div>
+
+                                </div>
+
+
+                                <div class="col-12 col-md-6">
+
+                                    <div class="border rounded p-3">
+
+                                        <div class="fw-semibold">
+                                            <i class="bi bi-shop"></i>
+                                            Sucursal
+                                        </div>
+
+                                        {% if estado.sucursal %}
+
+                                            <span class="badge text-bg-success mt-2">
+                                                <i class="bi bi-check"></i>
+                                                Completo
+                                            </span>
+
+                                        {% else %}
+
+                                            <span class="badge text-bg-danger mt-2">
+                                                Pendiente
+                                            </span>
+
+                                        {% endif %}
+
+                                    </div>
+
+                                </div>
+
+
+                                <div class="col-12 col-md-6">
+
+                                    <div class="border rounded p-3">
+
+                                        <div class="fw-semibold">
+                                            <i class="bi bi-person-badge"></i>
+                                            Administrador
+                                        </div>
+
+                                        {% if estado.usuario %}
+
+                                            <span class="badge text-bg-success mt-2">
+                                                <i class="bi bi-check"></i>
+                                                Completo
+                                            </span>
+
+                                        {% else %}
+
+                                            <span class="badge text-bg-danger mt-2">
+                                                Pendiente
+                                            </span>
+
+                                        {% endif %}
+
+                                    </div>
+
+                                </div>
+
+
+                                <div class="col-12 col-md-6">
+
+                                    <div class="border rounded p-3">
+
+                                        <div class="fw-semibold">
+                                            <i class="bi bi-cash-register"></i>
+                                            Caja física
+                                        </div>
+
+                                        {% if estado.caja %}
+
+                                            <span class="badge text-bg-success mt-2">
+                                                <i class="bi bi-check"></i>
+                                                Completo
+                                            </span>
+
+                                        {% else %}
+
+                                            <span class="badge text-bg-danger mt-2">
+                                                Pendiente
+                                            </span>
+
+                                        {% endif %}
+
+                                    </div>
+
+                                </div>
+
+
+                                <div class="col-12 col-md-6">
+
+                                    <div class="border rounded p-3">
+
+                                        <div class="fw-semibold">
+                                            <i class="bi bi-unlock"></i>
+                                            Turno de caja
+                                        </div>
+
+                                        {% if estado.turno %}
+
+                                            <span class="badge text-bg-success mt-2">
+                                                <i class="bi bi-check"></i>
+                                                Caja abierta
+                                            </span>
+
+                                        {% else %}
+
+                                            <span class="badge text-bg-warning mt-2">
+                                                Cerrada
+                                            </span>
+
+                                        {% endif %}
+
+                                    </div>
+
+                                </div>
+
+
+                                <div class="col-12 col-md-6">
+
+                                    <div class="border rounded p-3">
+
+                                        <div class="fw-semibold">
+                                            <i class="bi bi-database"></i>
+                                            Datos maestros
+                                        </div>
+
+                                        {% if estado.datos_base %}
+
+                                            <span class="badge text-bg-success mt-2">
+                                                <i class="bi bi-check"></i>
+                                                Cargados
+                                            </span>
+
+                                        {% else %}
+
+                                            <span class="badge text-bg-danger mt-2">
+                                                Pendientes
+                                            </span>
+
+                                        {% endif %}
+
+                                    </div>
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+                        <div class="d-flex justify-content-center gap-2 mt-5">
+
+                            <a
+                                href="/"
+                                class="btn btn-primary"
+                            >
+                                <i class="bi bi-house"></i>
+                                Ir al inicio
+                            </a>
+
+                            <a
+                                href="/admin-panel/"
+                                class="btn btn-outline-secondary"
+                            >
+                                <i class="bi bi-sliders"></i>
+                                Administración
+                            </a>
+
+                        </div>
+
+                    </div>
+
+
+                {% else %}
+
+
+                    <!-- ================================================= -->
+                    <!-- FORMULARIO DE INSTALACIÓN -->
+                    <!-- ================================================= -->
+
+                    <div class="mb-5">
+
+                        <h4 class="fw-bold">
+                            <i class="bi bi-wrench-adjustable"></i>
+                            Instalación inicial
+                        </h4>
+
+                        <p class="text-muted">
+                            Complete los siguientes datos para configurar
+                            el sistema por primera vez.
+                        </p>
+
+                    </div>
+
+
+                    {% if form.non_field_errors %}
+
+                        <div class="alert alert-danger">
+
+                            {% for error in form.non_field_errors %}
+                                <div>{{ error }}</div>
+                            {% endfor %}
+
+                        </div>
+
+                    {% endif %}
+
+
+                    <form method="post" novalidate>
+
+                        {% csrf_token %}
+
+
+                        <!-- EMPRESA -->
+
+                        <div class="mb-4">
+
+                            <h5 class="fw-bold border-bottom pb-2 mb-3">
+                                <i class="bi bi-building"></i>
+                                Empresa
+                            </h5>
+
+                            <label
+                                class="form-label fw-semibold"
+                                for="{{ form.nombre_empresa.id_for_label }}"
+                            >
+                                {{ form.nombre_empresa.label }}
+                            </label>
+
+                            {{ form.nombre_empresa }}
+
+                            {% if form.nombre_empresa.errors %}
+                                <div class="text-danger small mt-1">
+                                    {{ form.nombre_empresa.errors }}
+                                </div>
+                            {% endif %}
+
+                        </div>
+
+
+                        <!-- SUCURSAL -->
+
+                        <div class="mb-4">
+
+                            <h5 class="fw-bold border-bottom pb-2 mb-3">
+                                <i class="bi bi-shop"></i>
+                                Sucursal
+                            </h5>
+
+                            <div class="mb-3">
+
+                                <label
+                                    class="form-label fw-semibold"
+                                    for="{{ form.nombre_sucursal.id_for_label }}"
+                                >
+                                    {{ form.nombre_sucursal.label }}
+                                </label>
+
+                                {{ form.nombre_sucursal }}
+
+                                {% if form.nombre_sucursal.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {{ form.nombre_sucursal.errors }}
+                                    </div>
+                                {% endif %}
+
+                            </div>
+
+
+                            <div>
+
+                                <label
+                                    class="form-label fw-semibold"
+                                    for="{{ form.direccion.id_for_label }}"
+                                >
+                                    {{ form.direccion.label }}
+                                </label>
+
+                                {{ form.direccion }}
+
+                                {% if form.direccion.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {{ form.direccion.errors }}
+                                    </div>
+                                {% endif %}
+
+                            </div>
+
+                        </div>
+
+
+                        <!-- CAJA -->
+
+                        <div class="mb-4">
+
+                            <h5 class="fw-bold border-bottom pb-2 mb-3">
+                                <i class="bi bi-cash-register"></i>
+                                Caja inicial
+                            </h5>
+
+                            <div class="row g-3">
+
+                                <div class="col-md-6">
+
+                                    <label
+                                        class="form-label fw-semibold"
+                                        for="{{ form.codigo_caja.id_for_label }}"
+                                    >
+                                        {{ form.codigo_caja.label }}
+                                    </label>
+
+                                    {{ form.codigo_caja }}
+
+                                    {% if form.codigo_caja.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {{ form.codigo_caja.errors }}
+                                        </div>
+                                    {% endif %}
+
+                                </div>
+
+
+                                <div class="col-md-6">
+
+                                    <label
+                                        class="form-label fw-semibold"
+                                        for="{{ form.nombre_caja.id_for_label }}"
+                                    >
+                                        {{ form.nombre_caja.label }}
+                                    </label>
+
+                                    {{ form.nombre_caja }}
+
+                                    {% if form.nombre_caja.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {{ form.nombre_caja.errors }}
+                                        </div>
+                                    {% endif %}
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+                        <!-- ADMINISTRADOR -->
+
+                        <div class="mb-4">
+
+                            <h5 class="fw-bold border-bottom pb-2 mb-3">
+                                <i class="bi bi-person-badge"></i>
+                                Administrador
+                            </h5>
+
+
+                            <div class="row g-3">
+
+                                <div class="col-md-6">
+
+                                    <label
+                                        class="form-label fw-semibold"
+                                        for="{{ form.username.id_for_label }}"
+                                    >
+                                        {{ form.username.label }}
+                                    </label>
+
+                                    {{ form.username }}
+
+                                    {% if form.username.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {{ form.username.errors }}
+                                        </div>
+                                    {% endif %}
+
+                                </div>
+
+
+                                <div class="col-md-6">
+
+                                    <label
+                                        class="form-label fw-semibold"
+                                        for="{{ form.email.id_for_label }}"
+                                    >
+                                        {{ form.email.label }}
+                                    </label>
+
+                                    {{ form.email }}
+
+                                    {% if form.email.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {{ form.email.errors }}
+                                        </div>
+                                    {% endif %}
+
+                                </div>
+
+
+                                <div class="col-md-6">
+
+                                    <label
+                                        class="form-label fw-semibold"
+                                        for="{{ form.first_name.id_for_label }}"
+                                    >
+                                        {{ form.first_name.label }}
+                                    </label>
+
+                                    {{ form.first_name }}
+
+                                    {% if form.first_name.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {{ form.first_name.errors }}
+                                        </div>
+                                    {% endif %}
+
+                                </div>
+
+
+                                <div class="col-md-6">
+
+                                    <label
+                                        class="form-label fw-semibold"
+                                        for="{{ form.last_name.id_for_label }}"
+                                    >
+                                        {{ form.last_name.label }}
+                                    </label>
+
+                                    {{ form.last_name }}
+
+                                    {% if form.last_name.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {{ form.last_name.errors }}
+                                        </div>
+                                    {% endif %}
+
+                                </div>
+
+
+                                <div class="col-md-6">
+
+                                    <label
+                                        class="form-label fw-semibold"
+                                        for="{{ form.password.id_for_label }}"
+                                    >
+                                        {{ form.password.label }}
+                                    </label>
+
+                                    {{ form.password }}
+
+                                    {% if form.password.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {{ form.password.errors }}
+                                        </div>
+                                    {% endif %}
+
+                                </div>
+
+
+                                <div class="col-md-6">
+
+                                    <label
+                                        class="form-label fw-semibold"
+                                        for="{{ form.confirmar_password.id_for_label }}"
+                                    >
+                                        {{ form.confirmar_password.label }}
+                                    </label>
+
+                                    {{ form.confirmar_password }}
+
+                                    {% if form.confirmar_password.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {{ form.confirmar_password.errors }}
+                                        </div>
+                                    {% endif %}
+
+                                </div>
+
+                            </div>
+
+                        </div>
+
+
+                        <!-- INFORMACIÓN -->
+
+                        <div class="alert alert-info">
+
+                            <div class="fw-semibold mb-2">
+                                <i class="bi bi-info-circle"></i>
+                                Esta instalación creará:
+                            </div>
+
+                            <ul class="small mb-0">
+
+                                <li>Empresa</li>
+                                <li>Sucursal</li>
+                                <li>Listas de precios</li>
+                                <li>Bóveda</li>
+                                <li>Caja física</li>
+                                <li>Usuario administrador</li>
+                                <li>Perfil de administrador</li>
+                                <li>Turno inicial</li>
+                                <li>Cliente consumidor final</li>
+                                <li>Colores, telas y tallas iniciales</li>
+
+                            </ul>
+
+                        </div>
+
+
+                        <div class="d-grid mt-4">
+
+                            <button
+                                class="btn btn-primary btn-lg"
+                                type="submit"
+                            >
+                                <i class="bi bi-check-circle"></i>
+                                Instalar sistema
+                            </button>
+
+                        </div>
+
+                    </form>
+
+                {% endif %}
+
+            </div>
+
+        </div>
+
+    </div>
 </div>
 
 
-
-<div class="step">
-
-🏬 Sucursal
-
-{% if estado.sucursal %}
-
-<span class="ok">
-✔ Completo
-</span>
-
-{% else %}
-
-<span class="pending">
-Pendiente
-</span>
-
-{% endif %}
-
 </div>
-
-
-
-
-<div class="step">
-
-👤 Usuario administrador
-
-{% if estado.usuario %}
-
-<span class="ok">
-✔ Completo
-</span>
-
-{% else %}
-
-<span class="pending">
-Pendiente
-</span>
-
-{% endif %}
-
-</div>
-
-
-
-
-<div class="step">
-
-💰 Caja física
-
-{% if estado.caja %}
-
-<span class="ok">
-✔ Completo
-</span>
-
-{% else %}
-
-<span class="pending">
-Pendiente
-</span>
-
-{% endif %}
-
-</div>
-
-
-
-<div class="step">
-
-🔓 Turno abierto
-
-{% if estado.turno %}
-
-<span class="ok">
-✔ Caja abierta
-</span>
-
-{% else %}
-
-<span class="pending">
-Pendiente
-</span>
-
-{% endif %}
-
-</div>
-
-
-
-<div class="step">
-
-📦 Datos maestros
-
-{% if estado.datos_base %}
-
-<span class="ok">
-✔ Cargados
-</span>
-
-{% else %}
-
-<span class="pending">
-Pendiente
-</span>
-
-{% endif %}
-
-</div>
-
-
-
-<br>
-
-
-<a href="{% url 'setup:wizard' %}" class="btn">
-Configurar sistema
-</a>
-
-
-
-</div>
-
 
 {% endblock %}

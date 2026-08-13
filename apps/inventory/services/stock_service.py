@@ -1,4 +1,4 @@
-# apps
+# apps/inventory/services/stock_service.py
 from decimal import Decimal, ROUND_HALF_UP
 from django.db import transaction
 from django.core.exceptions import ValidationError
@@ -144,3 +144,37 @@ class InventoryService:
             stock_final=stock.cantidad,
             costo_unitario=costo_unitario
         )
+
+    # ======================================================
+    # AJUSTE MANUAL
+    # ======================================================
+    @staticmethod
+    def ajustar_stock(
+        variante,
+        cantidad,
+        tipo,
+        user,
+        sucursal_id=None,
+        referencia=None,
+    ):
+        if tipo == "AJUSTE_ENTRADA":
+            return InventoryService.agregar_stock(
+                variante=variante,
+                cantidad=cantidad,
+                user=user,
+                sucursal_id=sucursal_id,
+                tipo="AJUSTE_ENTRADA",
+                referencia=referencia or "AJUSTE MANUAL",
+            )
+
+        if tipo == "AJUSTE_SALIDA":
+            return InventoryService.descontar_stock(
+                variante=variante,
+                cantidad=cantidad,
+                user=user,
+                sucursal_id=sucursal_id,
+                tipo="AJUSTE_SALIDA",
+                referencia=referencia or "AJUSTE MANUAL",
+            )
+
+        raise ValidationError("Tipo de ajuste inválido.")

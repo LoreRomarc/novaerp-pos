@@ -77,6 +77,20 @@ class CorteRollo(models.Model):
 # ======================================================
 
 class ProduccionLote(models.Model):
+    numero_corte = models.PositiveIntegerField(
+        null=True,
+        blank=True
+    )
+
+    anio_corte = models.PositiveIntegerField(
+        null=True,
+        blank=True
+    )
+
+    referencia = models.CharField(
+        max_length=50,
+        unique=True
+    )
 
     sucursal = models.ForeignKey(Sucursal, on_delete=models.PROTECT)
 

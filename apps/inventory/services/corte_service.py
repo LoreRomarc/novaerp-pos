@@ -1,10 +1,10 @@
 # apps/inventory/services/corte_service.py
 from decimal import Decimal
-import uuid
 from django.db import transaction
 from django.core.exceptions import ValidationError
 
 from apps.inventory.models import ProductoBase, TipoTela, Color
+from apps.inventory.services.corte_numero_service import NumeroCorteService
 from apps.inventory.services.variant_service import VariantService
 from apps.inventory.services.stock_service import InventoryService
 
@@ -66,7 +66,11 @@ class CorteService:
 
         consumo_unitario = consumo_total / Decimal(total_prendas)
 
-        referencia = f"CORTE-{uuid.uuid4().hex[:8]}"
+        anio, numero = NumeroCorteService.siguiente_numero()
+
+        referencia = (
+            f"CORTE-{anio}-{numero:04d}"
+        )
 
         # ==========================
         # LOTE
@@ -77,7 +81,9 @@ class CorteService:
             consumo_unitario=consumo_unitario,
             total_prendas=total_prendas,
             operario=usuario,
-            referencia=referencia
+            referencia=referencia,
+            numero_corte=numero,
+            anio_corte=anio
         )
 
         # ==========================

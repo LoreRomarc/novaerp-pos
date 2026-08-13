@@ -38,27 +38,11 @@ def redondear_a_peso_colombiano(valor: Decimal) -> Decimal:
 
 class Caja(models.Model):
 
-    sucursal = models.ForeignKey(
-        "core.Sucursal",
-        on_delete=models.PROTECT,
-        related_name="cajas"
-    )
-
-    codigo = models.CharField(
-        max_length=20
-    )
-
-    nombre = models.CharField(
-        max_length=100
-    )
-
-    activa = models.BooleanField(
-        default=True
-    )
-
-    created_at = models.DateTimeField(
-        auto_now_add=True
-    )
+    sucursal = models.ForeignKey("core.Sucursal",on_delete=models.PROTECT,related_name="cajas")
+    codigo = models.CharField(max_length=20)
+    nombre = models.CharField(max_length=100)
+    activa = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
 
@@ -84,30 +68,11 @@ class Caja(models.Model):
 # =========================================================
 
 class TurnoCajaUsuario(models.Model):
-
-    turno = models.ForeignKey(
-        TurnoCaja,
-        on_delete=models.CASCADE,
-        related_name="cajeros"
-    )
-
-    usuario = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.PROTECT
-    )
-
-    asignado_en = models.DateTimeField(
-        auto_now_add=True
-    )
-
-    desasignado_en = models.DateTimeField(
-        null=True,
-        blank=True
-    )
-
-    activo = models.BooleanField(
-        default=True
-    )
+    turno = models.ForeignKey(TurnoCaja,on_delete=models.CASCADE,related_name="cajeros")
+    usuario = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT)
+    asignado_en = models.DateTimeField(auto_now_add=True)
+    desasignado_en = models.DateTimeField(null=True,blank=True)
+    activo = models.BooleanField(default=True)
 
     class Meta:
 
@@ -129,6 +94,171 @@ class TurnoCajaUsuario(models.Model):
         return f"{self.usuario} - {self.turno}"
 
 
+# =========================================================
+# CARRITO (BORRADOR DE VENTA)
+# =========================================================
+
+class Carrito(models.Model):
+
+    ESTADOS = (
+        ("BORRADOR", "Borrador"),
+        ("CANCELADO", "Cancelado"),
+        ("FINALIZADO", "Finalizado"),
+    )
+
+    TIPO_VENTA = (
+        ("DETAL", "Detal"),
+        ("MAYORISTA", "Mayorista"),
+    )
+
+    uuid = models.UUIDField( default=uuid.uuid4,editable=False, unique=True, db_index=True, )
+    sucursal = models.ForeignKey( "core.Sucursal", on_delete=models.CASCADE, related_name="carritos",)
+    usuario = models.ForeignKey( settings.AUTH_USER_MODEL, on_delete=models.CASCADE,related_name="carritos",)
+    tipo_venta = models.CharField( max_length=20, choices=TIPO_VENTA, default="DETAL",)
+    estado = models.CharField( max_length=20, choices=ESTADOS, default="BORRADOR", db_index=True,)
+    cliente = models.CharField( max_length=150, blank=True, default="",)
+    observaciones = models.TextField( blank=True, default="",)
+    monto_efectivo = models.DecimalField( max_digits=14, decimal_places=2, default=0, )
+    monto_tarjeta = models.DecimalField( max_digits=14, decimal_places=2, default=0 )
+
+    monto_transferencia = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=0,
+    )
+
+    creado = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    actualizado = models.DateTimeField(
+        auto_now=True,
+    )
+
+    class Meta:
+
+        ordering = ["-actualizado"]
+
+        indexes = [
+            models.Index(fields=["uuid"]),
+            models.Index(fields=["usuario"]),
+            models.Index(fields=["sucursal"]),
+            models.Index(fields=[
+                "usuario",
+                "sucursal",
+                "estado"
+            ]),
+        ]
+
+    @property
+    def subtotal(self):
+        return sum(
+            (
+                item.subtotal_linea
+                for item in self.items.all()
+            ),
+            Decimal("0"),
+        )
+
+    @property
+    def total_iva(self):
+        return sum(
+            (
+                item.iva_linea
+                for item in self.items.all()
+            ),
+            Decimal("0"),
+        )
+
+    @property
+    def total(self):
+        return sum(
+            (
+                item.total_linea
+                for item in self.items.all()
+            ),
+            Decimal("0"),
+        )
+
+    @property
+    def total_pagado(self):
+
+        return (
+            self.monto_efectivo +
+            self.monto_tarjeta +
+            self.monto_transferencia
+        )
+
+# =========================================================
+# ITEM DEL CARRITO
+# =========================================================
+
+class CarritoItem(models.Model):
+
+    carrito = models.ForeignKey(
+        Carrito,
+        on_delete=models.CASCADE,
+        related_name="items",
+    )
+
+    variante = models.ForeignKey(
+        "inventory.ProductoVariante",
+        on_delete=models.PROTECT,
+    )
+
+    cantidad = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=1,
+    )
+
+    precio_unitario = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+    )
+
+    subtotal_linea = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=0,
+    )
+
+    iva_linea = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=0,
+    )
+
+    total_linea = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=0,
+    )
+
+    class Meta:
+
+        indexes = [
+            models.Index(fields=["carrito"]),
+        ]
+
+    def save(self, *args, **kwargs):
+
+        precio = redondear_a_peso_colombiano(
+            self.precio_unitario
+        )
+
+        base = redondear_a_peso_colombiano(
+            precio * self.cantidad
+        )
+
+        iva = Decimal("0")
+
+        self.subtotal_linea = base
+        self.iva_linea = iva
+        self.total_linea = base + iva
+
+        super().save(*args, **kwargs)
+        
 # =========================================================
 # VENTA
 # =========================================================
@@ -366,10 +496,8 @@ class Venta(models.Model):
     # =====================================================
     # CIERRE DE VENTA
     # =====================================================
-
     @transaction.atomic
     def cerrar_venta(self):
-
         if self.estado != "ABIERTA":
             raise ValidationError(
                 "La venta no está abierta."
@@ -384,12 +512,28 @@ class Venta(models.Model):
 
         if not self.puede_cerrar():
             raise ValidationError(
-                "El pago no cubre el total."
+                "El pago no cubre el total de la venta."
             )
 
-        # =================================================
-        # DESCONTAR INVENTARIO
-        # =================================================
+        # -----------------------------------------------------
+        # VALIDAR TURNO
+        # -----------------------------------------------------
+
+        from apps.sales.services.caja_service import CajaService
+
+        turno = CajaService.obtener_turno_bloqueado(
+            self.turno_id,
+            sucursal=self.sucursal,
+        )
+
+        CajaService.validar_operador_turno(
+            turno,
+            self.usuario,
+        )
+
+        # -----------------------------------------------------
+        # INVENTARIO
+        # -----------------------------------------------------
 
         if not self.stock_descontado:
 
@@ -397,24 +541,22 @@ class Venta(models.Model):
                 self.items
                 .select_related("variante")
             ):
-
                 InventoryService.descontar_stock(
                     variante=item.variante,
                     cantidad=item.cantidad,
                     user=self.usuario,
                     sucursal_id=self.sucursal_id,
                     referencia=f"VENTA-{self.id}",
-                    tipo="VENTA"
+                    tipo="VENTA",
                 )
 
             self.stock_descontado = True
 
-        # =================================================
-        # CERRAR
-        # =================================================
+        # -----------------------------------------------------
+        # CERRAR VENTA
+        # -----------------------------------------------------
 
         self.estado = "CERRADA"
-
         self.cerrada = timezone.now()
 
         self.save(
@@ -425,48 +567,21 @@ class Venta(models.Model):
             ]
         )
 
-    # =====================================================
-    # ANULAR VENTA
-    # =====================================================
+        # -----------------------------------------------------
+        # REGISTRO FINANCIERO
+        # -----------------------------------------------------
 
-    @transaction.atomic
-    def anular_venta(self):
-
-        if self.estado == "ANULADA":
-            raise ValidationError(
-                "La venta ya fue anulada."
-            )
-
-        # =================================================
-        # DEVOLVER INVENTARIO
-        # =================================================
-
-        if self.stock_descontado:
-
-            for item in (
-                self.items
-                .select_related("variante")
-            ):
-
-                InventoryService.agregar_stock(
-                    variante=item.variante,
-                    cantidad=item.cantidad,
-                    user=self.usuario,
-                    sucursal_id=self.sucursal_id,
-                    referencia=f"ANULACION-{self.id}",
-                    tipo="ANULACION"
-                )
-
-        self.estado = "ANULADA"
-
-        self.anulada = timezone.now()
-
-        self.save(
-            update_fields=[
-                "estado",
-                "anulada"
-            ]
+        CajaService.registrar_movimientos_venta(
+            venta=self,
+            usuario=self.usuario,
+            pagos={
+                "EFECTIVO": self.monto_efectivo,
+                "TARJETA": self.monto_tarjeta,
+                "TRANSFERENCIA": self.monto_transferencia,
+            },
         )
+
+        return self
 
 
 # =========================================================

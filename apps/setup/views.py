@@ -1,167 +1,64 @@
 # apps/setup/views.py
-from django.views import View
+from django.contrib import messages
 from django.shortcuts import render, redirect
-from django.contrib.auth import login
+from django.views import View
 
-from django.contrib.auth.models import User
-
-from apps.core.models import (
-    Empresa,
-    Sucursal,
-)
-
-
-from apps.sales.models import Caja
-
-from apps.sales.models_caja_enterprise import TurnoCaja
-
-from apps.inventory.models import (
-    Color,
-    TipoTela,
-    Talla,
-)
-
-from apps.customers.models import Cliente
-
-from apps.setup.forms import SetupForm
-
-from apps.setup.service.setup_service import SetupService
-
-from apps.setup.service.setup_checker import SetupChecker
-
+from .forms import SetupForm
+from .service.setup_service import SetupService
 
 
 class SetupWizardView(View):
 
-
     template_name = "setup/wizard.html"
-
-
-
-    def estado_configuracion(self):
-
-
-        empresa = Empresa.objects.exists()
-
-
-        sucursal = Sucursal.objects.exists()
-
-
-        usuario = User.objects.exists()
-
-
-        caja = Caja.objects.exists()
-
-
-        turno = TurnoCaja.objects.filter(
-            estado="ABIERTO"
-        ).exists()
-
-
-        datos_base = (
-
-            Color.objects.exists()
-
-            and TipoTela.objects.exists()
-
-            and Talla.objects.exists()
-
-            and Cliente.objects.exists()
-
-        )
-
-
-        return {
-
-
-            "empresa": empresa,
-
-            "sucursal": sucursal,
-
-            "usuario": usuario,
-
-            "caja": caja,
-
-            "turno": turno,
-
-            "datos_base": datos_base,
-
-        }
-
-
 
     def get(self, request):
 
-
         form = SetupForm()
 
-
         return render(
-
             request,
-
             self.template_name,
-
             {
-
                 "form": form,
-
-                "estado": self.estado_configuracion()
-
-            }
-
+            },
         )
-
-
 
     def post(self, request):
 
+        form = SetupForm(request.POST)
 
-        form = SetupForm(
-            request.POST
-        )
+        if not form.is_valid():
 
+            return render(
+                request,
+                self.template_name,
+                {
+                    "form": form,
+                },
+                status=400,
+            )
 
-        if form.is_valid():
-
+        try:
 
             resultado = SetupService.crear_sistema(
-
                 form.cleaned_data
-
             )
 
-
-            login(
+            messages.success(
                 request,
-                resultado["usuario"]
+                "El sistema fue configurado correctamente.",
             )
 
-            print(
-                "LOGIN SETUP:",
-                request.user,
-                request.user.is_authenticated,
-                request.session.session_key
+            return redirect("login")
+
+        except Exception as error:
+
+            return render(
+                request,
+                self.template_name,
+                {
+                    "form": form,
+                    "error": str(error),
+                },
+                status=400,
             )
-
-
-
-            return redirect("/")
-
-
-
-        return render(
-
-            request,
-
-            self.template_name,
-
-            {
-
-                "form": form,
-
-                "estado": self.estado_configuracion()
-
-            }
-
-        )

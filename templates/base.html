@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -149,15 +150,55 @@
 
     <div class="sidebar-content">
 
-        <div class="section">General</div>
+        <div class="section">Operación</div>
 
-        <a href="/sales/pos/">🛒 POS</a>
+            {% if request.user.is_authenticated and request.user.profile %}
+                {% if request.user.profile.role == "SUPER_ADMIN" or request.user.profile.role == "ADMIN_SUCURSAL" or request.user.profile.role == "CAJERO" %}
 
-        {% if request.user.is_authenticated and request.user.profile %}
-            {% if request.user.profile.role != "CAJERO" %}
-                <a href="{% url 'sales:reportes' %}">📊 Reportes</a>
+                    {% if request.session.turno_id %}
+
+                        <a href="{% url 'sales:pos' %}">
+                            <i class="bi bi-cart3"></i> Punto de venta
+                        </a>
+
+                        <a href="{% url 'sales:reportes' %}">
+                            <i class="bi bi-graph-up"></i> Reporte de ventas
+                        </a>
+
+                        <a href="{% url 'sales:caja_dashboard' %}">
+                            <i class="bi bi-cash-register"></i> Operación de caja
+                        </a>
+
+                    {% else %}
+
+                        <a href="{% url 'sales:abrir_caja' %}">
+                            <i class="bi bi-unlock"></i> Abrir caja
+                        </a>
+
+                        <a href="{% url 'sales:pos' %}">
+                            <i class="bi bi-cart3"></i> Punto de venta
+                        </a>
+
+                    {% endif %}
+
+                {% endif %}
             {% endif %}
-        {% endif %}
+
+            {% if request.user.is_authenticated and request.user.profile %}
+                {% if request.user.profile.role == "SUPER_ADMIN" or request.user.profile.role == "ADMIN_SUCURSAL" or request.user.profile.role == "SUPERVISOR" %}
+                    <div class="section">Auditoría de caja</div>
+
+                    <a href="{% url 'sales:caja_historial_cierres' %}">
+                        <i class="bi bi-archive"></i> Cierres y arqueos
+                    </a>
+
+                    <a href="{% url 'sales:caja_reportes' %}">
+                        <i class="bi bi-cash-stack"></i> Reporte financiero
+                    </a>
+
+                {% endif %}
+            {% endif %}
+
 
         {% if request.user.is_authenticated and request.user.profile.role == "SUPER_ADMIN" %}
 
@@ -184,11 +225,11 @@
             <a href="{% url 'inventory:variante_list' %}">🧩 Variantes</a>
             <a href="{% url 'administration:lista_precio_list' %}">💰 Listas de Precio</a>
             <a href="{% url 'administration:precio_variante_list' %}">🏷️ Precios Productos</a>
-            <a href="{% url 'inventory:stock_list' %}">📊 Stock</a>
-            <a href="{% url 'inventory:kardex' %}">🔄 Kardex</a>
-            <a href="{% url 'inventory:produccion_list' %}">🏭 Producción</a>
             <a href="{% url 'inventory:rollo_list' %}">🧶 Rollos</a>
             <a href="{% url 'inventory:corte_produccion' %}">✂️ Corte</a>
+            <a href="{% url 'inventory:produccion_list' %}">🏭 Producción</a>
+            <a href="{% url 'inventory:kardex' %}">🔄 Kardex</a>
+            <a href="{% url 'inventory:stock_list' %}">📊 Stock</a>
             <a href="{% url 'inventory:traslado_list' %}">🚚 Traslados</a>
 
             {% endif %}

@@ -141,11 +141,11 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
-LOGIN_URL = "/admin/login/"
-LOGIN_REDIRECT_URL = '/sales/pos/'
-LOGOUT_REDIRECT_URL = '/accounts/login/'
+LOGIN_URL = "/accounts/login/"
+LOGIN_REDIRECT_URL = "/"
+LOGOUT_REDIRECT_URL = "/accounts/login/"
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Límite máximo de efectivo permitido en caja antes de requerir depósito a bóveda
-LIMITE_EFECTIVO_CAJA = Decimal("2000000.00")
+LIMITE_EFECTIVO_CAJA = None  # Puedes establecer un valor en Decimal, por ejemplo: Decimal('1000.00')

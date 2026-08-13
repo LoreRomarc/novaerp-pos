@@ -1,0 +1,661 @@
+<!--apps/sales/templates/sales/caja/dashboard.html-->
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    {% if turno %}
+        <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <h2 class="mb-0">Caja {{ turno.caja.nombre }}</h2>
+                    <span class="badge text-bg-success">{{ turno.get_estado_display }}</span>
+                </div>
+
+                <div class="text-muted small">
+                    Código: <strong>{{ turno.caja.codigo }}</strong>
+                    <span class="mx-2">•</span>
+                    Apertura: <strong>{{ turno.abierto_en|date:"d/m/Y H:i" }}</strong>
+                    <span class="mx-2">•</span>
+                    Cajero responsable: <strong>{{ turno.usuario_apertura }}</strong>
+                </div>
+
+                {% if turno.usuario_supervisor %}
+                    <div class="text-muted small mt-1">
+                        Supervisor: <strong>{{ turno.usuario_supervisor }}</strong>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div class="d-flex flex-wrap gap-2">
+                <button
+                    class="btn btn-outline-primary"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modalArqueo"
+                    type="button">
+                    <i class="bi bi-clipboard-check"></i> Arqueo
+                </button>
+
+                <button
+                    class="btn btn-outline-danger"
+                    data-bs-toggle="modal"
+                    data-bs-target="#modalCerrarCaja"
+                    type="button">
+                    <i class="bi bi-lock"></i> Cerrar caja
+                </button>
+
+                {% if puede_asignar_supervisor and not turno.usuario_supervisor %}
+                    <button
+                        class="btn btn-outline-secondary"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modalSupervisor"
+                        type="button">
+                        <i class="bi bi-person-badge"></i> Asignar supervisor
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Base inicial</div>
+                        <div class="fs-4 fw-bold">${{ resumen.monto_inicial|floatformat:0 }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card border-0 shadow-sm h-100 border-start border-4 border-success">
+                    <div class="card-body">
+                        <div class="text-muted small">Efectivo esperado</div>
+                        <div class="fs-4 fw-bold text-success">
+                            ${{ resumen.efectivo_esperado|floatformat:0 }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Ventas en efectivo</div>
+                        <div class="fs-4 fw-bold">${{ resumen.ventas_efectivo|floatformat:0 }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Ventas con tarjeta</div>
+                        <div class="fs-4 fw-bold">${{ resumen.ventas_tarjeta|floatformat:0 }}</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Transferencias</div>
+                        <div class="fs-4 fw-bold">
+                            ${{ resumen.ventas_transferencia|floatformat:0 }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card border-0 shadow-sm h-100 border-start border-4 border-primary">
+                    <div class="card-body">
+                        <div class="text-muted small">Ingresos manuales</div>
+                        <div class="fs-4 fw-bold text-primary">
+                            ${{ resumen.ingresos|floatformat:0 }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card border-0 shadow-sm h-100 border-start border-4 border-warning">
+                    <div class="card-body">
+                        <div class="text-muted small">Egresos manuales</div>
+                        <div class="fs-4 fw-bold text-warning">
+                            ${{ resumen.egresos|floatformat:0 }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card border-0 shadow-sm h-100 border-start border-4 border-danger">
+                    <div class="card-body">
+                        <div class="text-muted small">Retiros a bóveda</div>
+                        <div class="fs-4 fw-bold text-danger">
+                            ${{ resumen.retiros|floatformat:0 }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm mb-4">
+            <div class="card-body">
+                <div class="d-flex flex-wrap gap-2">
+                    <button
+                        class="btn btn-success"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modalIngreso"
+                        type="button">
+                        <i class="bi bi-plus-circle"></i> Registrar ingreso
+                    </button>
+
+                    <button
+                        class="btn btn-warning"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modalEgreso"
+                        type="button">
+                        <i class="bi bi-dash-circle"></i> Registrar egreso
+                    </button>
+
+                    <button
+                        class="btn btn-primary"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modalRetiro"
+                        type="button">
+                        <i class="bi bi-bank"></i> Retiro a bóveda
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Últimos movimientos</h5>
+                <span class="badge text-bg-light">{{ movimientos|length }} registros</span>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Tipo</th>
+                            <th>Medio de pago</th>
+                            <th>Usuario</th>
+                            <th>Observación</th>
+                            <th class="text-end">Monto</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for mov in movimientos %}
+                            <tr>
+                                <td class="text-nowrap">
+                                    {{ mov.creado_en|date:"d/m/Y H:i" }}
+                                </td>
+                                <td>{{ mov.get_tipo_display }}</td>
+                                <td>{{ mov.get_medio_pago_display|default:"-" }}</td>
+                                <td>{{ mov.usuario }}</td>
+                                <td>{{ mov.observacion|default:"-" }}</td>
+                                <td class="text-end fw-semibold">
+                                    ${{ mov.monto|floatformat:0 }}
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td class="text-center text-muted py-4" colspan="6">
+                                    No existen movimientos registrados.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% else %}
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center py-5">
+                <h3>No hay una caja abierta</h3>
+                <p class="text-muted mb-4">
+                    Debe abrir una caja antes de registrar ventas o movimientos.
+                </p>
+                <a class="btn btn-primary" href="{% url 'sales:abrir_caja' %}">
+                    Abrir caja
+                </a>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+{% if turno %}
+    {% if puede_asignar_supervisor and not turno.usuario_supervisor %}
+        <div class="modal fade" id="modalSupervisor" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog">
+                <form class="modal-content" id="formSupervisor">
+                    {% csrf_token %}
+
+                    <div class="modal-header">
+                        <h5 class="modal-title">Asignar supervisor de turno</h5>
+                        <button class="btn-close" data-bs-dismiss="modal" type="button"></button>
+                    </div>
+
+                    <div class="modal-body">
+                        <label class="form-label" for="supervisorId">Supervisor</label>
+
+                        <select
+                            class="form-select"
+                            id="supervisorId"
+                            required>
+                            <option value="">Seleccione un supervisor</option>
+
+                            {% for perfil in supervisores %}
+                                <option value="{{ perfil.user_id }}">
+                                    {{ perfil.user.get_full_name|default:perfil.user.username }}
+                                    — {{ perfil.get_role_display }}
+                                </option>
+                            {% endfor %}
+                        </select>
+
+                        {% if not supervisores %}
+                            <div class="alert alert-warning small mt-3 mb-0">
+                                No existen supervisores activos disponibles para esta sucursal.
+                            </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">
+                            Cancelar
+                        </button>
+                        <button class="btn btn-primary" type="submit">
+                            Asignar supervisor
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="modal fade" id="modalIngreso" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form class="modal-content js-movimiento-form" data-url="{% url 'sales:caja_ingreso' %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">Registrar ingreso de caja</h5>
+                    <button class="btn-close" data-bs-dismiss="modal" type="button"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label" for="ingresoMonto">Monto</label>
+                        <input
+                            class="form-control"
+                            id="ingresoMonto"
+                            min="1"
+                            name="monto"
+                            required
+                            step="0.01"
+                            type="number">
+                    </div>
+
+                    <div>
+                        <label class="form-label" for="ingresoMotivo">Motivo</label>
+                        <textarea
+                            class="form-control"
+                            id="ingresoMotivo"
+                            maxlength="1000"
+                            name="motivo"
+                            required
+                            rows="3"></textarea>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">
+                        Cancelar
+                    </button>
+                    <button class="btn btn-success" type="submit">
+                        Guardar ingreso
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalEgreso" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form class="modal-content js-movimiento-form" data-url="{% url 'sales:caja_egreso' %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">Registrar egreso de caja</h5>
+                    <button class="btn-close" data-bs-dismiss="modal" type="button"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label" for="egresoMonto">Monto</label>
+                        <input
+                            class="form-control"
+                            id="egresoMonto"
+                            min="1"
+                            name="monto"
+                            required
+                            step="0.01"
+                            type="number">
+                    </div>
+
+                    <div>
+                        <label class="form-label" for="egresoMotivo">Motivo</label>
+                        <textarea
+                            class="form-control"
+                            id="egresoMotivo"
+                            maxlength="1000"
+                            name="motivo"
+                            required
+                            rows="3"></textarea>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">
+                        Cancelar
+                    </button>
+                    <button class="btn btn-warning" type="submit">
+                        Guardar egreso
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalRetiro" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form class="modal-content js-movimiento-form" data-url="{% url 'sales:caja_retiro' %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">Registrar retiro a bóveda</h5>
+                    <button class="btn-close" data-bs-dismiss="modal" type="button"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="alert alert-info small">
+                        El retiro se registrará como un movimiento inmutable y aumentará el saldo de la bóveda.
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="retiroMonto">Monto</label>
+                        <input
+                            class="form-control"
+                            id="retiroMonto"
+                            min="1"
+                            name="monto"
+                            required
+                            step="0.01"
+                            type="number">
+                    </div>
+
+                    <div>
+                        <label class="form-label" for="retiroMotivo">Motivo</label>
+                        <textarea
+                            class="form-control"
+                            id="retiroMotivo"
+                            maxlength="1000"
+                            name="motivo"
+                            required
+                            rows="3"></textarea>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">
+                        Cancelar
+                    </button>
+                    <button class="btn btn-primary" type="submit">
+                        Confirmar retiro
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalArqueo" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <form class="modal-content" id="formArqueo">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">Arqueo de caja</h5>
+                    <button class="btn-close" data-bs-dismiss="modal" type="button"></button>
+                </div>
+
+                <div class="modal-body">
+                    <p class="text-muted small">
+                        Registre las cantidades físicas encontradas por denominación.
+                    </p>
+
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label">$100.000</label>
+                            <input class="form-control js-denominacion" data-valor="100000" min="0" type="number" value="0">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">$50.000</label>
+                            <input class="form-control js-denominacion" data-valor="50000" min="0" type="number" value="0">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">$20.000</label>
+                            <input class="form-control js-denominacion" data-valor="20000" min="0" type="number" value="0">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">$10.000</label>
+                            <input class="form-control js-denominacion" data-valor="10000" min="0" type="number" value="0">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">$5.000</label>
+                            <input class="form-control js-denominacion" data-valor="5000" min="0" type="number" value="0">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">$2.000</label>
+                            <input class="form-control js-denominacion" data-valor="2000" min="0" type="number" value="0">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">$1.000</label>
+                            <input class="form-control js-denominacion" data-valor="1000" min="0" type="number" value="0">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label">$500</label>
+                            <input class="form-control js-denominacion" data-valor="500" min="0" type="number" value="0">
+                        </div>
+                    </div>
+
+                    <div class="mt-3">
+                        <label class="form-label" for="arqueoObservacion">Observación</label>
+                        <textarea
+                            class="form-control"
+                            id="arqueoObservacion"
+                            maxlength="1000"
+                            rows="3"></textarea>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">
+                        Cancelar
+                    </button>
+                    <button class="btn btn-primary" type="submit">
+                        Registrar arqueo
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalCerrarCaja" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form class="modal-content" action="{% url 'sales:cerrar_caja' %}" method="post">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">Cerrar caja</h5>
+                    <button class="btn-close" data-bs-dismiss="modal" type="button"></button>
+                </div>
+
+                <div class="modal-body">
+                    <div class="alert alert-warning small">
+                        Antes de cerrar la caja, registre el arqueo físico correspondiente.
+                    </div>
+
+                    <label class="form-label" for="montoReal">Efectivo contado</label>
+                    <input
+                        class="form-control"
+                        id="montoReal"
+                        min="0"
+                        name="monto_real"
+                        required
+                        step="0.01"
+                        type="number">
+                </div>
+
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">
+                        Cancelar
+                    </button>
+                    <button class="btn btn-danger" type="submit">
+                        Cerrar caja
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const csrfToken = document.querySelector(
+            "[name=csrfmiddlewaretoken]"
+        ).value;
+
+        async function enviarJson(url, payload) {
+            const respuesta = await fetch(url, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrfToken,
+                    "Accept": "application/json",
+                },
+                body: JSON.stringify(payload),
+            });
+
+            const texto = await respuesta.text();
+
+            let datos;
+
+            try {
+                datos = JSON.parse(texto);
+            } catch {
+                console.error("Respuesta no JSON:", {
+                    status: respuesta.status,
+                    url: respuesta.url,
+                    respuesta: texto,
+                });
+
+                throw new Error(
+                    "El servidor no pudo procesar la operación. " +
+                    "Revisa el registro del servidor."
+                );
+            }
+
+            if (!respuesta.ok || !datos.success) {
+                throw new Error(
+                    datos.error || "No fue posible completar la operación."
+                );
+            }
+
+            return datos;
+        }
+
+        document.querySelectorAll(".js-movimiento-form").forEach((formulario) => {
+            formulario.addEventListener("submit", async (evento) => {
+                evento.preventDefault();
+
+                const boton = formulario.querySelector("[type=submit]");
+                const datosFormulario = new FormData(formulario);
+
+                boton.disabled = true;
+
+                try {
+                    await enviarJson(formulario.dataset.url, {
+                        monto: datosFormulario.get("monto"),
+                        motivo: datosFormulario.get("motivo"),
+                    });
+
+                    window.location.reload();
+                } catch (error) {
+                    window.alert(error.message);
+                    boton.disabled = false;
+                }
+            });
+        });
+
+        document.getElementById("formArqueo").addEventListener(
+            "submit",
+            async (evento) => {
+                evento.preventDefault();
+
+                const boton = evento.currentTarget.querySelector("[type=submit]");
+                const denominaciones = {};
+
+                document.querySelectorAll(".js-denominacion").forEach((input) => {
+                    denominaciones[input.dataset.valor] = input.value || 0;
+                });
+
+                boton.disabled = true;
+
+                try {
+                    const respuesta = await enviarJson(
+                        "{% url 'sales:caja_arqueo' %}",
+                        {
+                            denominaciones: denominaciones,
+                            observacion: document.getElementById(
+                                "arqueoObservacion"
+                            ).value,
+                        }
+                    );
+
+                    window.alert(
+                        `Arqueo registrado. Diferencia: $${respuesta.arqueo.diferencia}`
+                    );
+
+                    window.location.reload();
+                } catch (error) {
+                    window.alert(error.message);
+                    boton.disabled = false;
+                }
+            }
+        );
+
+        const formSupervisor = document.getElementById("formSupervisor");
+
+        formSupervisor?.addEventListener("submit", async (evento) => {
+            evento.preventDefault();
+
+            const boton = formSupervisor.querySelector("[type=submit]");
+            const supervisorId = document.getElementById("supervisorId").value;
+
+            boton.disabled = true;
+
+            try {
+                await enviarJson(
+                    "{% url 'sales:caja_asignar_supervisor' %}",
+                    {
+                        supervisor_id: supervisorId,
+                    }
+                );
+
+                window.location.reload();
+            } catch (error) {
+                window.alert(error.message);
+                boton.disabled = false;
+            }
+        });
+
+    </script>
+{% endif %}
+{% endblock %}

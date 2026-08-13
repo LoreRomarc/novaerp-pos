@@ -1,9 +1,12 @@
 # apps/inventory/views.py
-from django.db.models import Sum
+from decimal import Decimal
+
 from django import forms
+from django.db.models import Sum
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.urls import reverse_lazy
 from django.views import View
-from django.views.generic import ListView, FormView
+from django.views.generic import CreateView, ListView, FormView
 from django.shortcuts import redirect
 from django.db import transaction
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -28,11 +31,7 @@ from apps.inventory.services.traslado_service import TrasladoService
 # PRODUCCION
 # ======================================================
 
-class ProduccionListView(
-    LoginRequiredMixin,
-    InventoryAccessMixin,
-    ListView
-):
+class ProduccionListView( LoginRequiredMixin, InventoryAccessMixin, ListView):
     model = ProduccionLote
     template_name = "inventory/produccion.html"
     context_object_name = "lotes"
@@ -40,7 +39,7 @@ class ProduccionListView(
 
     def get_queryset(self):
 
-        return (
+        qs = (
             ProduccionLote.objects
             .select_related(
                 "sucursal",
@@ -53,6 +52,7 @@ class ProduccionListView(
                 "rollos__rollo__color",
 
                 "detalles",
+                "detalles__rollo",
                 "detalles__variante",
                 "detalles__variante__producto_base",
                 "detalles__variante__tipo_tela",
@@ -61,6 +61,52 @@ class ProduccionListView(
             )
             .order_by("-creado")
         )
+
+
+        request = self.request
+
+
+        q = request.GET.get("q")
+
+        fecha_desde = request.GET.get("fecha_desde")
+
+        fecha_hasta = request.GET.get("fecha_hasta")
+
+
+        if q:
+
+            qs = qs.filter(
+
+                Q(referencia__icontains=q) |
+
+                Q(rollos__rollo__codigo__icontains=q) |
+
+                Q(detalles__variante__producto_base__nombre__icontains=q) |
+
+                Q(detalles__variante__tipo_tela__nombre__icontains=q) |
+
+                Q(detalles__variante__color__nombre__icontains=q) |
+
+                Q(detalles__variante__talla__nombre__icontains=q)
+
+            ).distinct()
+
+
+        if fecha_desde:
+
+            qs = qs.filter(
+                creado__date__gte=fecha_desde
+            )
+
+
+        if fecha_hasta:
+
+            qs = qs.filter(
+                creado__date__lte=fecha_hasta
+            )
+
+
+        return qs
 
     def get_context_data(self, **kwargs):
 
@@ -93,6 +139,11 @@ class ProduccionListView(
             )
             .order_by("-creado")[:10]
         )
+
+        for lote in context["lotes"]:
+
+            lote.consumos_rollos = lote.rollos.all()
+
 
         context["stock_producido"] = (
             Stock.objects
@@ -164,119 +215,105 @@ class StockListView(LoginRequiredMixin, InventoryAccessMixin, SucursalScopedMixi
 
         return context
 
-class AjusteStockView(View):
+class AjusteStockView(LoginRequiredMixin, InventoryAccessMixin, View):
 
     def post(self, request):
-
         try:
             variante_id = request.POST.get("variante_id")
-            cantidad = float(request.POST.get("cantidad", 0))
+            cantidad = Decimal(request.POST.get("cantidad", "0"))
 
             if not variante_id:
-                raise Exception("Debes seleccionar un producto válido")
+                raise ValidationError("Debes seleccionar un producto válido.")
+
+            if cantidad == 0:
+                raise ValidationError("La cantidad no puede ser cero.")
 
             variante = ProductoVariante.objects.get(id=variante_id)
 
-            if cantidad > 0:
-                InventoryService.agregar_stock(
-                    variante=variante,
-                    cantidad=cantidad,
-                    user=request.user,
-                    tipo="AJUSTE"
-                )
-            else:
-                InventoryService.descontar_stock(
-                    variante=variante,
-                    cantidad=abs(cantidad),
-                    user=request.user,
-                    tipo="AJUSTE"
-                )
+            # La cantidad positiva es entrada; la negativa es salida.
+            tipo = (
+                "AJUSTE_ENTRADA"
+                if cantidad > 0
+                else "AJUSTE_SALIDA"
+            )
 
-            messages.success(request, f"Ajuste aplicado a {variante}")
+            InventoryService.ajustar_stock(
+                variante=variante,
+                cantidad=abs(cantidad),
+                tipo=tipo,
+                user=request.user,
+                referencia="AJUSTE MANUAL",
+            )
 
-        except Exception as e:
-            messages.error(request, str(e))
+            messages.success(
+                request,
+                f"Ajuste aplicado a {variante} y registrado en kardex."
+            )
+
+        except ProductoVariante.DoesNotExist:
+            messages.error(request, "La variante seleccionada no existe.")
+
+        except ValidationError as error:
+            messages.error(request, error.messages[0])
 
         return redirect("inventory:dashboard")
-     
-class AjusteStockForm(forms.Form):
 
+
+class AjusteStockForm(forms.Form):
     variante = forms.ModelChoiceField(
-        queryset=ProductoVariante.objects.select_related(
-            "producto_base",
-            "color"
-        )
+        label="Producto",
+        queryset=ProductoVariante.objects.filter(activo=True),
+        widget=forms.Select(attrs={"class": "form-select"})
     )
 
     cantidad = forms.DecimalField(
-        min_value=0.01
+        label="Cantidad",
+        min_value=Decimal("0.01"),
+        decimal_places=2,
+        max_digits=12,
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+            "min": "0.01",
+            "step": "0.01",
+        })
     )
 
     tipo = forms.ChoiceField(
+        label="Movimiento",
         choices=[
-            ("AJUSTE_ENTRADA", "➕ Entrada"),
-            ("AJUSTE_SALIDA", "➖ Salida"),
-        ]
+            ("AJUSTE_ENTRADA", "Entrada de inventario"),
+            ("AJUSTE_SALIDA", "Salida de inventario"),
+        ],
+        widget=forms.Select(attrs={"class": "form-select"})
     )
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        self.fields["variante"].label_from_instance = (
-            lambda obj: f"{obj.producto_base.nombre} - {obj.color} - {obj.talla}"
-        )
-
-class AjusteStockCreateView( LoginRequiredMixin,InventoryAccessMixin,FormView):
-
+class AjusteStockCreateView(
+    LoginRequiredMixin,
+    InventoryAccessMixin,
+    FormView
+):
     template_name = "inventory/ajuste_stock.html"
-
     form_class = AjusteStockForm
+    success_url = reverse_lazy("inventory:stock_list")
 
     def form_valid(self, form):
-
         try:
-
-            variante = form.cleaned_data["variante"]
-            cantidad = form.cleaned_data["cantidad"]
-            tipo = form.cleaned_data["tipo"]
-
-            if tipo == "AJUSTE_ENTRADA":
-
-                InventoryService.agregar_stock(
-                    variante=variante,
-                    cantidad=cantidad,
-                    user=self.request.user,
-                    tipo="AJUSTE_ENTRADA"
-                )
-
-            else:
-
-                InventoryService.descontar_stock(
-                    variante=variante,
-                    cantidad=cantidad,
-                    user=self.request.user,
-                    tipo="AJUSTE_SALIDA"
-                )
-
-            messages.success(
-                self.request,
-                "Stock actualizado correctamente."
+            InventoryService.ajustar_stock(
+                variante=form.cleaned_data["variante"],
+                cantidad=form.cleaned_data["cantidad"],
+                tipo=form.cleaned_data["tipo"],
+                user=self.request.user,
+                referencia="AJUSTE MANUAL",
             )
+        except ValidationError as error:
+            form.add_error(None, error.messages[0])
+            return self.form_invalid(form)
 
-        except Exception as e:
-
-            messages.error(
-                self.request,
-                str(e)
-            )
-
-            return redirect(
-                "inventory:ajuste_stock_form"
-            )
-
-        return redirect(
-            "inventory:stock_list"
+        messages.success(
+            self.request,
+            "Stock ajustado y movimiento registrado en kardex."
         )
+        return super().form_valid(form)
     
 # ======================================================
 # TRASLADOS ENTRE SUCURSALES (ENTRADAS/SALIDAS)

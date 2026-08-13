@@ -156,7 +156,6 @@ class VarianteForm(forms.ModelForm):
 
             self.precios_lista[campo] = lista
 
-
         # cargar precios si estamos editando
 
         if self.instance.pk:
@@ -170,7 +169,6 @@ class VarianteForm(forms.ModelForm):
                 if campo in self.fields:
 
                     self.initial[campo] = precio.precio
-
 
     def save(self, commit=True):
 
@@ -191,8 +189,6 @@ class VarianteForm(forms.ModelForm):
                 )
 
         return instancia
-
-
 
 # ======================================================
 # LISTADO

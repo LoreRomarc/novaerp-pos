@@ -1,260 +1,312 @@
+<!--apps/sales/templates/sales/reportes.html-->
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Reporte de Ventas{% endblock %}
+{% block title %}Reporte de ventas{% endblock %}
 
 {% block content %}
+<div class="container-fluid py-4">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+        <div>
+            <h2 class="mb-1">Reporte de ventas</h2>
+            <p class="text-muted mb-0">
+                Consulte ventas, medios de pago y detalle por usuario.
+            </p>
+        </div>
 
-<style>
-.page-title{font-size:28px;font-weight:700;color:#1e293b;margin-bottom:25px}
-.filtros{background:white;padding:20px;border-radius:16px;box-shadow:0 4px 20px rgba(0,0,0,.05);margin-bottom:20px}
-.filtros-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:15px}
-.filtros label{display:block;font-size:13px;margin-bottom:6px;color:#64748b;font-weight:600}
-.filtros input,.filtros select{width:100%;padding:10px;border:1px solid #dbe4ee;border-radius:10px;background:#f8fafc}
-.btn-filtrar{margin-top:28px;width:100%}
+        <a class="btn btn-outline-primary" href="{% url 'sales:caja_reportes' %}">
+            <i class="bi bi-cash-stack"></i> Reportes de caja
+        </a>
+    </div>
 
-.cards{display:grid;grid-template-columns:repeat(6,1fr);gap:18px;margin-bottom:25px}
-.card-dashboard{background:white;border-radius:16px;padding:18px;box-shadow:0 4px 18px rgba(0,0,0,.05)}
-.card-dashboard h6{color:#64748b;margin-bottom:10px;font-size:13px}
-.card-dashboard h3{font-size:22px;margin:0;color:#111827}
+    <form class="card border-0 shadow-sm mb-4" method="get">
+        <div class="card-body">
+            <div class="row g-3 align-items-end">
+                <div class="col-12 col-md-6 col-xl-2">
+                    <label class="form-label" for="inicio">Fecha inicial</label>
+                    <input class="form-control" id="inicio" name="inicio" type="date" value="{{ inicio }}">
+                </div>
 
-.tabla{background:white;border-radius:16px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.05)}
-.table{margin:0}
-.table thead{background:#111827;color:white}
-.table thead th{border:none;font-size:13px}
-.table td{vertical-align:middle}
+                <div class="col-12 col-md-6 col-xl-2">
+                    <label class="form-label" for="fin">Fecha final</label>
+                    <input class="form-control" id="fin" name="fin" type="date" value="{{ fin }}">
+                </div>
 
-.badge-abierta{background:#facc15;color:#111}
-</style>
+                <div class="col-12 col-md-6 col-xl-2">
+                    <label class="form-label" for="estado">Estado</label>
+                    <select class="form-select" id="estado" name="estado">
+                        <option value="">Todos</option>
+                        <option value="ABIERTA" {% if estado == "ABIERTA" %}selected{% endif %}>Abierta</option>
+                        <option value="CERRADA" {% if estado == "CERRADA" %}selected{% endif %}>Cerrada</option>
+                        <option value="ANULADA" {% if estado == "ANULADA" %}selected{% endif %}>Anulada</option>
+                    </select>
+                </div>
 
+                <div class="col-12 col-md-6 col-xl-2">
+                    <label class="form-label" for="tipoPago">Tipo de pago</label>
+                    <select class="form-select" id="tipoPago" name="tipo_pago">
+                        <option value="">Todos</option>
+                        <option value="EFECTIVO" {% if tipo_pago == "EFECTIVO" %}selected{% endif %}>Efectivo</option>
+                        <option value="TRANSFERENCIA" {% if tipo_pago == "TRANSFERENCIA" %}selected{% endif %}>Transferencia</option>
+                        <option value="TARJETA" {% if tipo_pago == "TARJETA" %}selected{% endif %}>Tarjeta</option>
+                        <option value="MIXTO" {% if tipo_pago == "MIXTO" %}selected{% endif %}>Mixto</option>
+                    </select>
+                </div>
 
-<h2 class="page-title">📊 Reporte de Ventas</h2>
+                <div class="col-12 col-md-6 col-xl-2">
+                    <label class="form-label" for="usuario">Usuario</label>
+                    <select class="form-select" id="usuario" name="usuario">
+                        <option value="">Todos</option>
+                        {% for usuario in usuarios %}
+                            <option
+                                value="{{ usuario.usuario__id }}"
+                                {% if usuario_id == usuario.usuario__id|stringformat:"s" %}selected{% endif %}>
+                                {% if usuario.usuario__first_name or usuario.usuario__last_name %}
+                                    {{ usuario.usuario__first_name }} {{ usuario.usuario__last_name }}
+                                {% else %}
+                                    {{ usuario.usuario__username }}
+                                {% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
 
+                <div class="col-12 col-xl-2">
+                    <label class="form-label" for="buscar">Buscar</label>
+                    <input
+                        class="form-control"
+                        id="buscar"
+                        name="buscar"
+                        placeholder="Venta, cliente, SKU..."
+                        type="search"
+                        value="{{ buscar }}">
+                </div>
 
-<form method="get" class="filtros">
+                <div class="col-12 d-flex flex-wrap gap-2">
+                    <button class="btn btn-primary" type="submit">
+                        <i class="bi bi-funnel"></i> Aplicar filtros
+                    </button>
 
-<div class="filtros-grid">
+                    <a class="btn btn-outline-secondary" href="{% url 'sales:reportes' %}">
+                        Limpiar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </form>
 
-<div>
-<label>Fecha inicial</label>
-<input type="date" name="inicio" value="{{ inicio }}">
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Total vendido</div>
+                    <div class="fs-4 fw-bold">
+                        ${{ resumen.total_general|floatformat:0|intcomma }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Ventas en efectivo</div>
+                    <div class="fs-4 fw-bold text-success">
+                        ${{ resumen.total_efectivo|floatformat:0|intcomma }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-sm-6 col-xl-2">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Transferencias</div>
+                    <div class="fs-4 fw-bold">
+                        ${{ resumen.total_transferencia|floatformat:0|intcomma }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-sm-6 col-xl-2">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Tarjetas</div>
+                    <div class="fs-4 fw-bold">
+                        ${{ resumen.total_tarjeta|floatformat:0|intcomma }}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-sm-6 col-xl-1">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Ventas</div>
+                    <div class="fs-4 fw-bold">{{ resumen.cantidad_ventas }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-sm-6 col-xl-2">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="text-muted small">Ticket promedio</div>
+                    <div class="fs-4 fw-bold">
+                        ${{ resumen.promedio|floatformat:0|intcomma }}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="card border-0 shadow-sm">
+        <div class="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Ventas encontradas</h5>
+            <span class="badge text-bg-light">
+                {{ resumen.cantidad_ventas }} registros
+            </span>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>#</th>
+                        <th>Fecha</th>
+                        <th>Usuario</th>
+                        <th>Cliente</th>
+                        <th>Estado</th>
+                        <th class="text-end">Efectivo</th>
+                        <th class="text-end">Transferencia</th>
+                        <th class="text-end">Tarjeta</th>
+                        <th class="text-end">Total</th>
+                        <th></th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for venta in ventas %}
+                        <tr>
+                            <td>#{{ venta.id }}</td>
+                            <td class="text-nowrap">
+                                {{ venta.creada|date:"d/m/Y H:i" }}
+                            </td>
+                            <td>
+                                {% if venta.usuario.get_full_name %}
+                                    {{ venta.usuario.get_full_name }}
+                                {% else %}
+                                    {{ venta.usuario.username }}
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div>{{ venta.cliente|default:"Consumidor final" }}</div>
+
+                                {% if venta.observaciones %}
+                                    <small class="text-muted">
+                                        {{ venta.observaciones|truncatechars:50 }}
+                                    </small>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if venta.estado == "ABIERTA" %}
+                                    <span class="badge text-bg-warning">Abierta</span>
+                                {% elif venta.estado == "CERRADA" %}
+                                    <span class="badge text-bg-success">Cerrada</span>
+                                {% else %}
+                                    <span class="badge text-bg-danger">Anulada</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end">
+                                ${{ venta.efectivo_caja|floatformat:0|intcomma }}
+                            </td>
+                            <td class="text-end">
+                                ${{ venta.transferencia_caja|floatformat:0|intcomma }}
+                            </td>
+                            <td class="text-end">
+                                ${{ venta.tarjeta_caja|floatformat:0|intcomma }}
+                            </td>
+                            <td class="text-end fw-bold">
+                                ${{ venta.total|floatformat:0|intcomma }}
+                            </td>
+                            <td class="text-end">
+                                <button
+                                    class="btn btn-sm btn-outline-primary js-ver-venta"
+                                    data-id="{{ venta.id }}"
+                                    type="button">
+                                    Ver detalle
+                                </button>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td class="text-center text-muted py-5" colspan="10">
+                                No existen ventas para los filtros seleccionados.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>
 
-<div>
-<label>Fecha final</label>
-<input type="date" name="fin" value="{{ fin }}">
+<div class="modal fade" id="modalVenta" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-dark text-white">
+                <h5 class="modal-title">Detalle de venta</h5>
+                <button
+                    class="btn-close btn-close-white"
+                    data-bs-dismiss="modal"
+                    type="button"></button>
+            </div>
+
+            <div class="modal-body" id="contenidoVenta">
+                Cargando...
+            </div>
+        </div>
+    </div>
 </div>
-
-<div>
-<label>Estado</label>
-<select name="estado">
-<option value="">Todos</option>
-<option value="ABIERTA" {% if estado == "ABIERTA" %}selected{% endif %}>Abierta</option>
-<option value="CERRADA" {% if estado == "CERRADA" %}selected{% endif %}>Cerrada</option>
-<option value="ANULADA" {% if estado == "ANULADA" %}selected{% endif %}>Anulada</option>
-</select>
-</div>
-
-<div>
-<label>Tipo pago</label>
-<select name="tipo_pago">
-<option value="">Todos</option>
-<option value="EFECTIVO" {% if tipo_pago == "EFECTIVO" %}selected{% endif %}>Efectivo</option>
-<option value="TRANSFERENCIA" {% if tipo_pago == "TRANSFERENCIA" %}selected{% endif %}>Transferencia</option>
-<option value="TARJETA" {% if tipo_pago == "TARJETA" %}selected{% endif %}>Tarjeta</option>
-<option value="MIXTO" {% if tipo_pago == "MIXTO" %}selected{% endif %}>Mixto</option>
-</select>
-</div>
-
-<div>
-<label>Usuario</label>
-<select name="usuario">
-<option value="">Todos</option>
-{% for u in usuarios %}
-<option value="{{u.usuario__id}}" {% if usuario_id == u.usuario__id|stringformat:"s" %}selected{% endif %}>
-{{u.usuario__first_name}} {{u.usuario__last_name}}
-</option>
-{% endfor %}
-</select>
-</div>
-
-
-<div>
-<label>Buscar</label>
-<input type="text"  name="buscar" value="{{buscar}}" placeholder="venta, cliente, producto, SKU...">
-
-<button class="btn btn-primary btn-filtrar">Filtrar</button>
-</div>
-
-</div>
-
-</form>
-
-
-
-<div class="cards">
-
-<div class="card-dashboard"><h6>Total General</h6><h3>${{resumen.total_general|floatformat:0|intcomma}}</h3></div>
-<div class="card-dashboard"><h6>Efectivo</h6><h3>${{resumen.total_efectivo|floatformat:0|intcomma}}</h3></div>
-<div class="card-dashboard"><h6>Transferencia</h6><h3>${{resumen.total_transferencia|floatformat:0|intcomma}}</h3></div>
-<div class="card-dashboard"><h6>Tarjeta</h6><h3>${{resumen.total_tarjeta|floatformat:0|intcomma}}</h3></div>
-<div class="card-dashboard"><h6>Ventas</h6><h3>{{resumen.cantidad_ventas}}</h3></div>
-<div class="card-dashboard"><h6>Promedio</h6><h3>${{resumen.promedio|floatformat:0|intcomma}}</h3></div>
-
-</div>
-
-
-
-<div class="tabla">
-
-<table class="table table-hover">
-
-<thead>
-<tr>
-<th>#</th>
-<th>Fecha</th>
-<th>Usuario</th>
-<th>Cliente</th>
-<th>Observación</th>
-<th>Sucursal</th>
-<th>Estado</th>
-<th>Efectivo</th>
-<th>Transferencia</th>
-<th>Tarjeta</th>
-<th>Total</th>
-<th></th>
-</tr>
-</thead>
-
-
-<tbody>
-
-{% for venta in ventas %}
-
-<tr>
-
-<td>{{venta.id}}</td>
-
-<td>{{venta.creada|date:"d/m/Y H:i"}}</td>
-
-<td>{{venta.usuario.get_full_name|default:venta.usuario.username}}</td>
-
-<td>{{ venta.cliente|default:"-" }}</td>
-
-<td>{{ venta.observaciones|default:"-"|truncatechars:40 }}</td>
-
-<td>{{venta.sucursal.nombre}}</td>
-
-
-<td>
-{% if venta.estado == "ABIERTA" %}
-<span class="badge badge-abierta">Abierta</span>
-{% elif venta.estado == "CERRADA" %}
-<span class="badge bg-success">Cerrada</span>
-{% else %}
-<span class="badge bg-danger">Anulada</span>
-{% endif %}
-</td>
-
-
-<td>${{venta.monto_efectivo|floatformat:0|intcomma}}</td>
-<td>${{venta.monto_transferencia|floatformat:0|intcomma}}</td>
-<td>${{venta.monto_tarjeta|floatformat:0|intcomma}}</td>
-
-<td><strong>${{venta.total|floatformat:0|intcomma}}</strong></td>
-
-
-<td>
-<button class="btn btn-sm btn-outline-primary ver-venta" data-id="{{venta.id}}">
-Ver
-</button>
-</td>
-
-</tr>
-
-
-{% empty %}
-
-<tr>
-<td colspan="10" class="text-center p-5">
-No existen ventas.
-</td>
-</tr>
-
-{% endfor %}
-
-</tbody>
-
-</table>
-
-</div>
-
-
-
-<!-- MODAL GRANDE -->
-
-<div class="modal fade" id="modalVenta">
-
-<div class="modal-dialog modal-xl modal-dialog-centered">
-
-<div class="modal-content">
-
-<div class="modal-header bg-dark text-white">
-
-<h5 class="modal-title">
-Detalle venta
-</h5>
-
-<button class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-
-</div>
-
-
-<div class="modal-body" id="contenidoVenta">
-Cargando...
-</div>
-
-
-</div>
-
-</div>
-
-</div>
-
-
 
 <script>
+    const modalVentaElement = document.getElementById("modalVenta");
+    const contenidoVenta = document.getElementById("contenidoVenta");
+    const modalVenta = new bootstrap.Modal(modalVentaElement);
 
-document.querySelectorAll(".ver-venta").forEach(btn=>{
+    document.querySelectorAll(".js-ver-venta").forEach((boton) => {
+        boton.addEventListener("click", async () => {
+            contenidoVenta.textContent = "Cargando...";
+            modalVenta.show();
 
-    btn.addEventListener("click",async()=>{
+            try {
+                const url = "{% url 'sales:venta_detalle' 0 %}".replace(
+                    "/0/",
+                    `/${boton.dataset.id}/`
+                );
 
-    let id=btn.dataset.id;
+                const respuesta = await fetch(url, {
+                    headers: {
+                        "X-Requested-With": "XMLHttpRequest",
+                    },
+                });
 
-    let modal=new bootstrap.Modal(
-    document.getElementById("modalVenta")
-    );
+                if (!respuesta.ok) {
+                    throw new Error(
+                        "No fue posible cargar el detalle de la venta."
+                    );
+                }
 
-    document.getElementById("contenidoVenta").innerHTML="Cargando...";
-
-    modal.show();
-
-
-    let response=await fetch(`/sales/venta/${id}/`);
-
-    let html=await response.text();
-
-
-    document.getElementById("contenidoVenta").innerHTML=html;
-
-
+                contenidoVenta.innerHTML = await respuesta.text();
+            } catch (error) {
+                contenidoVenta.innerHTML = `
+                    <div class="alert alert-danger mb-0">
+                        ${error.message}
+                    </div>
+                `;
+            }
+        });
     });
-
-
-});
-
-
 </script>
-
-
 {% endblock %}

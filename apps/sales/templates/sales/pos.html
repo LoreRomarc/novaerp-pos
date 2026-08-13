@@ -1,3 +1,4 @@
+<!--apps/sales/templates/sales/pos.html-->
 {% extends "base.html" %}
 {% load static %}
 
@@ -471,8 +472,9 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
       let pagoEditadoManualmente = false;
       let usandoKeypad = false;
       let tipoVentaActual = "DETAL";
-      let ventaActualUUID=null;
-      let ventasAbiertas=[];
+      let ventaActualUUID = null;
+
+      let carritos = {{ carritos|safe }};
 
 
       /* =========================================================
@@ -529,18 +531,14 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
         return moneyFormatter.format(toNumber(v));
       };
 
-      // Inicializa la venta desde el backend
+      // VENTA INICIAL (si hay) 
       const ventaInicial = {{ venta|safe }};
 
-      if(ventaInicial.uuid){
+      if (ventaInicial){
 
-    ventasAbiertas.push({
+          ventaActualUUID = ventaInicial.uuid;
 
-        uuid:ventaInicial.uuid
-
-    });
-
-}
+      }
 
 function guardarEstadoVenta(){
 
@@ -568,169 +566,201 @@ function guardarEstadoVenta(){
       if(ventaInicial){
         ventaActualUUID = ventaInicial.uuid;
       }
-      document.addEventListener("DOMContentLoaded", function () {
-        if (ventaInicial && ventaInicial.items) {
-          actualizarTabla(ventaInicial);
-        }
-        renderTabs();
+      document.addEventListener("DOMContentLoaded", function(){
+
+          if(ventaInicial){
+
+              actualizarTabla(ventaInicial);
+
+          }
+
+          renderTabs();
+
       });
 
 
       function renderTabs(){
 
-    const cont=document.getElementById("tabsVentas");
+          const cont = document.getElementById("tabsVentas");
 
-    cont.innerHTML="";
+          cont.innerHTML = "";
 
-    ventasAbiertas.forEach((v,index)=>{
+          carritos.forEach((c,index)=>{
 
-        const tab=document.createElement("div");
+              const tab = document.createElement("div");
 
-        tab.className="tab-venta";
+              tab.className="tab-venta";
 
-        if(v.uuid===ventaActualUUID)
-            tab.classList.add("active");
+              if(c.uuid===ventaActualUUID){
 
-        tab.innerHTML=`
-            Venta ${index+1}
+                  tab.classList.add("active");
 
-            <span class="cerrar"
-                  onclick="cerrarTab(event,'${v.uuid}')">
-            ×
-            </span>
-        `;
+              }
 
-        tab.onclick = () => {
+              const nombre =
+                  c.cliente && c.cliente.trim() !== ""
+                  ? c.cliente
+                  : "Venta "+(index+1);
 
-            if (v.uuid === ventaActualUUID)
-                return;
+              tab.innerHTML=`
 
-            guardarEstadoVenta().then(() => {
+                  <span>${nombre}</span>
 
-                cargarVenta(v.uuid);
+                  <span class="cerrar"
+                          onclick="cerrarTab(event,'${c.uuid}')">
+                      ×
+                  </span>
 
-            });
+              `;
 
-        };
+              tab.onclick=()=>{
 
-        cont.appendChild(tab);
+                  if(c.uuid===ventaActualUUID){
 
-    });
+                      return;
 
-}
+                  }
 
-function crearNuevaVenta(){
+                  cargarVenta(c.uuid);
 
-    guardarEstadoVenta().then(()=>{
+              };
 
-        fetch("{% url 'sales:pos_nueva_venta' %}",{
+              cont.appendChild(tab);
 
-            method:"POST",
+          });
 
-            headers:{
-                "X-CSRFToken":csrf
-            }
+      }
 
-        })
-        .then(r=>r.json())
-        .then(data=>{
+      function crearNuevaVenta(){
 
-            if(!data.success)
-                return;
+          postJSON("{% url 'sales:pos_nueva_venta' %}")
 
-            ventasAbiertas.push(data.venta);
+          .then(res=>{
 
-            ventaActualUUID=data.venta.uuid;
+              if(!res.success){
 
-            actualizarTabla({
-                subtotal:0,
-                iva:0,
-                total:0,
-                items:[]
-            });
+                  alert(res.error);
 
-            inputCliente.value="";
-            inputObservaciones.value="";
-            inputEfectivo.value="";
-            inputTransferencia.value="";
-            inputTarjeta.value="";
+                  return;
 
-            renderTabs();
+              }
 
-        });
+              const carrito = res.data;
 
-    });
+              carritos.unshift({
 
-}
+                  uuid:carrito.uuid,
 
-function cargarVenta(uuid){
+                  cliente:"",
 
-    fetch("{% url 'sales:pos_cargar' %}?uuid="+uuid)
+                  estado:"BORRADOR",
 
-    .then(r=>r.json())
+                  total:"0"
 
-    .then(res=>{
+              });
 
-        if(!res.success){
+              ventaActualUUID = carrito.uuid;
 
-            alert(res.error);
+              actualizarTabla(carrito);
 
-            return;
+              renderTabs();
 
-        }
+              inputBuscar.focus();
 
-        const venta=res.data;
+          });
 
-        ventaActualUUID=venta.uuid;
+      }
 
-        actualizarTabla(venta);
+      function obtenerCarritoUUID(){
 
-        inputCliente.value=venta.cliente;
+          return ventaActualUUID || null;
 
-        inputObservaciones.value=venta.observaciones;
+      }
 
-        inputEfectivo.value=venta.efectivo;
 
-        inputTransferencia.value=venta.transferencia;
+      function cargarVenta(uuid){
 
-        inputTarjeta.value=venta.tarjeta;
+          fetch("{% url 'sales:pos_cargar' %}?uuid="+uuid)
 
-        setTipoVentaUI(venta.tipo_venta);
+          .then(r=>r.json())
 
-        actualizarTotalesPago();
+          .then(res=>{
 
-        renderTabs();
+              if(!res.success){
 
-        inputBuscar.focus();
+                  alert(res.error);
 
-    });
+                  return;
 
-}
+              }
 
-function cerrarTab(e,uuid){
+              const venta=res.data;
 
-    e.stopPropagation();
+              ventaActualUUID=venta.uuid;
 
-    ventasAbiertas=
-        ventasAbiertas.filter(x=>x.uuid!=uuid);
+              actualizarTabla(venta);
 
-    if(ventaActualUUID==uuid){
+              inputCliente.value=venta.cliente;
 
-        if(ventasAbiertas.length){
+              inputObservaciones.value=venta.observaciones;
 
-            cargarVenta(ventasAbiertas[0].uuid);
+              inputEfectivo.value=venta.efectivo;
 
-        }else{
+              inputTransferencia.value=venta.transferencia;
 
-            crearNuevaVenta();
+              inputTarjeta.value=venta.tarjeta;
 
-        }
+              setTipoVentaUI(venta.tipo_venta);
 
-    }
+              actualizarTotalesPago();
 
-    renderTabs();
+              renderTabs();
 
-}
+              inputBuscar.focus();
+
+          });
+
+      }
+
+      function cerrarTab(e,uuid){
+
+          e.stopPropagation();
+
+          if(!confirm("Cancelar esta venta?")){
+
+              return;
+
+          }
+
+          postJSON("{% url 'sales:pos_cancelar' %}",{
+
+              venta_uuid:uuid
+
+          })
+
+          .then(res=>{
+
+              if(!res.success){
+
+                  alert(res.error);
+
+                  return;
+
+              }
+
+              carritos = res.data;
+
+              if (carritos.length){
+
+                  cargarVenta(carritos[0].uuid);
+
+              }
+
+              renderTabs();
+
+          });
+
+      }
 
 
 
@@ -1016,6 +1046,17 @@ function cerrarTab(e,uuid){
 
         const fragment = document.createDocumentFragment();
 
+        ventaActualUUID = data.uuid;
+
+        inputCliente.value = data.cliente || "";
+        inputObservaciones.value = data.observaciones || "";
+
+        inputEfectivo.value = data.efectivo || "";
+        inputTransferencia.value = data.transferencia || "";
+        inputTarjeta.value = data.tarjeta || "";
+
+        setTipoVentaUI(data.tipo_venta);
+
         data.items.forEach((item) => {
           const tr = document.createElement("tr");
 
@@ -1265,25 +1306,30 @@ function cerrarTab(e,uuid){
 
       document.addEventListener("blur", function (e) {
 
-  if (!e.target.classList.contains("precio-input")) return;
+      if (!e.target.classList.contains("precio-input")) return;
 
-  const id = e.target.dataset.id;
-  const precio = toNumber(e.target.value);
+      const id = e.target.dataset.id;
+      const precio = toNumber(e.target.value);
 
-  if (precio <= 0) return;
+      if (precio <= 0) return;
 
-  postJSON("{% url 'sales:pos_actualizar' %}", {
-    item_id: id,
-    precio_unitario: precio
-  }).then((response) => {
-    if (response.success) {
-      actualizarTabla(response.data);
-    } else {
-      alert(response.error);
-    }
-  });
+      postJSON("{% url 'sales:pos_actualizar' %}", {
 
-}, true);
+      item_id:id,
+
+      precio_unitario:precio,
+
+      venta_uuid:ventaActualUUID
+
+    }).then((response) => {
+        if (response.success) {
+          actualizarTabla(response.data);
+        } else {
+          alert(response.error);
+        }
+      });
+
+    }, true);
 
 </script>
 

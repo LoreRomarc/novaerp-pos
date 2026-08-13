@@ -9,11 +9,8 @@ from apps.core.models_config import SistemaConfiguracion
 
 class SetupChecker:
 
-
-
     @staticmethod
     def sistema_configurado():
-
 
         configuracion = (
             SistemaConfiguracion.objects

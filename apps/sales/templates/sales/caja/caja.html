@@ -1,0 +1,729 @@
+{% extends "base.html" %}
+
+{% block title %}Operación de caja{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    {% if turno %}
+        <div class="d-flex flex-column flex-xl-row justify-content-between align-items-xl-center gap-3 mb-4">
+            <div>
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <span class="badge {% if cierre_en_proceso %}text-bg-warning{% else %}text-bg-success{% endif %}">
+                        {% if cierre_en_proceso %}
+                            Cierre en proceso
+                        {% else %}
+                            Caja operativa
+                        {% endif %}
+                    </span>
+
+                    <span class="badge text-bg-light">
+                        Turno #{{ turno.id }}
+                    </span>
+                </div>
+
+                <h2 class="mb-1">{{ turno.caja.nombre }}</h2>
+
+                <div class="text-muted small">
+                    Caja: <strong>{{ turno.caja.codigo }}</strong>
+                    <span class="mx-2">•</span>
+                    Apertura: <strong>{{ turno.abierto_en|date:"d/m/Y H:i" }}</strong>
+                    <span class="mx-2">•</span>
+                    Cajero: <strong>{{ turno.usuario_apertura }}</strong>
+                </div>
+
+                {% if turno.usuario_supervisor %}
+                    <div class="text-muted small mt-1">
+                        Supervisor: <strong>{{ turno.usuario_supervisor }}</strong>
+                    </div>
+                {% endif %}
+            </div>
+
+            <div>
+                {% if cierre_en_proceso %}
+                    <span class="text-muted small">
+                        El arqueo está registrado. Complete el cierre de caja.
+                    </span>
+                {% else %}
+                    <a class="btn btn-outline-secondary" href="{% url 'sales:pos' %}">
+                        <i class="bi bi-cart3"></i> Ir al POS
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Base inicial</div>
+                        <div class="fs-4 fw-bold">
+                            ${{ resumen.monto_inicial|floatformat:0 }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card border-0 shadow-sm border-start border-4 border-success h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Efectivo esperado</div>
+                        <div class="fs-4 fw-bold text-success">
+                            ${{ resumen.efectivo_esperado|floatformat:0 }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Ventas del turno</div>
+                        <div class="fs-4 fw-bold">
+                            ${{ resumen.ventas_total|floatformat:0 }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Retiros a bóveda</div>
+                        <div class="fs-4 fw-bold text-primary">
+                            ${{ resumen.retiros|floatformat:0 }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if not cierre_en_proceso %}
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">1. Operación de caja</h5>
+                </div>
+
+                <div class="card-body">
+                    <p class="text-muted small mb-3">
+                        Registre solamente operaciones excepcionales. Las ventas se registran desde el POS.
+                    </p>
+
+                    <div class="d-flex flex-wrap gap-2">
+                        <button
+                            class="btn btn-outline-success"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modalMovimiento"
+                            data-tipo="INGRESO"
+                            data-titulo="Registrar ingreso"
+                            data-url="{% url 'sales:caja_ingreso' %}"
+                            type="button">
+                            <i class="bi bi-plus-circle"></i> Ingreso
+                        </button>
+
+                        <button
+                            class="btn btn-outline-warning"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modalMovimiento"
+                            data-tipo="EGRESO"
+                            data-titulo="Registrar egreso"
+                            data-url="{% url 'sales:caja_egreso' %}"
+                            type="button">
+                            <i class="bi bi-dash-circle"></i> Egreso
+                        </button>
+
+                        <button
+                            class="btn btn-outline-primary"
+                            data-bs-toggle="modal"
+                            data-bs-target="#modalMovimiento"
+                            data-tipo="RETIRO"
+                            data-titulo="Registrar retiro a bóveda"
+                            data-url="{% url 'sales:caja_retiro' %}"
+                            type="button">
+                            <i class="bi bi-bank"></i> Retiro a bóveda
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card border-0 shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">2. Preparar cierre</h5>
+                </div>
+
+                <div class="card-body d-flex flex-column flex-md-row justify-content-between gap-3 align-items-md-center">
+                    <div>
+                        <div class="fw-semibold">Realizar arqueo físico</div>
+                        <div class="text-muted small">
+                            El conteo bloquea la operación visual de caja y habilita el cierre.
+                        </div>
+                    </div>
+
+                    <button
+                        class="btn btn-primary"
+                        data-bs-toggle="modal"
+                        data-bs-target="#modalArqueo"
+                        type="button">
+                        <i class="bi bi-clipboard-check"></i> Realizar arqueo
+                    </button>
+                </div>
+            </div>
+        {% endif %}
+
+        <div
+            class="card border-0 shadow-sm mb-4 {% if not arqueo_actual %}d-none{% endif %}"
+            id="panelArqueo">
+
+            <div class="card-header bg-white d-flex flex-column flex-md-row justify-content-between gap-2 align-items-md-center">
+                <div>
+                    <h5 class="mb-0">3. Arqueo registrado</h5>
+                    <div class="text-muted small" id="arqueoFecha">
+                        {% if arqueo_actual %}
+                            Registrado el {{ arqueo_actual.creado_en|date:"d/m/Y H:i" }}
+                        {% endif %}
+                    </div>
+                </div>
+
+                <span class="badge text-bg-primary" id="arqueoEstado">
+                    {% if arqueo_actual %}
+                        {{ arqueo_actual.get_estado_display }}
+                    {% endif %}
+                </span>
+            </div>
+
+            <div class="card-body">
+                <div class="row g-3 mb-4">
+                    <div class="col-12 col-md-4">
+                        <div class="border rounded p-3 h-100">
+                            <div class="text-muted small">Esperado</div>
+                            <div class="fs-5 fw-bold" id="arqueoEsperado">
+                                {% if arqueo_actual %}
+                                    ${{ arqueo_actual.monto_esperado|floatformat:0 }}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <div class="border rounded p-3 h-100">
+                            <div class="text-muted small">Contado</div>
+                            <div class="fs-5 fw-bold text-primary" id="arqueoContado">
+                                {% if arqueo_actual %}
+                                    ${{ arqueo_actual.total_contado|floatformat:0 }}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <div class="border rounded p-3 h-100">
+                            <div class="text-muted small">Diferencia</div>
+                            <div class="fs-5 fw-bold" id="arqueoDiferencia">
+                                {% if arqueo_actual %}
+                                    ${{ arqueo_actual.diferencia|floatformat:0 }}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <details class="mb-3">
+                    <summary class="fw-semibold">Ver denominaciones registradas</summary>
+
+                    <div class="table-responsive mt-3">
+                        <table class="table table-sm table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Denominación</th>
+                                    <th class="text-end">Cantidad</th>
+                                    <th class="text-end">Subtotal</th>
+                                </tr>
+                            </thead>
+
+                            <tbody id="arqueoDenominaciones">
+                                {% if arqueo_actual %}
+                                    {% for item in arqueo_actual.denominaciones.all %}
+                                        <tr>
+                                            <td>${{ item.denominacion|floatformat:0 }}</td>
+                                            <td class="text-end">{{ item.cantidad }}</td>
+                                            <td class="text-end">${{ item.subtotal|floatformat:0 }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
+
+                <div class="text-muted small mb-4" id="arqueoObservacion">
+                    {% if arqueo_actual.observacion %}
+                        Observación: {{ arqueo_actual.observacion }}
+                    {% endif %}
+                </div>
+
+                <form action="{% url 'sales:cerrar_caja' %}" id="formCerrarCaja" method="post">
+                    {% csrf_token %}
+
+                    <input
+                        id="montoReal"
+                        name="monto_real"
+                        type="hidden"
+                        value="{% if arqueo_actual %}{{ arqueo_actual.total_contado }}{% endif %}">
+
+                    <div class="d-flex flex-column flex-md-row justify-content-between gap-3 align-items-md-center border-top pt-3">
+                        <div>
+                            <div class="fw-semibold">4. Cerrar caja</div>
+                            <div class="text-muted small">
+                                El cierre usará exactamente el efectivo contado en el arqueo.
+                            </div>
+                        </div>
+
+                        <button
+                            class="btn btn-danger"
+                            id="btnCerrarCaja"
+                            type="submit">
+                            <i class="bi bi-lock"></i> Confirmar cierre de caja
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="accordion" id="acordeonHistorial">
+            <div class="accordion-item border-0 shadow-sm">
+                <h2 class="accordion-header" id="tituloMovimientos">
+                    <button
+                        class="accordion-button collapsed"
+                        data-bs-target="#panelMovimientos"
+                        data-bs-toggle="collapse"
+                        type="button">
+                        Historial del turno ({{ movimientos|length }} movimientos)
+                    </button>
+                </h2>
+
+                <div
+                    class="accordion-collapse collapse"
+                    data-bs-parent="#acordeonHistorial"
+                    id="panelMovimientos">
+
+                    <div class="accordion-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-sm table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Fecha</th>
+                                        <th>Tipo</th>
+                                        <th>Usuario</th>
+                                        <th>Observación</th>
+                                        <th class="text-end">Monto</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+                                    {% for movimiento in movimientos %}
+                                        <tr>
+                                            <td class="text-nowrap">
+                                                {{ movimiento.creado_en|date:"d/m/Y H:i" }}
+                                            </td>
+                                            <td>{{ movimiento.get_tipo_display }}</td>
+                                            <td>{{ movimiento.usuario }}</td>
+                                            <td>{{ movimiento.observacion|default:"-" }}</td>
+                                            <td class="text-end fw-semibold">
+                                                ${{ movimiento.monto|floatformat:0 }}
+                                            </td>
+                                        </tr>
+                                    {% empty %}
+                                        <tr>
+                                            <td class="text-center text-muted py-4" colspan="5">
+                                                No hay movimientos registrados.
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div
+            class="modal fade"
+            id="modalMovimiento"
+            tabindex="-1"
+            aria-hidden="true">
+
+            <div class="modal-dialog modal-dialog-centered">
+                <form class="modal-content" id="formMovimiento">
+                    {% csrf_token %}
+
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="tituloMovimiento"></h5>
+                        <button class="btn-close" data-bs-dismiss="modal" type="button"></button>
+                    </div>
+
+                    <div class="modal-body">
+                        <input id="tipoMovimiento" type="hidden">
+
+                        <div class="mb-3">
+                            <label class="form-label" for="montoMovimiento">Monto</label>
+                            <input
+                                class="form-control"
+                                id="montoMovimiento"
+                                min="1"
+                                required
+                                step="0.01"
+                                type="number">
+                        </div>
+
+                        <div>
+                            <label class="form-label" for="motivoMovimiento">Motivo</label>
+                            <textarea
+                                class="form-control"
+                                id="motivoMovimiento"
+                                maxlength="1000"
+                                required
+                                rows="3"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="modal-footer">
+                        <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">
+                            Cancelar
+                        </button>
+                        <button class="btn btn-primary" type="submit">
+                            Guardar
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {% if not cierre_en_proceso %}
+            <div
+                class="modal fade"
+                id="modalArqueo"
+                tabindex="-1"
+                aria-hidden="true">
+
+                <div class="modal-dialog modal-lg modal-dialog-centered">
+                    <form class="modal-content" id="formArqueo">
+                        {% csrf_token %}
+
+                        <div class="modal-header">
+                            <h5 class="modal-title">Arqueo físico de caja</h5>
+                            <button class="btn-close" data-bs-dismiss="modal" type="button"></button>
+                        </div>
+
+                        <div class="modal-body">
+                            <p class="text-muted small">
+                                Ingrese el número de billetes y monedas encontrados físicamente.
+                            </p>
+
+                            <div class="row g-3">
+                                {% for valor in "100000,50000,20000,10000,5000,2000,1000,500,200,100,50"|cut:" " %}
+                                {% endfor %}
+
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label">$100.000</label>
+                                    <input class="form-control js-denominacion" data-valor="100000" min="0" type="number" value="0">
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label">$50.000</label>
+                                    <input class="form-control js-denominacion" data-valor="50000" min="0" type="number" value="0">
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label">$20.000</label>
+                                    <input class="form-control js-denominacion" data-valor="20000" min="0" type="number" value="0">
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label">$10.000</label>
+                                    <input class="form-control js-denominacion" data-valor="10000" min="0" type="number" value="0">
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label">$5.000</label>
+                                    <input class="form-control js-denominacion" data-valor="5000" min="0" type="number" value="0">
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label">$2.000</label>
+                                    <input class="form-control js-denominacion" data-valor="2000" min="0" type="number" value="0">
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label">$1.000</label>
+                                    <input class="form-control js-denominacion" data-valor="1000" min="0" type="number" value="0">
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label">$500</label>
+                                    <input class="form-control js-denominacion" data-valor="500" min="0" type="number" value="0">
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label">$200</label>
+                                    <input class="form-control js-denominacion" data-valor="200" min="0" type="number" value="0">
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label">$100</label>
+                                    <input class="form-control js-denominacion" data-valor="100" min="0" type="number" value="0">
+                                </div>
+                                <div class="col-6 col-md-3">
+                                    <label class="form-label">$50</label>
+                                    <input class="form-control js-denominacion" data-valor="50" min="0" type="number" value="0">
+                                </div>
+                            </div>
+
+                            <div class="card bg-light border-0 mt-4">
+                                <div class="card-body d-flex justify-content-between">
+                                    <span class="fw-semibold">Total contado</span>
+                                    <span class="fs-4 fw-bold" id="totalArqueo">$0</span>
+                                </div>
+                            </div>
+
+                            <div class="mt-3">
+                                <label class="form-label" for="observacionArqueo">Observación</label>
+                                <textarea
+                                    class="form-control"
+                                    id="observacionArqueo"
+                                    maxlength="1000"
+                                    rows="3"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="modal-footer">
+                            <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">
+                                Cancelar
+                            </button>
+                            <button class="btn btn-primary" type="submit">
+                                Registrar arqueo
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        {% endif %}
+    {% else %}
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center py-5">
+                <h3>No existe una caja abierta</h3>
+                <p class="text-muted">
+                    Abra una caja para iniciar ventas y movimientos.
+                </p>
+                <a class="btn btn-primary" href="{% url 'sales:abrir_caja' %}">
+                    Abrir caja
+                </a>
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+{% if turno %}
+<script>
+    const csrfToken = document.querySelector(
+        "[name=csrfmiddlewaretoken]"
+    ).value;
+
+    const formatearMoneda = (valor) => {
+        return new Intl.NumberFormat(
+            "es-CO",
+            {
+                style: "currency",
+                currency: "COP",
+                maximumFractionDigits: 0,
+            }
+        ).format(Number(valor || 0));
+    };
+
+    async function enviarJson(url, datos) {
+        const respuesta = await fetch(url, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrfToken,
+            },
+            body: JSON.stringify(datos),
+        });
+
+        const contenido = await respuesta.json();
+
+        if (!respuesta.ok || !contenido.success) {
+            throw new Error(
+                contenido.error || "No fue posible completar la operación."
+            );
+        }
+
+        return contenido;
+    }
+
+    const modalMovimiento = document.getElementById("modalMovimiento");
+    const formMovimiento = document.getElementById("formMovimiento");
+
+    modalMovimiento?.addEventListener("show.bs.modal", (evento) => {
+        const boton = evento.relatedTarget;
+
+        formMovimiento.dataset.url = boton.dataset.url;
+        document.getElementById("tipoMovimiento").value = boton.dataset.tipo;
+        document.getElementById("tituloMovimiento").textContent =
+            boton.dataset.titulo;
+        formMovimiento.reset();
+    });
+
+    formMovimiento?.addEventListener("submit", async (evento) => {
+        evento.preventDefault();
+
+        const boton = formMovimiento.querySelector("[type=submit]");
+        boton.disabled = true;
+
+        try {
+            await enviarJson(
+                formMovimiento.dataset.url,
+                {
+                    monto: document.getElementById("montoMovimiento").value,
+                    motivo: document.getElementById("motivoMovimiento").value,
+                }
+            );
+
+            window.location.reload();
+        } catch (error) {
+            window.alert(error.message);
+            boton.disabled = false;
+        }
+    });
+
+    const formArqueo = document.getElementById("formArqueo");
+    const totalArqueo = document.getElementById("totalArqueo");
+
+    function calcularTotalArqueo() {
+        let total = 0;
+
+        document.querySelectorAll(".js-denominacion").forEach((input) => {
+            total += (
+                Math.max(Number(input.value) || 0, 0)
+                * Number(input.dataset.valor)
+            );
+        });
+
+        if (totalArqueo) {
+            totalArqueo.textContent = formatearMoneda(total);
+        }
+
+        return total;
+    }
+
+    document.querySelectorAll(".js-denominacion").forEach((input) => {
+        input.addEventListener("input", () => {
+            if (Number(input.value) < 0) {
+                input.value = 0;
+            }
+
+            calcularTotalArqueo();
+        });
+    });
+
+    function mostrarArqueo(arqueo) {
+        const panel = document.getElementById("panelArqueo");
+
+        panel.classList.remove("d-none");
+        document.getElementById("arqueoFecha").textContent =
+            `Registrado el ${arqueo.creado_en}`;
+        document.getElementById("arqueoEstado").textContent =
+            arqueo.estado_display;
+        document.getElementById("arqueoEsperado").textContent =
+            formatearMoneda(arqueo.monto_esperado);
+        document.getElementById("arqueoContado").textContent =
+            formatearMoneda(arqueo.total_contado);
+
+        const diferencia = document.getElementById("arqueoDiferencia");
+        diferencia.textContent = formatearMoneda(arqueo.diferencia);
+        diferencia.className = "fs-5 fw-bold";
+
+        if (Number(arqueo.diferencia) > 0) {
+            diferencia.classList.add("text-warning");
+        } else if (Number(arqueo.diferencia) < 0) {
+            diferencia.classList.add("text-danger");
+        } else {
+            diferencia.classList.add("text-success");
+        }
+
+        document.getElementById("arqueoObservacion").textContent =
+            arqueo.observacion
+                ? `Observación: ${arqueo.observacion}`
+                : "";
+
+        const cuerpo = document.getElementById("arqueoDenominaciones");
+        cuerpo.innerHTML = "";
+
+        arqueo.denominaciones.forEach((item) => {
+            cuerpo.insertAdjacentHTML(
+                "beforeend",
+                `
+                    <tr>
+                        <td>${formatearMoneda(item.denominacion)}</td>
+                        <td class="text-end">${item.cantidad}</td>
+                        <td class="text-end">${formatearMoneda(item.subtotal)}</td>
+                    </tr>
+                `
+            );
+        });
+
+        document.getElementById("montoReal").value =
+            arqueo.total_contado;
+
+        document.querySelectorAll(
+            "[data-bs-target='#modalMovimiento'], [data-bs-target='#modalArqueo']"
+        ).forEach((boton) => {
+            boton.disabled = true;
+        });
+    }
+
+    formArqueo?.addEventListener("submit", async (evento) => {
+        evento.preventDefault();
+
+        const boton = formArqueo.querySelector("[type=submit]");
+        boton.disabled = true;
+
+        const denominaciones = {};
+
+        document.querySelectorAll(".js-denominacion").forEach((input) => {
+            denominaciones[input.dataset.valor] = Math.max(
+                Number(input.value) || 0,
+                0
+            );
+        });
+
+        try {
+            const respuesta = await enviarJson(
+                "{% url 'sales:caja_arqueo' %}",
+                {
+                    denominaciones: denominaciones,
+                    observacion: document.getElementById(
+                        "observacionArqueo"
+                    ).value.trim(),
+                }
+            );
+
+            mostrarArqueo(respuesta.arqueo);
+
+            bootstrap.Modal.getInstance(
+                document.getElementById("modalArqueo")
+            ).hide();
+
+        } catch (error) {
+            window.alert(error.message);
+            boton.disabled = false;
+        }
+    });
+
+    document.getElementById("formCerrarCaja")?.addEventListener(
+        "submit",
+        (evento) => {
+            if (
+                !window.confirm(
+                    "¿Confirma cerrar la caja con el total registrado en el arqueo?"
+                )
+            ) {
+                evento.preventDefault();
+            }
+        }
+    );
+
+    calcularTotalArqueo();
+</script>
+{% endif %}
+{% endblock %}

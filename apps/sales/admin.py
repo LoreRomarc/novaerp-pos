@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.db.models import Q
-from .models import Caja, TurnoCajaUsuario, Venta, VentaItem, ListaPrecio, PrecioVariante
+from .models import Caja, TurnoCajaUsuario, Venta,  ListaPrecio, PrecioVariante, VentaItem
 from .models_caja_enterprise import TurnoCaja, CajaMovimiento, ArqueoTurno, ArqueoDenominacion, Boveda
 
 # =========================================================
