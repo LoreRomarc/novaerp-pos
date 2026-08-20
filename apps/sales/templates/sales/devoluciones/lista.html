@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Devoluciones y cambios{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+
+    <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-4">
+        <div>
+            <h2 class="mb-1">Devoluciones y cambios</h2>
+            <p class="text-muted mb-0">
+                Consulte las operaciones registradas.
+            </p>
+        </div>
+
+        <a
+            href="{% url 'sales:devolucion_create' %}"
+            class="btn btn-primary">
+            <i class="bi bi-arrow-left-right"></i>
+            Nuevo cambio o devolución
+        </a>
+    </div>
+
+    <form method="get" class="card shadow-sm border-0 mb-4">
+        <div class="card-body">
+            <div class="row g-2 align-items-end">
+                <div class="col-md-5">
+                    <label class="form-label">Buscar</label>
+                    <input
+                        type="search"
+                        name="q"
+                        class="form-control"
+                        value="{{ request.GET.q }}"
+                        placeholder="Número, referencia, motivo o cliente">
+                </div>
+
+                <div class="col-md-auto">
+                    <button class="btn btn-dark" type="submit">
+                        Buscar
+                    </button>
+
+                    <a
+                        class="btn btn-outline-secondary"
+                        href="{% url 'sales:devolucion_list' %}">
+                        Limpiar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </form>
+
+    <div class="card shadow-sm border-0">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Comprobante</th>
+                        <th>Referencia</th>
+                        <th>Tipo</th>
+                        <th>Usuario</th>
+                        <th class="text-end">Recibido</th>
+                        <th class="text-end">Entregado</th>
+                        <th class="text-end">Cobrado</th>
+                        <th class="text-end">Reembolsado</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for devolucion in devoluciones %}
+                    <tr>
+                        <td>{{ devolucion.creada|date:"d/m/Y H:i" }}</td>
+
+                        <td><strong>#{{ devolucion.id }}</strong></td>
+
+                        <td>
+                            {% if devolucion.venta_id %}
+                                Venta #{{ devolucion.venta_id }}
+                            {% elif devolucion.referencia_externa %}
+                                {{ devolucion.referencia_externa }}
+                            {% else %}
+                                <span class="text-muted">
+                                    Cambio directo
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if devolucion.tipo == "CAMBIO" %}
+                                <span class="badge bg-primary">Cambio</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">
+                                    Devolución
+                                </span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {{ devolucion.usuario.get_full_name|default:devolucion.usuario.username }}
+                        </td>
+
+                        <td class="text-end">
+                            ${{ devolucion.total_devuelto|floatformat:0|intcomma }}
+                        </td>
+
+                        <td class="text-end">
+                            ${{ devolucion.total_entregado|floatformat:0|intcomma }}
+                        </td>
+
+                        <td class="text-end text-success">
+                            {% if devolucion.monto_cobrado %}
+                                ${{ devolucion.monto_cobrado|floatformat:0|intcomma }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+
+                        <td class="text-end text-danger">
+                            {% if devolucion.monto_reembolsado %}
+                                ${{ devolucion.monto_reembolsado|floatformat:0|intcomma }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9" class="text-center text-muted py-4">
+                            No hay devoluciones o cambios registrados.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

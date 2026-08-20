@@ -114,7 +114,7 @@ class Carrito(models.Model):
     uuid = models.UUIDField( default=uuid.uuid4,editable=False, unique=True, db_index=True, )
     sucursal = models.ForeignKey( "core.Sucursal", on_delete=models.CASCADE, related_name="carritos",)
     usuario = models.ForeignKey( settings.AUTH_USER_MODEL, on_delete=models.CASCADE,related_name="carritos",)
-    tipo_venta = models.CharField( max_length=20, choices=TIPO_VENTA, default="DETAL",)
+    tipo_venta = models.CharField( max_length=20, choices=TIPO_VENTA, default="MAYORISTA",)
     estado = models.CharField( max_length=20, choices=ESTADOS, default="BORRADOR", db_index=True,)
     cliente = models.CharField( max_length=150, blank=True, default="",)
     observaciones = models.TextField( blank=True, default="",)
@@ -241,7 +241,21 @@ class CarritoItem(models.Model):
             models.Index(fields=["carrito"]),
         ]
 
+    def clean(self):
+        if self.cantidad <= 0:
+            raise ValidationError("La cantidad debe ser mayor a cero.")
+
+        if self.cantidad % 1 != 0:
+            raise ValidationError(
+                "La cantidad de prendas debe ser un número entero."
+            )
+
+        if self.precio_unitario <= 0:
+            raise ValidationError("El precio debe ser mayor a cero.")
+
     def save(self, *args, **kwargs):
+
+        self.clean()
 
         precio = redondear_a_peso_colombiano(
             self.precio_unitario
@@ -283,8 +297,6 @@ class Venta(models.Model):
         db_index=True,
     )
 
-
-
     sucursal = models.ForeignKey(
         "core.Sucursal",
         on_delete=models.PROTECT,
@@ -317,7 +329,7 @@ class Venta(models.Model):
     tipo_venta = models.CharField(
         max_length=20,
         choices=TIPO_VENTA,
-        default="DETAL"
+        default="MAYORISTA"
     )
 
     estado = models.CharField(
@@ -785,6 +797,338 @@ class VentaItem(models.Model):
             venta.recalcular_totales()
 
 
+# =========================================================
+# DEVOLUCIONES Y CAMBIOS
+# =========================================================
+
+class Devolucion(models.Model):
+    """
+    Comprobante de una devolución parcial o cambio.
+    La venta original NO se modifica ni se elimina.
+    """
+
+    class Tipo(models.TextChoices):
+        DEVOLUCION = "DEVOLUCION", "Devolución"
+        CAMBIO = "CAMBIO", "Cambio de prenda"
+
+    uuid = models.UUIDField(
+        default=uuid.uuid4,
+        editable=False,
+        unique=True,
+        db_index=True,
+    )
+
+    venta = models.ForeignKey(
+        Venta,
+        on_delete=models.PROTECT,
+        related_name="devoluciones",
+        null=True,
+        blank=True,
+    )
+
+    referencia_externa = models.CharField(
+        max_length=100,
+        blank=True,
+        default="",
+        help_text=(
+            "Factura, nota o referencia opcional "
+            "proporcionada por el cliente."
+        ),
+    )
+
+    tipo_venta = models.CharField(
+        max_length=20,
+        choices=Venta.TIPO_VENTA,
+        default="MAYORISTA",
+    )
+
+    sucursal = models.ForeignKey(
+        "core.Sucursal",
+        on_delete=models.PROTECT,
+        related_name="devoluciones",
+    )
+
+    turno = models.ForeignKey(
+        "sales.TurnoCaja",
+        on_delete=models.PROTECT,
+        related_name="devoluciones",
+    )
+
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="devoluciones_procesadas",
+    )
+
+    tipo = models.CharField(
+        max_length=20,
+        choices=Tipo.choices,
+    )
+
+    motivo = models.TextField()
+
+    # Si es False, el cliente puede aceptar una prenda
+    # más barata sin recibir dinero.
+    permite_reembolso = models.BooleanField(
+        default=False,
+    )
+
+    medio_reembolso = models.CharField(
+        max_length=20,
+        blank=True,
+        default="",
+    )
+
+    # Valor de prendas que entrega el cliente.
+    total_devuelto = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=0,
+    )
+
+    # Valor de prendas nuevas que se lleva el cliente.
+    total_entregado = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=0,
+    )
+
+    # total_entregado - total_devuelto
+    # Positivo: cliente paga.
+    # Negativo: existe saldo a favor del cliente.
+    diferencia = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=0,
+    )
+
+    # Dinero adicional cobrado al cliente si lleva
+    # una prenda de mayor valor.
+    monto_cobrado = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=0,
+    )
+
+    # Dinero realmente devuelto al cliente.
+    monto_reembolsado = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=0,
+    )
+
+    # Diferencia que el cliente acepta no recibir.
+    monto_no_reembolsado = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=0,
+    )
+
+    creada = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-creada", "-id"]
+
+        indexes = [
+            models.Index(fields=["sucursal", "creada"]),
+            models.Index(fields=["venta", "creada"]),
+            models.Index(fields=["turno"]),
+        ]
+
+    def clean(self):
+        if (
+            self.venta_id
+            and self.sucursal_id
+            and self.sucursal_id != self.venta.sucursal_id
+        ):
+            raise ValidationError(
+                "La devolución debe pertenecer a la sucursal de la venta."
+            )
+
+        if (
+            self.turno_id
+            and self.sucursal_id
+            and self.sucursal_id != self.turno.sucursal_id
+        ):
+            raise ValidationError(
+                "El turno de caja pertenece a otra sucursal."
+            )
+
+    def __str__(self):
+        origen = (
+            f"Venta #{self.venta_id}"
+            if self.venta_id
+            else "Cambio directo"
+        )
+
+        return (
+            f"{self.get_tipo_display()} #{self.id} "
+            f"- {origen}"
+        )
+
+
+class DevolucionDetalle(models.Model):
+    """
+    Prenda que el cliente entrega.
+    APTA: entra nuevamente a stock.
+    DANADA: se registra devolución y baja por daño.
+    """
+
+    class EstadoPrenda(models.TextChoices):
+        APTA = "APTA", "Apta para la venta"
+        DANADA = "DANADA", "Dañada / no apta para la venta"
+
+    devolucion = models.ForeignKey(
+        Devolucion,
+        on_delete=models.PROTECT,
+        related_name="items_devueltos",
+    )
+
+    venta_item = models.ForeignKey(
+        VentaItem,
+        on_delete=models.PROTECT,
+        related_name="devoluciones",
+        null=True,
+        blank=True,
+    )
+
+    variante = models.ForeignKey(
+        "inventory.ProductoVariante",
+        on_delete=models.PROTECT,
+    )
+
+    cantidad = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+
+    estado_prenda = models.CharField(
+        max_length=12,
+        choices=EstadoPrenda.choices,
+    )
+
+    # Precio que el cliente pagó en la venta original.
+    precio_unitario = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+    )
+
+    precio_modificado = models.BooleanField(
+        default=False,
+    )
+
+    motivo_precio = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+    )
+
+    total = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["devolucion", "venta_item"],
+                name="unique_item_por_devolucion",
+            )
+        ]
+
+    def clean(self):
+        if self.cantidad <= 0:
+            raise ValidationError(
+                "La cantidad devuelta debe ser mayor a cero."
+            )
+
+        if self.cantidad % 1 != 0:
+            raise ValidationError(
+                "La cantidad de prendas devueltas debe ser entera."
+            )
+
+        if (
+            self.venta_item_id
+            and self.variante_id != self.venta_item.variante_id
+        ):
+            raise ValidationError(
+                "La variante devuelta no coincide con el ítem vendido."
+            )
+
+        if self.precio_modificado and not self.motivo_precio.strip():
+            raise ValidationError(
+                "Debe indicar el motivo de la modificación de precio."
+            )
+
+    def __str__(self):
+        return (
+            f"Devolución #{self.devolucion_id} - "
+            f"{self.variante} x {self.cantidad}"
+        )
+
+
+class CambioDetalle(models.Model):
+    """
+    Prenda nueva que el cliente se lleva durante el cambio.
+    """
+
+    devolucion = models.ForeignKey(
+        Devolucion,
+        on_delete=models.PROTECT,
+        related_name="items_entregados",
+    )
+
+    variante = models.ForeignKey(
+        "inventory.ProductoVariante",
+        on_delete=models.PROTECT,
+    )
+
+    cantidad = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+    )
+
+    precio_unitario = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+    )
+
+    precio_modificado = models.BooleanField(default=False)
+
+    motivo_precio = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+    )
+
+    total = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+    )
+
+    def clean(self):
+        if self.cantidad <= 0:
+            raise ValidationError(
+                "La cantidad entregada debe ser mayor a cero."
+            )
+
+        if self.cantidad % 1 != 0:
+            raise ValidationError(
+                "La cantidad de prendas entregadas debe ser entera."
+            )
+
+        if self.precio_modificado and not self.motivo_precio.strip():
+            raise ValidationError(
+                "Debe indicar el motivo de la modificación de precio."
+            )
+
+    def __str__(self):
+        return (
+            f"Cambio #{self.devolucion_id} - "
+            f"{self.variante} x {self.cantidad}"
+        )
+
+    
 # =========================================================
 # LISTA DE PRECIOS
 # =========================================================

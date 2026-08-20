@@ -7,6 +7,12 @@ from apps.sales.report_views import (
     ReporteVentasView,
     VentaDetalleView,
 )
+from apps.sales.views_devoluciones import (
+    CambioDirectoProcesarView,
+    CambioDirectoView,
+    CambioProductoBusquedaView,
+    DevolucionListView,
+)
 from apps.sales.views_caja import (
     AbrirCajaView,
     CajaAprobarArqueoView,
@@ -75,4 +81,12 @@ urlpatterns = [
 
     path("reportes/", ReporteVentasView.as_view(), name="reportes"),
     path("venta/<int:pk>/", VentaDetalleView.as_view(), name="venta_detalle"),
+
+    # ======================================================
+    # DEVOLUCIONES Y CAMBIOS
+    # ======================================================
+    path("devoluciones/",DevolucionListView.as_view(), name="devolucion_list",),
+    path("devoluciones/nuevo/", CambioDirectoView.as_view(), name="devolucion_create",),
+    path("devoluciones/procesar/", CambioDirectoProcesarView.as_view(), name="devolucion_procesar",),
+    path("devoluciones/buscar-producto/",CambioProductoBusquedaView.as_view(), name="devolucion_buscar_producto",),
 ]

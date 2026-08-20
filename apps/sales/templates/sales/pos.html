@@ -471,7 +471,7 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
       let debounceTimer;
       let pagoEditadoManualmente = false;
       let usandoKeypad = false;
-      let tipoVentaActual = "DETAL";
+      let tipoVentaActual = "MAYORISTA";
       let ventaActualUUID = null;
 
       let carritos = {{ carritos|safe }};
@@ -1204,7 +1204,7 @@ function guardarEstadoVenta(){
           btnCerrar.disabled = true;
           pagoEditadoManualmente = false;
 
-          setTipoVentaUI("DETAL");
+          setTipoVentaUI("MAYORISTA");
 
           inputBuscar.focus();
         }

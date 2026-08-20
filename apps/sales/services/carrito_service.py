@@ -79,7 +79,7 @@ class CarritoService:
             "color",
             "tipo_tela",
             "talla",
-        )
+        ).filter(activo=True)
 
         if variante_id:
 
@@ -108,7 +108,6 @@ class CarritoService:
 
         stock = (
             Stock.objects
-            .select_for_update()
             .filter(
                 variante=variante,
                 sucursal=sucursal,
@@ -191,7 +190,6 @@ class CarritoService:
                 "Producto no encontrado."
             )
 
-
         precio = CarritoService.precio(
             variante,
             carrito
@@ -200,12 +198,28 @@ class CarritoService:
 
         item = (
             CarritoItem.objects
+            .select_for_update()
             .filter(
                 carrito=carrito,
                 variante=variante
             )
             .first()
         )
+
+        # Mantener el mismo orden de bloqueos que al actualizar un ítem:
+        # carrito -> ítem -> stock. Así evitamos interbloqueos concurrentes.
+        stock = (
+            Stock.objects
+            .select_for_update()
+            .filter(
+                variante=variante,
+                sucursal=carrito.sucursal,
+            )
+            .first()
+        )
+
+        if not stock or stock.cantidad <= 0:
+            raise ValidationError("No hay stock.")
 
 
         if item:
@@ -215,12 +229,22 @@ class CarritoService:
                 Decimal(str(cantidad))
             )
 
+            if nueva_cantidad > stock.cantidad:
+                raise ValidationError(
+                    "Cantidad supera el inventario disponible."
+                )
+
             item.cantidad = nueva_cantidad
             item.precio_unitario = precio
 
             item.save()
 
         else:
+
+            if Decimal(str(cantidad)) > stock.cantidad:
+                raise ValidationError(
+                    "Cantidad supera el inventario disponible."
+                )
 
             CarritoItem.objects.create(
 

@@ -600,7 +600,10 @@ class CajaService:
         for movimiento in movimientos:
             monto = movimiento.monto
 
-            if movimiento.tipo == CajaMovimiento.Tipo.VENTA:
+            if movimiento.tipo in {
+                CajaMovimiento.Tipo.VENTA,
+                CajaMovimiento.Tipo.CAMBIO,
+            }:
                 if movimiento.medio_pago == CajaMovimiento.MedioPago.EFECTIVO:
                     resumen["ventas_efectivo"] += monto
 
@@ -1313,6 +1316,129 @@ class CajaService:
             )
 
         return resultado
+
+    # ==========================================================
+    # DEVOLUCIONES Y CAMBIOS
+    # ==========================================================
+
+    @staticmethod
+    @transaction.atomic
+    def registrar_movimientos_devolucion(
+        devolucion,
+        turno,
+        usuario,
+        pagos_adicionales=None,
+        medio_reembolso="",
+    ):
+        """
+        Registra únicamente el movimiento financiero de un cambio.
+
+        - Si el cliente lleva una prenda más costosa:
+          registra CAMBIO por el excedente cobrado.
+
+        - Si lleva una prenda más barata y se autorizó reembolso:
+          registra DEVOLUCION por el valor devuelto.
+
+        - Si acepta no recibir dinero:
+          no crea movimiento de caja.
+        """
+
+        pagos_adicionales = pagos_adicionales or {}
+
+        turno = CajaService.obtener_turno_bloqueado(
+            turno.id,
+            sucursal=devolucion.sucursal,
+        )
+
+        CajaService.validar_operador_turno(
+            turno,
+            usuario,
+        )
+
+        if turno.sucursal_id != devolucion.sucursal_id:
+            raise ValidationError(
+                "El turno no pertenece a la sucursal de la devolución."
+            )
+
+        pagos_limpios = {
+            medio: CajaService.monto_positivo(
+                pagos_adicionales.get(medio, 0),
+                f"El monto de {medio} es inválido.",
+            )
+            if pagos_adicionales.get(medio, 0)
+            else Decimal("0.00")
+            for medio in CajaService.MEDIOS_VENTA_PERMITIDOS
+        }
+
+        total_cobrado = sum(
+            pagos_limpios.values(),
+            Decimal("0.00"),
+        )
+
+        # Cliente debe pagar una diferencia.
+        if devolucion.monto_cobrado > 0:
+            if total_cobrado != devolucion.monto_cobrado:
+                raise ValidationError(
+                    "Los pagos no coinciden con el excedente del cambio."
+                )
+
+            for medio, monto in pagos_limpios.items():
+                if monto <= 0:
+                    continue
+
+                CajaMovimiento.objects.create(
+                    turno=turno,
+                    usuario=usuario,
+                    tipo=CajaMovimiento.Tipo.CAMBIO,
+                    medio_pago=medio,
+                    monto=monto,
+                    referencia_venta=devolucion.venta,
+                    referencia_devolucion=devolucion,
+                    observacion=(
+                        f"Cobro por cambio #{devolucion.id} "
+                        f"de venta #{devolucion.venta_id}"
+                    ),
+                )
+
+            CajaService.verificar_retiro_automatico(turno)
+
+        elif total_cobrado > 0:
+            raise ValidationError(
+                "No debe registrar pagos adicionales en este cambio."
+            )
+
+        # Cliente recibe una devolución de dinero.
+        if devolucion.monto_reembolsado > 0:
+            if medio_reembolso not in CajaService.MEDIOS_VENTA_PERMITIDOS:
+                raise ValidationError(
+                    "Debe seleccionar un medio válido para el reembolso."
+                )
+
+            if medio_reembolso == CajaMovimiento.MedioPago.EFECTIVO:
+                resumen = CajaService.resumen_turno(turno)
+
+                if (
+                    devolucion.monto_reembolsado
+                    > resumen["efectivo_esperado"]
+                ):
+                    raise ValidationError(
+                        "No hay suficiente efectivo en caja "
+                        "para realizar el reembolso."
+                    )
+
+            CajaMovimiento.objects.create(
+                turno=turno,
+                usuario=usuario,
+                tipo=CajaMovimiento.Tipo.DEVOLUCION,
+                medio_pago=medio_reembolso,
+                monto=devolucion.monto_reembolsado,
+                referencia_venta=devolucion.venta,
+                referencia_devolucion=devolucion,
+                observacion=(
+                    f"Reembolso de devolución #{devolucion.id} "
+                    f"de venta #{devolucion.venta_id}"
+                ),
+            )
 
     # ==========================================================
     # INTEGRIDAD

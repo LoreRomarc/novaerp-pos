@@ -345,7 +345,10 @@ class ReporteCajaView(
                 Sum(
                     "monto",
                     filter=Q(
-                        tipo=CajaMovimiento.Tipo.VENTA,
+                        tipo__in=[
+                            CajaMovimiento.Tipo.VENTA,
+                            CajaMovimiento.Tipo.CAMBIO,
+                        ],
                         medio_pago=CajaMovimiento.MedioPago.EFECTIVO,
                     ),
                 ),
@@ -356,7 +359,10 @@ class ReporteCajaView(
                 Sum(
                     "monto",
                     filter=Q(
-                        tipo=CajaMovimiento.Tipo.VENTA,
+                        tipo__in=[
+                            CajaMovimiento.Tipo.VENTA,
+                            CajaMovimiento.Tipo.CAMBIO,
+                        ],
                         medio_pago=CajaMovimiento.MedioPago.TARJETA,
                     ),
                 ),
@@ -367,7 +373,10 @@ class ReporteCajaView(
                 Sum(
                     "monto",
                     filter=Q(
-                        tipo=CajaMovimiento.Tipo.VENTA,
+                       tipo__in=[
+                            CajaMovimiento.Tipo.VENTA,
+                            CajaMovimiento.Tipo.CAMBIO,
+                        ],
                         medio_pago=CajaMovimiento.MedioPago.TRANSFERENCIA,
                     ),
                 ),

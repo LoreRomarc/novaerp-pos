@@ -161,6 +161,10 @@
                             <i class="bi bi-cart3"></i> Punto de venta
                         </a>
 
+                        <a href="{% url 'sales:devolucion_create' %}">
+                            <i class="bi bi-arrow-left-right"></i> Cambios y devoluciones
+                        </a>
+
                         <a href="{% url 'sales:reportes' %}">
                             <i class="bi bi-graph-up"></i> Reporte de ventas
                         </a>
@@ -194,6 +198,11 @@
 
                     <a href="{% url 'sales:caja_reportes' %}">
                         <i class="bi bi-cash-stack"></i> Reporte financiero
+                    </a>
+
+                    <a href="{% url 'sales:devolucion_list' %}">
+                        <i class="bi bi-clock-history"></i>
+                        Historial de cambios
                     </a>
 
                 {% endif %}

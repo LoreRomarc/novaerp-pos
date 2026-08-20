@@ -1,15 +1,15 @@
+# apps/sales/views.py
 import json
+import logging
 
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
-from django.db import transaction
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.views import View
 
 from apps.inventory.models import ProductoVariante
-from apps.sales.models import Venta
 from apps.sales.services.carrito_service import CarritoService
 from apps.sales.services.pos_service import POSService
 from apps.sales.services.serializers import serializar_carrito
@@ -23,6 +23,8 @@ POS_ROLES = [
     "ADMIN_SUCURSAL",
     "CAJERO",
 ]
+
+logger = logging.getLogger(__name__)
 
 
 def success(data=None, status=200):
@@ -275,7 +277,6 @@ class POSAnularVentaView(POSBaseView):
         "SUPERVISOR",
     ]
 
-    @transaction.atomic
     def post(self, request):
         try:
             data = self.obtener_json(request)
@@ -288,33 +289,11 @@ class POSAnularVentaView(POSBaseView):
                     "Debe indicar la venta a anular."
                 )
 
-            turno = CajaService.obtener_turno_request(request)
-
-            if not turno:
-                raise ValidationError(
-                    "Debe tener una caja abierta para procesar "
-                    "una devolución."
-                )
-
-            venta = (
-                Venta.objects
-                .select_for_update()
-                .filter(
-                    pk=venta_id,
-                    sucursal=self.get_sucursal(),
-                )
-                .first()
-            )
-
-            if not venta:
-                raise ValidationError(
-                    "La venta no existe o no pertenece "
-                    "a la sucursal activa."
-                )
-
-            venta.anular_venta(
-                turno_devolucion_id=turno.id,
+            venta = POSService.anular_venta(
                 usuario=request.user,
+                sucursal=self.get_sucursal(),
+                turno_id=request.session.get("turno_id"),
+                venta_id=venta_id,
                 observacion=observacion,
             )
 
@@ -332,6 +311,7 @@ class POSAnularVentaView(POSBaseView):
             return error(error_validacion)
 
         except Exception:
+            logger.exception("Error al anular una venta desde el POS.")
             return error(
                 "No fue posible anular la venta.",
                 status=500,

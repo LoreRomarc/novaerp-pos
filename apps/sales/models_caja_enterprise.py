@@ -331,6 +331,7 @@ class CajaMovimiento(models.Model):
     class Tipo(models.TextChoices):
         APERTURA = "APERTURA", "Apertura"
         VENTA = "VENTA", "Venta"
+        CAMBIO = "CAMBIO", "Cobro por cambio"
         RETIRO_BOVEDA = "RETIRO_BOVEDA", "Retiro a bóveda"
         INGRESO = "INGRESO", "Ingreso manual"
         EGRESO = "EGRESO", "Egreso manual"
@@ -393,6 +394,14 @@ class CajaMovimiento(models.Model):
 
     referencia_venta = models.ForeignKey(
         "sales.Venta",
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name="movimientos_caja",
+    )
+
+    referencia_devolucion = models.ForeignKey(
+        "sales.Devolucion",
         null=True,
         blank=True,
         on_delete=models.PROTECT,
@@ -496,6 +505,12 @@ class CajaMovimiento(models.Model):
                     "referencia_venta",
                 ]
             ),
+
+            models.Index(
+                fields=[
+                    "referencia_devolucion",
+                ]
+            ),
         ]
 
     def clean(self):
@@ -574,13 +589,37 @@ class CajaMovimiento(models.Model):
                     }
                 )
 
-        if self.tipo == self.Tipo.DEVOLUCION:
-            if not self.referencia_venta_id:
+        if self.tipo == self.Tipo.CAMBIO:
+            if not self.referencia_devolucion_id:
                 raise ValidationError(
                     {
-                        "referencia_venta": (
-                            "La devolución debe "
-                            "referenciar una venta."
+                        "referencia_devolucion": (
+                            "Un cobro por cambio debe referenciar "
+                            "un comprobante de devolución."
+                        )
+                    }
+                )
+
+            if not self.medio_pago:
+                raise ValidationError(
+                    {
+                        "medio_pago": (
+                            "Un cobro por cambio debe indicar "
+                            "el medio de pago."
+                        )
+                    }
+                )
+            
+        if self.tipo == self.Tipo.DEVOLUCION:
+            if (
+                not self.referencia_venta_id
+                and not self.referencia_devolucion_id
+            ):
+                raise ValidationError(
+                    {
+                        "referencia_devolucion": (
+                            "La devolución debe referenciar "
+                            "una venta o un comprobante de devolución."
                         )
                     }
                 )
@@ -615,6 +654,33 @@ class CajaMovimiento(models.Model):
                         "referencia_venta": (
                             "La venta debe pertenecer "
                             "al mismo turno."
+                        )
+                    }
+                )
+
+        if self.referencia_devolucion_id:
+            devolucion = self.referencia_devolucion
+
+            if (
+                self.sucursal_id
+                and devolucion.sucursal_id != self.sucursal_id
+            ):
+                raise ValidationError(
+                    {
+                        "referencia_devolucion": (
+                            "La devolución pertenece a otra sucursal."
+                        )
+                    }
+                )
+
+            if (
+                self.referencia_venta_id
+                and devolucion.venta_id != self.referencia_venta_id
+            ):
+                raise ValidationError(
+                    {
+                        "referencia_devolucion": (
+                            "La venta y la devolución no coinciden."
                         )
                     }
                 )
@@ -677,25 +743,30 @@ class CajaMovimiento(models.Model):
             ]
         )
 
-        cadena = "|".join(
-            [
-                self.hash_anterior,
-                str(self.turno_id),
-                str(self.numero_secuencia),
-                str(self.sucursal_id),
-                str(self.caja_id),
-                str(self.usuario_id),
-                self.tipo,
-                self.medio_pago or "",
-                str(self.monto),
-                str(
-                    self.referencia_venta_id
-                    or ""
-                ),
-                self.observacion,
-                self.creado_en.isoformat(),
-            ]
-        )
+        partes_hash = [
+            self.hash_anterior,
+            str(self.turno_id),
+            str(self.numero_secuencia),
+            str(self.sucursal_id),
+            str(self.caja_id),
+            str(self.usuario_id),
+            self.tipo,
+            self.medio_pago or "",
+            str(self.monto),
+            str(self.referencia_venta_id or ""),
+            self.observacion,
+            self.creado_en.isoformat(),
+        ]
+
+        # Solo movimientos nuevos de devoluciones/cambios
+        # incorporan este identificador al hash.
+        if self.referencia_devolucion_id:
+            partes_hash.insert(
+                -2,
+                str(self.referencia_devolucion_id),
+            )
+
+        cadena = "|".join(partes_hash)
 
         self.hash_integridad = hashlib.sha256(
             cadena.encode("utf-8")

@@ -1,0 +1,887 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Cambio o devolución{% endblock %}
+
+{% block content %}
+<style>
+    .card-header {
+        padding: .6rem .85rem;
+    }
+
+    .card-body {
+        padding: .75rem;
+    }
+
+    .table {
+        margin-bottom: 0;
+    }
+
+    .table td,
+    .table th {
+        padding: .45rem;
+        font-size: .88rem;
+    }
+
+    .form-control,
+    .form-select {
+        min-height: 34px;
+        font-size: .9rem;
+    }
+</style>
+
+<div class="container-fluid py-4">
+
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <h2 class="mb-1">Cambio o devolución</h2>
+            <p class="text-muted mb-0">
+                Sucursal: {{ sucursal.nombre }}
+                · Caja: {{ turno.caja.nombre }}
+            </p>
+        </div>
+
+        <a
+            href="{% url 'sales:devolucion_list' %}"
+            class="btn btn-outline-secondary">
+            Historial
+        </a>
+    </div>
+
+    <div id="mensaje"></div>
+
+    <div class="row g-4">
+
+        <div class="col-lg-6">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">1. Recibe</h5>
+                </div>
+
+                <div class="card-body">
+                    <div class="position-relative mb-3">
+                        <input
+                            id="buscar-recibido"
+                            type="search"
+                            class="form-control"
+                            autocomplete="off"
+                            placeholder="Buscar prenda que entrega el cliente">
+
+                        <div
+                            id="sugerencias-recibido"
+                            class="list-group position-absolute w-100 shadow"
+                            style="z-index: 10;">
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Producto</th>
+                                    <th style="width: 75px;">Cant.</th>
+                                    <th style="width: 105px;">Estado</th>
+                                    <th style="width: 110px;" class="text-end">
+                                        Precio
+                                    </th>
+                                    <th style="width: 110px;" class="text-end">
+                                        Total
+                                    </th>
+                                    <th style="width: 40px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-recibidos"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-6">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-white">
+                    <h5 class="mb-0">2. Entrega</h5>
+                </div>
+
+                <div class="card-body">
+                    <div class="position-relative mb-3">
+                        <input
+                            id="buscar-entregado"
+                            type="search"
+                            class="form-control"
+                            autocomplete="off"
+                            placeholder="Buscar prenda nueva">
+
+                        <div
+                            id="sugerencias-entregado"
+                            class="list-group position-absolute w-100 shadow"
+                            style="z-index: 10;">
+                        </div>
+                    </div>
+
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle">
+                            <thead>
+                                <tr>
+                                    <th>Producto</th>
+                                    <th style="width: 75px;">Cant.</th>
+                                    <th style="width: 110px;" class="text-end">
+                                        Precio
+                                    </th>
+                                    <th style="width: 110px;" class="text-end">
+                                        Total
+                                    </th>
+                                    <th style="width: 40px;"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-entregados"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="card shadow-sm border-0 mt-4">
+        <div class="card-header bg-white">
+            <h5 class="mb-0">3. Referencia y dinero</h5>
+        </div>
+
+        <div class="card-body">
+            <div class="row g-3 mb-4">
+                <div class="col-md-3">
+                    <label class="form-label">Tipo de precio</label>
+                    <select id="tipo-venta" class="form-select">
+                        <option value="DETAL">Detal</option>
+                        <option value="MAYORISTA" selected>Mayorista</option>
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">
+                        Venta de referencia
+                    </label>
+                    <input
+                        id="venta-id"
+                        type="number"
+                        min="1"
+                        class="form-control"
+                        placeholder="Opcional">
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">
+                        Factura / referencia externa
+                    </label>
+                    <input
+                        id="referencia-externa"
+                        type="text"
+                        class="form-control"
+                        placeholder="Opcional">
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label">Motivo *</label>
+                    <input
+                        id="motivo"
+                        type="text"
+                        class="form-control"
+                        placeholder="Cambio de talla, defecto, etc.">
+                </div>
+            </div>
+
+            <div class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <div class="form-check mb-2">
+                        <input
+                            id="permite-reembolso"
+                            class="form-check-input"
+                            type="checkbox">
+
+                        <label
+                            class="form-check-label"
+                            for="permite-reembolso">
+                            Reembolsar diferencia al cliente
+                        </label>
+                    </div>
+
+                    <select
+                        id="medio-reembolso"
+                        class="form-select"
+                        disabled>
+                        <option value="">Medio de reembolso</option>
+                        <option value="EFECTIVO">Efectivo</option>
+                        <option value="TARJETA">Tarjeta</option>
+                        <option value="TRANSFERENCIA">
+                            Transferencia
+                        </option>
+                    </select>
+                </div>
+
+                <div class="col-md-8">
+                    <div class="row g-2">
+                        <div class="col-md-4">
+                            <label class="form-label">
+                                Pago adicional efectivo
+                            </label>
+                            <input
+                                id="efectivo"
+                                type="number"
+                                min="0"
+                                step="100"
+                                value="0"
+                                class="form-control pago-adicional">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">
+                                Pago adicional tarjeta
+                            </label>
+                            <input
+                                id="tarjeta"
+                                type="number"
+                                min="0"
+                                step="100"
+                                value="0"
+                                class="form-control pago-adicional">
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">
+                                Pago adicional transferencia
+                            </label>
+                            <input
+                                id="transferencia"
+                                type="number"
+                                min="0"
+                                step="100"
+                                value="0"
+                                class="form-control pago-adicional">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <hr>
+
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <small class="text-muted">Valor recibido</small>
+                    <h4 id="total-recibido">$0</h4>
+                </div>
+
+                <div class="col-md-3">
+                    <small class="text-muted">Valor entregado</small>
+                    <h4 id="total-entregado">$0</h4>
+                </div>
+
+                <div class="col-md-3">
+                    <small class="text-muted">Resultado</small>
+                    <h4 id="resultado" class="text-primary">
+                        Sin productos
+                    </h4>
+                </div>
+
+                <div class="col-md-3 d-flex align-items-end justify-content-end">
+                    <button
+                        id="btn-procesar"
+                        type="button"
+                        class="btn btn-success w-100">
+                        Confirmar operación
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+const recibidos = [];
+const entregados = [];
+const puedeModificarPrecio =
+    {{ puede_modificar_precio|yesno:"true,false" }};
+
+const dinero = new Intl.NumberFormat("es-CO", {
+    style: "currency",
+    currency: "COP",
+    maximumFractionDigits: 0,
+});
+
+function valorNumerico(valor) {
+    const numero = Number(valor);
+    return Number.isFinite(numero) ? numero : 0;
+}
+
+function csrfToken() {
+    const nombre = "csrftoken=";
+
+    return document.cookie
+        .split(";")
+        .map(valor => valor.trim())
+        .find(valor => valor.startsWith(nombre))
+        ?.substring(nombre.length);
+}
+
+function mostrarMensaje(texto, tipo = "danger") {
+    document.getElementById("mensaje").innerHTML = `
+        <div class="alert alert-${tipo} alert-dismissible fade show">
+            ${texto}
+            <button
+                type="button"
+                class="btn-close"
+                data-bs-dismiss="alert">
+            </button>
+        </div>
+    `;
+}
+
+function total(items) {
+    return items.reduce(
+        (acumulado, item) => (
+            acumulado
+            + valorNumerico(item.cantidad)
+            * valorNumerico(item.precio)
+        ),
+        0,
+    );
+}
+
+function renderTabla(tipo) {
+    const items = tipo === "recibido"
+        ? recibidos
+        : entregados;
+
+    const tabla = document.getElementById(
+        tipo === "recibido"
+            ? "tabla-recibidos"
+            : "tabla-entregados"
+    );
+
+    tabla.innerHTML = "";
+
+    items.forEach((item, indice) => {
+        const fila = document.createElement("tr");
+
+        const celdaProducto = document.createElement("td");
+        celdaProducto.innerHTML = `
+            <strong>${item.nombre}</strong><br>
+            <small class="text-muted">${item.sku}</small>
+        `;
+
+        const celdaCantidad = document.createElement("td");
+        const inputCantidad = document.createElement("input");
+        inputCantidad.type = "number";
+        inputCantidad.min = "1";
+        inputCantidad.step = "1";
+        inputCantidad.inputMode = "numeric";
+        inputCantidad.value = item.cantidad;
+        inputCantidad.className = "form-control form-control-sm";
+
+        inputCantidad.addEventListener("input", function () {
+            item.cantidad = valorNumerico(this.value);
+
+            celdaValor.textContent = dinero.format(
+                valorNumerico(item.precio)
+                * valorNumerico(item.cantidad)
+            );
+
+            actualizarResumen();
+        });
+
+        celdaCantidad.appendChild(inputCantidad);
+
+        fila.appendChild(celdaProducto);
+        fila.appendChild(celdaCantidad);
+
+        if (tipo === "recibido") {
+            const celdaEstado = document.createElement("td");
+            const selectorEstado = document.createElement("select");
+
+            selectorEstado.className = "form-select form-select-sm";
+            selectorEstado.innerHTML = `
+                <option value="APTA">Apta</option>
+                <option value="DANADA">Dañada</option>
+            `;
+
+            selectorEstado.value = item.estado_prenda;
+
+            selectorEstado.addEventListener("change", function () {
+                item.estado_prenda = this.value;
+            });
+
+            celdaEstado.appendChild(selectorEstado);
+            fila.appendChild(celdaEstado);
+        }
+
+        const celdaValor = document.createElement("td");
+        celdaValor.className = "text-end";
+        celdaValor.textContent = dinero.format(
+            valorNumerico(item.precio)
+            * valorNumerico(item.cantidad)
+        );
+
+        fila.appendChild(celdaValor);
+
+        const celdaPrecio = document.createElement("td");
+        celdaPrecio.className = "text-end";
+
+        if (puedeModificarPrecio) {
+            const inputPrecio = document.createElement("input");
+
+            inputPrecio.type = "number";
+            inputPrecio.min = "1";
+            inputPrecio.step = "1";
+            inputPrecio.value = item.precio || "";
+            inputPrecio.placeholder = "Precio";
+            inputPrecio.className =
+                "form-control form-control-sm text-end";
+
+            inputPrecio.addEventListener("input", function () {
+                item.precio = valorNumerico(this.value);
+                item.precio_manual = true;
+
+                celdaValor.textContent = dinero.format(
+                    valorNumerico(item.precio)
+                    * valorNumerico(item.cantidad)
+                );
+
+                actualizarResumen();
+            });
+
+            celdaPrecio.appendChild(inputPrecio);
+
+        } else {
+            celdaPrecio.textContent = item.precio
+                ? dinero.format(valorNumerico(item.precio))
+                : "Sin precio";
+        }
+
+        fila.appendChild(celdaPrecio);
+        fila.appendChild(celdaValor);
+
+        const celdaEliminar = document.createElement("td");
+        const botonEliminar = document.createElement("button");
+
+        botonEliminar.type = "button";
+        botonEliminar.className = "btn btn-sm btn-outline-danger";
+        botonEliminar.textContent = "×";
+
+        botonEliminar.addEventListener("click", function () {
+            items.splice(indice, 1);
+            renderTabla(tipo);
+            actualizarResumen();
+        });
+
+        celdaEliminar.appendChild(botonEliminar);
+        fila.appendChild(celdaEliminar);
+
+        tabla.appendChild(fila);
+    });
+}
+
+function actualizarResumen() {
+    const recibido = total(recibidos);
+    const entregado = total(entregados);
+    const diferencia = entregado - recibido;
+
+    document.getElementById("total-recibido").textContent =
+        dinero.format(recibido);
+
+    document.getElementById("total-entregado").textContent =
+        dinero.format(entregado);
+
+    const resultado = document.getElementById("resultado");
+
+    if (recibido <= 0) {
+        resultado.className = "text-muted";
+        resultado.textContent = "Seleccione una prenda recibida";
+        return;
+    }
+
+    if (diferencia > 0) {
+        resultado.className = "text-success";
+        resultado.textContent =
+            "Cliente paga: " + dinero.format(diferencia);
+        return;
+    }
+
+    if (diferencia < 0) {
+        const permiteReembolso = document.getElementById(
+            "permite-reembolso"
+        ).checked;
+
+        resultado.className = permiteReembolso
+            ? "text-danger"
+            : "text-warning";
+
+        resultado.textContent = permiteReembolso
+            ? "Reembolso: " + dinero.format(Math.abs(diferencia))
+            : "Diferencia aceptada: " + dinero.format(
+                Math.abs(diferencia)
+            );
+
+        return;
+    }
+
+    resultado.className = "text-primary";
+    resultado.textContent = "Cambio por valor igual";
+}
+
+async function buscarProducto(tipo, valor) {
+    if (valor.trim().length < 2) {
+        return [];
+    }
+
+    const tipoVenta = document.getElementById(
+        "tipo-venta"
+    ).value;
+
+    const url =
+        "{% url 'sales:devolucion_buscar_producto' %}"
+        + "?q="
+        + encodeURIComponent(valor)
+        + "&tipo_venta="
+        + encodeURIComponent(tipoVenta);
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (!response.ok) {
+        throw new Error(
+            data.error || "No fue posible buscar productos."
+        );
+    }
+
+    return data.results || [];
+}
+
+function mostrarSugerencias(tipo, productos) {
+    const contenedor = document.getElementById(
+        tipo === "recibido"
+            ? "sugerencias-recibido"
+            : "sugerencias-entregado"
+    );
+
+    contenedor.innerHTML = "";
+
+    productos.forEach((producto) => {
+        const boton = document.createElement("button");
+
+        boton.type = "button";
+        boton.className = "list-group-item list-group-item-action";
+
+        boton.innerHTML = `
+        <div class="d-flex justify-content-between">
+            <span>${producto.nombre}</span>
+            <strong>
+                ${
+                    producto.sin_precio
+                        ? "Sin precio"
+                        : dinero.format(valorNumerico(producto.precio))
+                }
+            </strong>
+        </div>
+        <small class="text-muted">
+            ${producto.sku} · Stock: ${producto.stock}
+        </small>
+    `;
+
+        boton.addEventListener("click", function () {
+            agregarProducto(tipo, producto);
+            contenedor.innerHTML = "";
+
+            document.getElementById(
+                tipo === "recibido"
+                    ? "buscar-recibido"
+                    : "buscar-entregado"
+            ).value = "";
+        });
+
+        if (producto.sin_precio && !puedeModificarPrecio) {
+            boton.disabled = true;
+            boton.classList.add("text-muted");
+        }
+
+        contenedor.appendChild(boton);
+    });
+}
+
+function agregarProducto(tipo, producto) {
+    const lista = tipo === "recibido"
+        ? recibidos
+        : entregados;
+
+    if (lista.some(item => item.variante_id === producto.id)) {
+        mostrarMensaje(
+            "Ese producto ya fue agregado. "
+            + "Modifique la cantidad en la tabla.",
+            "warning"
+        );
+        return;
+    }
+
+    lista.push({
+        variante_id: producto.id,
+        nombre: producto.nombre,
+        sku: producto.sku,
+        cantidad: 1,
+        precio: producto.precio || "",
+        precio_manual: false,
+        motivo_precio: "",
+        estado_prenda: "APTA",
+    });
+
+    renderTabla(tipo);
+    actualizarResumen();
+}
+
+function activarBuscador(tipo) {
+    const input = document.getElementById(
+        tipo === "recibido"
+            ? "buscar-recibido"
+            : "buscar-entregado"
+    );
+
+    let temporizador;
+
+    input.addEventListener("input", function () {
+        clearTimeout(temporizador);
+
+        temporizador = setTimeout(async () => {
+            try {
+                const resultados = await buscarProducto(
+                    tipo,
+                    input.value
+                );
+
+                mostrarSugerencias(tipo, resultados);
+
+            } catch (error) {
+                mostrarMensaje(error.message);
+            }
+        }, 250);
+    });
+}
+
+async function procesarOperacion() {
+    if (!recibidos.length) {
+        mostrarMensaje(
+            "Debe registrar al menos una prenda recibida."
+        );
+        return;
+    }
+
+    const motivo = document.getElementById("motivo").value.trim();
+
+    if (!motivo) {
+        mostrarMensaje("El motivo es obligatorio.");
+        return;
+    }
+
+    const permiteReembolso = document.getElementById(
+        "permite-reembolso"
+    ).checked;
+
+    const medioReembolso = document.getElementById(
+        "medio-reembolso"
+    ).value;
+
+    const recibido = total(recibidos);
+    const entregado = total(entregados);
+    const diferencia = entregado - recibido;
+
+    if (
+        permiteReembolso
+        && diferencia < 0
+        && !medioReembolso
+    ) {
+        mostrarMensaje(
+            "Seleccione el medio para el reembolso."
+        );
+        return;
+    }
+
+    const payload = {
+        productos_recibidos: recibidos.map(item => ({
+            variante_id: item.variante_id,
+            cantidad: item.cantidad,
+            estado_prenda: item.estado_prenda,
+            precio_unitario: item.precio,
+            motivo_precio: item.motivo_precio || motivo,
+        })),
+
+        productos_entregados: entregados.map(item => ({
+            variante_id: item.variante_id,
+            cantidad: item.cantidad,
+            precio_unitario: item.precio,
+            motivo_precio: item.motivo_precio || motivo,
+        })),
+
+        tipo_venta: document.getElementById(
+            "tipo-venta"
+        ).value,
+
+        venta_id: document.getElementById(
+            "venta-id"
+        ).value || null,
+
+        referencia_externa: document.getElementById(
+            "referencia-externa"
+        ).value,
+
+        motivo: motivo,
+        permite_reembolso: permiteReembolso,
+        medio_reembolso: medioReembolso,
+
+        efectivo: document.getElementById(
+            "efectivo"
+        ).value || 0,
+
+        tarjeta: document.getElementById(
+            "tarjeta"
+        ).value || 0,
+
+        transferencia: document.getElementById(
+            "transferencia"
+        ).value || 0,
+    };
+
+    const boton = document.getElementById("btn-procesar");
+    boton.disabled = true;
+    boton.textContent = "Procesando...";
+
+    try {
+        const response = await fetch(
+            "{% url 'sales:devolucion_procesar' %}",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": csrfToken(),
+                },
+                body: JSON.stringify(payload),
+            }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok || !data.success) {
+            throw new Error(
+                data.error || "No fue posible procesar el cambio."
+            );
+        }
+
+        mostrarMensaje(
+            "Operación #" + data.data.id
+            + " procesada correctamente.",
+            "success"
+        );
+
+        recibidos.splice(0);
+        entregados.splice(0);
+
+        renderTabla("recibido");
+        renderTabla("entregado");
+        actualizarResumen();
+
+        document.getElementById("motivo").value = "";
+        document.getElementById("venta-id").value = "";
+        document.getElementById("referencia-externa").value = "";
+
+    } catch (error) {
+        mostrarMensaje(error.message);
+
+    } finally {
+        boton.disabled = false;
+        boton.textContent = "Confirmar operación";
+    }
+}
+
+async function actualizarPreciosPorTipo() {
+    const items = [...recibidos, ...entregados];
+
+    if (!items.length) {
+        return;
+    }
+
+    const tipoVenta = document.getElementById(
+        "tipo-venta"
+    ).value;
+
+    try {
+        for (const item of items) {
+
+            if (item.precio_manual) {
+                continue;
+            }
+
+            const resultados = await buscarProducto(
+                "recibido",
+                item.sku
+            );
+
+            const producto = resultados.find(
+                resultado => resultado.id === item.variante_id
+            );
+
+            if (!producto) {
+                throw new Error(
+                    "El producto " + item.sku
+                    + " no tiene precio en la lista seleccionada."
+                );
+            }
+
+            item.precio = producto.precio;
+        }
+
+        renderTabla("recibido");
+        renderTabla("entregado");
+        actualizarResumen();
+
+        mostrarMensaje(
+            "Se conservaron los productos y se actualizaron "
+            + "sus precios de " + tipoVenta + ".",
+            "success"
+        );
+
+    } catch (error) {
+        mostrarMensaje(error.message);
+    }
+}
+
+document.addEventListener("DOMContentLoaded", function () {
+    activarBuscador("recibido");
+    activarBuscador("entregado");
+
+    document.getElementById(
+        "permite-reembolso"
+    ).addEventListener("change", function () {
+        const medio = document.getElementById(
+            "medio-reembolso"
+        );
+
+        medio.disabled = !this.checked;
+
+        if (!this.checked) {
+            medio.value = "";
+        }
+
+        actualizarResumen();
+    });
+
+    document.getElementById(
+        "tipo-venta"
+    ).addEventListener("change", function () {
+        actualizarPreciosPorTipo();
+    });
+
+    document.getElementById(
+        "btn-procesar"
+    ).addEventListener("click", procesarOperacion);
+
+    actualizarResumen();
+});
+</script>
+{% endblock %}

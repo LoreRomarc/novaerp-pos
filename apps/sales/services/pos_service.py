@@ -1,14 +1,18 @@
+# apps/sales/services/pos_service.py
 from decimal import Decimal, InvalidOperation
 
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.utils import timezone
 
 from apps.inventory.models import Stock
+from apps.inventory.services.stock_service import InventoryService
 from apps.sales.models import (
     Carrito,
     CarritoItem,
     ListaPrecio,
     PrecioVariante,
+    Venta,
 )
 from apps.sales.services.carrito_service import CarritoService
 from apps.sales.services.serializers import serializar_carrito
@@ -30,13 +34,18 @@ class POSService:
     @staticmethod
     def _decimal(valor, mensaje):
         try:
-            return Decimal(str(valor or 0))
+            monto = Decimal(str(valor if valor is not None else 0))
         except (
             InvalidOperation,
             TypeError,
             ValueError,
         ) as error:
             raise ValidationError(mensaje) from error
+
+        if not monto.is_finite():
+            raise ValidationError(mensaje)
+
+        return monto
 
     @staticmethod
     def _obtener_carrito_bloqueado(
@@ -586,3 +595,71 @@ class POSService:
             serializar_carrito(carrito_abierto)
             for carrito_abierto in carritos
         ]
+
+    @staticmethod
+    @transaction.atomic
+    def anular_venta(
+        usuario,
+        sucursal,
+        turno_id,
+        venta_id,
+        observacion="",
+    ):
+        """Anula una venta cerrada, repone inventario y registra la devolución."""
+        if not turno_id:
+            raise ValidationError(
+                "Debe tener una caja abierta para procesar una devolución."
+            )
+
+        venta = (
+            Venta.objects
+            .select_for_update()
+            .filter(pk=venta_id, sucursal=sucursal)
+            .first()
+        )
+
+        if not venta:
+            raise ValidationError(
+                "La venta no existe o no pertenece a la sucursal activa."
+            )
+
+        if venta.estado != "CERRADA":
+            raise ValidationError("Solo se pueden anular ventas cerradas.")
+
+        if not venta.stock_descontado:
+            raise ValidationError(
+                "La venta no tiene una salida de inventario para reversar."
+            )
+
+        turno = CajaService.obtener_turno_bloqueado(
+            turno_id=turno_id,
+            sucursal=sucursal,
+        )
+        CajaService.validar_operador_turno(
+            turno=turno,
+            usuario=usuario,
+        )
+
+        # Si falla caja o inventario, la transacción revierte todo el proceso.
+        CajaService.registrar_devolucion_venta(
+            venta=venta,
+            turno_id=turno.id,
+            usuario=usuario,
+            observacion=observacion,
+        )
+
+        for item in venta.items.select_related("variante").order_by("variante_id"):
+            InventoryService.agregar_stock(
+                variante=item.variante,
+                cantidad=item.cantidad,
+                user=usuario,
+                sucursal_id=sucursal.id,
+                referencia=f"ANULACION-VENTA-{venta.id}",
+                tipo="DEVOLUCION_CLIENTE",
+            )
+
+        venta.estado = "ANULADA"
+        venta.anulada = timezone.now()
+        venta.save(update_fields=["estado", "anulada"])
+
+        return venta
