@@ -1,19 +1,28 @@
-{% extends "base.html" %}
+{% extends "administration/base_admin.html" %}
 
-{% block content %}
+{% block title %}Eliminar usuario{% endblock %}
 
-<div class="card col-md-4 mx-auto mt-5">
-    <div class="card-body text-center">
-        <h5>¿Eliminar usuario?</h5>
+{% block admin_content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-md-8 col-lg-6">
+        <div class="admin-card">
+            <div class="admin-card-body text-center p-4 p-lg-5">
+                <div class="text-danger mb-3"><i class="bi bi-exclamation-triangle-fill fs-1"></i></div>
+                <div class="admin-eyebrow">Acción irreversible</div>
+                <h1 class="admin-page-title h3">¿Eliminar usuario?</h1>
+                <p class="admin-page-subtitle mb-4">
+                    Se eliminará el acceso de <strong>{{ object.username }}</strong>. Esta operación no se puede deshacer.
+                </p>
 
-        <p>{{ object.username }}</p>
-
-        <form method="post">
-            {% csrf_token %}
-            <button class="btn btn-danger">Eliminar</button>
-            <a href="{% url 'administration:user_list' %}" class="btn btn-secondary">Cancelar</a>
-        </form>
+                <form method="post" class="d-flex justify-content-center gap-2">
+                    {% csrf_token %}
+                    <a href="{% url 'administration:user_list' %}" class="btn btn-light border">Cancelar</a>
+                    <button class="btn btn-danger" type="submit">
+                        <i class="bi bi-trash"></i> Eliminar usuario
+                    </button>
+                </form>
+            </div>
+        </div>
     </div>
 </div>
-
 {% endblock %}

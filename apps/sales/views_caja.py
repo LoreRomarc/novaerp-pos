@@ -11,7 +11,7 @@ from django.contrib.auth import get_user_model
 from django.db.models import Q
 from django.core.serializers.json import DjangoJSONEncoder
 from django.core.paginator import Paginator
-from django.db import transaction
+from django.db import IntegrityError, transaction
 
 
 from apps.accounts.models import UserProfile
@@ -142,11 +142,101 @@ class SeleccionarSucursalView(
                 status=400,
             )
 
+        sucursal_anterior_id = request.session.get("sucursal_id")
+
+        if str(sucursal_anterior_id) != str(sucursal.id):
+            request.session.pop("turno_id", None)
+            request.session.pop("caja_id", None)
+
         request.session["sucursal_id"] = sucursal.id
         request.session.modified = True
 
-        return redirect("sales:abrir_caja")
-    
+        return redirect("sales:caja_dashboard")
+
+class CajaConfiguracionView(
+    LoginRequiredMixin,
+    RolePermissionMixin,
+    SucursalIsolationMixin,
+    View,
+):
+    allowed_roles = [
+        "SUPER_ADMIN",
+    ]
+
+    template_name = "sales/caja/configuracion.html"
+
+    def _contexto(self, sucursal, error=None):
+        return {
+            "sucursal": sucursal,
+            "error": error,
+            "cajas": (
+                Caja.objects
+                .filter(sucursal=sucursal)
+                .order_by("codigo")
+            ),
+        }
+
+    def get(self, request):
+        sucursal = self.get_sucursal()
+
+        return render(
+            request,
+            self.template_name,
+            self._contexto(sucursal),
+        )
+
+    def post(self, request):
+        sucursal = self.get_sucursal()
+
+        codigo = (request.POST.get("codigo") or "").strip().upper()
+        nombre = (request.POST.get("nombre") or "").strip()
+
+        if not codigo or not nombre:
+            return render(
+                request,
+                self.template_name,
+                self._contexto(
+                    sucursal,
+                    "Código y nombre son obligatorios.",
+                ),
+                status=400,
+            )
+
+        caja = Caja(
+            sucursal=sucursal,
+            codigo=codigo,
+            nombre=nombre,
+            activa=True,
+        )
+
+        try:
+            caja.full_clean()
+            caja.save()
+
+        except ValidationError as error:
+            return render(
+                request,
+                self.template_name,
+                self._contexto(
+                    sucursal,
+                    " ".join(error.messages),
+                ),
+                status=400,
+            )
+
+        except IntegrityError:
+            return render(
+                request,
+                self.template_name,
+                self._contexto(
+                    sucursal,
+                    "Ya existe una caja con ese código en esta sucursal.",
+                ),
+                status=400,
+            )
+
+        return redirect("sales:caja_configuracion")
+        
 class CajaDashboardView(
     LoginRequiredMixin,
     RolePermissionMixin,

@@ -1,34 +1,99 @@
-{% extends "base.html" %}
+{% extends "administration/base_admin.html" %}
 
-{% block content %}
+{% block title %}{% if modo_edicion %}Editar lista de precios{% else %}Crear listas de precios{% endif %}{% endblock %}
 
-<div class="card shadow-sm">
-
-    <div class="card-header bg-white">
-        <h5>Nueva Lista de Precios</h5>
+{% block admin_content %}
+<div class="admin-page-header">
+    <div>
+        <div class="admin-eyebrow">Configuración comercial</div>
+        <h1 class="admin-page-title">{% if modo_edicion %}Editar lista en grupo{% else %}Crear listas en grupo{% endif %}</h1>
+        <p class="admin-page-subtitle">{% if modo_edicion %}Los datos actuales ya están cargados. Seleccione las sucursales que conservarán esta lista.{% else %}Seleccione las sucursales y cree la misma lista para todas a la vez.{% endif %}</p>
     </div>
 
-    <div class="card-body">
-
-        <form method="post">
-
-            {% csrf_token %}
-
-            {{ form.as_p }}
-
-            <button class="btn btn-success">
-                Guardar
-            </button>
-
-            <a href="{% url 'administration:lista_precio_list' %}"
-               class="btn btn-secondary">
-                Cancelar
-            </a>
-
-        </form>
-
-    </div>
-
+    <a href="{% url 'administration:lista_precio_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Volver
+    </a>
 </div>
 
+<form method="post">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+
+    <div class="row justify-content-center">
+        <div class="col-12 col-xl-8">
+            <div class="admin-card">
+                <div class="admin-card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ form.nombre.id_for_label }}">Nombre de la lista</label>
+                            {{ form.nombre }}
+                            <div class="form-text">Ejemplo: Precio Mayorista o Precio Detal.</div>
+                            <div class="text-danger small mt-1">{{ form.nombre.errors }}</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ form.tipo_venta.id_for_label }}">Tipo de venta</label>
+                            {% if modo_edicion %}
+                                <input class="form-control" value="{{ lista.get_tipo_venta_display }}" readonly>
+                                <input type="hidden" name="tipo_venta" value="{{ lista.tipo_venta }}">
+                            {% else %}
+                                {{ form.tipo_venta }}
+                            {% endif %}
+                            <div class="text-danger small mt-1">{{ form.tipo_venta.errors }}</div>
+                        </div>
+                    </div>
+
+                    <section class="admin-form-section">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h2 class="admin-form-section-title mb-0">Sucursales</h2>
+                            <button class="btn btn-sm btn-link text-decoration-none p-0" id="seleccionarTodas" type="button">
+                                Seleccionar todas
+                            </button>
+                        </div>
+                        <p class="form-text mt-0">{% if modo_edicion %}Las sucursales que retire quedan inactivas para esta lista; sus precios históricos no se borran.{% else %}Si ya existe una lista del mismo tipo en una sede, se actualiza su nombre y estado; no se duplica.{% endif %}</p>
+
+                        <div class="row g-2">
+                            {% for opcion in form.sucursales %}
+                                <div class="col-12 col-sm-6">
+                                    <label class="border rounded p-3 d-flex align-items-center gap-2 w-100 h-100">
+                                        {{ opcion.tag }}
+                                        <span>{{ opcion.choice_label }}</span>
+                                    </label>
+                                </div>
+                            {% empty %}
+                                <div class="col-12 text-muted">No existen sucursales activas.</div>
+                            {% endfor %}
+                        </div>
+                        <div class="text-danger small mt-1">{{ form.sucursales.errors }}</div>
+                    </section>
+
+                    <section class="admin-form-section">
+                        <div class="form-check">
+                            {{ form.activa }}
+                            <label class="form-check-label" for="{{ form.activa.id_for_label }}">Mantener lista activa</label>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle"></i> {% if modo_edicion %}Guardar cambios{% else %}Crear o actualizar listas{% endif %}</button>
+                <a href="{% url 'administration:lista_precio_list' %}" class="btn btn-light border">Cancelar</a>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block content-script %}
+<script>
+    const botonTodas = document.getElementById("seleccionarTodas");
+    const checksSucursal = document.querySelectorAll("input[name='sucursales']");
+
+    botonTodas.addEventListener("click", function () {
+        const seleccionar = Array.from(checksSucursal).some((check) => !check.checked);
+        checksSucursal.forEach((check) => { check.checked = seleccionar; });
+        botonTodas.textContent = seleccionar ? "Quitar selección" : "Seleccionar todas";
+    });
+</script>
 {% endblock %}

@@ -1,37 +1,74 @@
-{% extends "base.html" %}
+{% extends "administration/base_admin.html" %}
 
-{% block title %}
-Nueva Sucursal
-{% endblock %}
+{% block title %}Nueva sucursal{% endblock %}
 
-{% block content %}
-
-<div class="card shadow">
-    <div class="card-header">
-        <h4>Crear Sucursal</h4>
+{% block admin_content %}
+<div class="admin-page-header">
+    <div>
+        <div class="admin-eyebrow">Organización</div>
+        <h1 class="admin-page-title">Nueva sucursal</h1>
+        <p class="admin-page-subtitle">Cree una sede operativa y configure su lista de precios predeterminada.</p>
     </div>
 
-    <div class="card-body">
-
-        <form method="post">
-
-            {% csrf_token %}
-
-            {{ form.as_p }}
-
-            <button type="submit"
-                    class="btn btn-primary">
-                Guardar
-            </button>
-
-            <a href="{% url 'administration:sucursal_list' %}"
-               class="btn btn-secondary">
-                Volver
-            </a>
-
-        </form>
-
-    </div>
+    <a href="{% url 'administration:sucursal_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Volver
+    </a>
 </div>
 
+<form method="post">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+
+    <div class="row justify-content-center">
+        <div class="col-12 col-xl-8">
+            <div class="admin-card">
+                <div class="admin-card-body">
+                    <section class="admin-form-section">
+                        <h2 class="admin-form-section-title">Información de la sede</h2>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="{{ form.empresa.id_for_label }}">Empresa</label>
+                                {{ form.empresa }}
+                                <div class="text-danger small mt-1">{{ form.empresa.errors }}</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="{{ form.nombre.id_for_label }}">Nombre de la sucursal</label>
+                                {{ form.nombre }}
+                                <div class="text-danger small mt-1">{{ form.nombre.errors }}</div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label" for="{{ form.direccion.id_for_label }}">Dirección</label>
+                                {{ form.direccion }}
+                                <div class="text-danger small mt-1">{{ form.direccion.errors }}</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="admin-form-section">
+                        <h2 class="admin-form-section-title">Configuración comercial</h2>
+                        <div class="row g-3 align-items-end">
+                            <div class="col-md-8">
+                                <label class="form-label" for="{{ form.lista_precio_default.id_for_label }}">Lista de precios predeterminada</label>
+                                {{ form.lista_precio_default }}
+                                <div class="form-text">Se aplicará por defecto a las ventas de esta sucursal.</div>
+                                <div class="text-danger small mt-1">{{ form.lista_precio_default.errors }}</div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-check mb-2">
+                                    {{ form.activa }}
+                                    <label class="form-check-label" for="{{ form.activa.id_for_label }}">Sucursal activa</label>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle"></i> Guardar sucursal</button>
+                <a href="{% url 'administration:sucursal_list' %}" class="btn btn-light border">Cancelar</a>
+            </div>
+        </div>
+    </div>
+</form>
 {% endblock %}

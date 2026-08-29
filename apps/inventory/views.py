@@ -6,12 +6,12 @@ from django.db.models import Sum
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
 from django.views import View
-from django.views.generic import CreateView, ListView, FormView
+from django.views.generic import ListView, FormView
 from django.shortcuts import redirect
 from django.db import transaction
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.contrib import messages
-
+from apps.sales.mixins import SucursalIsolationMixin
 from django.db.models import ExpressionWrapper, Sum, Q, F, DecimalField
 
 from apps.core.models import Sucursal
@@ -31,7 +31,7 @@ from apps.inventory.services.traslado_service import TrasladoService
 # PRODUCCION
 # ======================================================
 
-class ProduccionListView( LoginRequiredMixin, InventoryAccessMixin, ListView):
+class ProduccionListView( LoginRequiredMixin, InventoryAccessMixin, SucursalIsolationMixin, ListView):
     model = ProduccionLote
     template_name = "inventory/produccion.html"
     context_object_name = "lotes"
@@ -62,7 +62,7 @@ class ProduccionListView( LoginRequiredMixin, InventoryAccessMixin, ListView):
             .order_by("-creado")
         )
 
-
+        qs = qs.filter(sucursal=self.get_sucursal())
         request = self.request
 
 

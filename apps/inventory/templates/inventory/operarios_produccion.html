@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Operarios de producción{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-0">Operarios de producción</h2>
+            <small class="text-muted">
+                Cortadores y costureras sin acceso al sistema.
+            </small>
+        </div>
+
+        <a
+            href="{% url 'inventory:produccion_list' %}"
+            class="btn btn-outline-secondary">
+            Volver a producción
+        </a>
+    </div>
+
+    <div class="row g-4">
+
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white">
+                    Nuevo operario
+                </div>
+
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label class="form-label">Nombre *</label>
+                            {{ form.nombre }}
+                            {{ form.nombre.errors }}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Documento</label>
+                            {{ form.documento }}
+                            {{ form.documento.errors }}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">
+                                Especialidad *
+                            </label>
+                            {{ form.especialidad }}
+                            {{ form.especialidad.errors }}
+                        </div>
+
+                        <button class="btn btn-primary w-100">
+                            Guardar operario
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white">
+                    Empleados registrados
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Nombre</th>
+                                <th>Documento</th>
+                                <th>Especialidad</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            {% for operario in operarios %}
+                            <tr>
+                                <td>{{ operario.nombre }}</td>
+                                <td>
+                                    {{ operario.documento|default:"—" }}
+                                </td>
+                                <td>
+                                    {{ operario.get_especialidad_display }}
+                                </td>
+                                <td>
+                                    {% if operario.activo %}
+                                        <span class="badge bg-success">
+                                            Activo
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">
+                                            Inactivo
+                                        </span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td
+                                    colspan="4"
+                                    class="text-center text-muted py-4">
+                                    Aún no hay operarios registrados.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endblock %}

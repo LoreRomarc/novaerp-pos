@@ -528,6 +528,16 @@ class DevolucionService:
             )
         )
 
+        # Una devolución o un cambio por igual valor no recibe dinero del
+        # cliente. La interfaz puede conservar valores escritos antes de que
+        # se cambien los productos, por lo que esos valores no deben bloquear
+        # ni afectar una operación cuyo saldo a cobrar sea cero.
+        if monto_cobrado == Decimal("0.00"):
+            pagos_adicionales = {
+                medio: Decimal("0.00")
+                for medio in DevolucionService.MEDIOS_PAGO
+            }
+
         total_pagos = sum(
             pagos_adicionales.values(),
             Decimal("0.00"),

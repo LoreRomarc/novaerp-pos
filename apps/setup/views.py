@@ -1,64 +1,61 @@
 # apps/setup/views.py
-from django.contrib import messages
-from django.shortcuts import render, redirect
+from django.shortcuts import redirect, render
 from django.views import View
 
 from .forms import SetupForm
+from .service.setup_checker import SetupChecker
 from .service.setup_service import SetupService
 
 
 class SetupWizardView(View):
-
     template_name = "setup/wizard.html"
 
     def get(self, request):
-
-        form = SetupForm()
+        # El setup solo puede ejecutarse una vez.
+        if SetupChecker.sistema_configurado():
+            return redirect("inicio")
 
         return render(
             request,
             self.template_name,
             {
-                "form": form,
+                "form": SetupForm(),
+                "sistema_instalado": False,
             },
         )
 
     def post(self, request):
+        # Protección adicional ante reenvíos, doble clics
+        # o acceso directo a la URL.
+        if SetupChecker.sistema_configurado():
+            return redirect("inicio")
 
         form = SetupForm(request.POST)
 
         if not form.is_valid():
-
             return render(
                 request,
                 self.template_name,
                 {
                     "form": form,
+                    "sistema_instalado": False,
                 },
                 status=400,
             )
 
         try:
-
-            resultado = SetupService.crear_sistema(
-                form.cleaned_data
-            )
-
-            messages.success(
-                request,
-                "El sistema fue configurado correctamente.",
-            )
-
-            return redirect("login")
+            SetupService.crear_sistema(form.cleaned_data)
 
         except Exception as error:
-
             return render(
                 request,
                 self.template_name,
                 {
                     "form": form,
                     "error": str(error),
+                    "sistema_instalado": False,
                 },
                 status=400,
             )
+
+        return redirect("login")

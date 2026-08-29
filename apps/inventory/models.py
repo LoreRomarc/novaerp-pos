@@ -438,6 +438,17 @@ class MovimientoStock(models.Model):
     def __str__(self):
         return f"{self.variante} | {self.tipo} | {self.cantidad}"
 
+    @property
+    def tipo_legible(self):
+        """Etiqueta clara también para tipos históricos de traslados."""
+        etiquetas = dict(self.TIPOS)
+        etiquetas.update({
+            "COMPLETO": "Traslado completo",
+            "SALIDA": "Salida entre sucursales",
+            "ENTRADA": "Entrada entre sucursales",
+        })
+        return etiquetas.get(self.tipo, self.tipo.replace("_", " ").title())
+
 
 # ======================================================
 # MOVIMIENTOS INVENTARIO / TRASLADOS

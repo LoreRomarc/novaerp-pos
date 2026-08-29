@@ -1,0 +1,82 @@
+{% extends "administration/base_admin.html" %}
+
+{% block title %}Empresas{% endblock %}
+
+{% block admin_content %}
+<div class="admin-page-header">
+    <div>
+        <div class="admin-eyebrow">Configuración general</div>
+        <h1 class="admin-page-title">Empresa</h1>
+        <p class="admin-page-subtitle">Información legal y comercial usada por el ERP.</p>
+    </div>
+</div>
+
+<div class="admin-card">
+    <div class="admin-card-header">
+        <div>
+            <h2 class="admin-card-title">Empresas registradas</h2>
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table admin-table align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Empresa</th>
+                        <th>NIT</th>
+                        <th>Ciudad</th>
+                        <th>Teléfono</th>
+                        <th>Estado</th>
+                        <th class="text-end">Acción</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for empresa in empresas %}
+                        <tr>
+                            <td>
+                                <strong>{{ empresa.nombre }}</strong>
+
+                                {% if empresa.razon_social %}
+                                    <div class="small text-muted">
+                                        {{ empresa.razon_social }}
+                                    </div>
+                                {% endif %}
+                            </td>
+
+                            <td>{{ empresa.nit|default:"—" }}</td>
+                            <td>{{ empresa.ciudad|default:"—" }}</td>
+                            <td>{{ empresa.telefono|default:"—" }}</td>
+
+                            <td>
+                                {% if empresa.activa %}
+                                    <span class="admin-badge admin-badge-success">Activa</span>
+                                {% else %}
+                                    <span class="admin-badge admin-badge-muted">Inactiva</span>
+                                {% endif %}
+                            </td>
+
+                            <td class="text-end">
+                                <a
+                                    href="{% url 'administration:empresa_update' empresa.pk %}"
+                                    class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-pencil"></i> Editar
+                                </a>
+                            </td>
+                        </tr>
+
+                    {% empty %}
+                        <tr>
+                            <td colspan="6">
+                                <div class="admin-empty">
+                                    <i class="bi bi-building"></i>
+                                    No existe una empresa configurada.
+                                </div>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+    </div>
+</div>
+{% endblock %}

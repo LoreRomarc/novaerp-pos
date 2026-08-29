@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load humanize %}
 
 {% block content %}
 
@@ -93,7 +94,7 @@
 
                     <td>{{ v.stock_total }}</td>
 
-                    <td>${{ v.precio_venta }}</td>
+                    <td>${{ v.precio_venta|floatformat:0|intcomma }}</td>
 
                 </tr>
 

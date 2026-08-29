@@ -219,8 +219,23 @@
                     </select>
                 </div>
 
-                <div class="col-md-8">
+                <div class="col-md-8" id="panel-pago-adicional">
                     <div class="row g-2">
+                        <div class="col-md-12">
+                            <label class="form-label mb-1" for="medio-pago-adicional">
+                                Medio de pago adicional
+                            </label>
+                            <select id="medio-pago-adicional" class="form-select" disabled>
+                                <option value="">Seleccione cómo paga el cliente</option>
+                                <option value="EFECTIVO">Efectivo</option>
+                                <option value="TARJETA">Tarjeta</option>
+                                <option value="TRANSFERENCIA">Transferencia</option>
+                                <option value="COMBINADO">Combinado</option>
+                            </select>
+                            <div class="form-text" id="ayuda-pago-adicional">
+                                Se habilita cuando la prenda entregada tiene un valor mayor.
+                            </div>
+                        </div>
                         <div class="col-md-4">
                             <label class="form-label">
                                 Pago adicional efectivo
@@ -231,7 +246,8 @@
                                 min="0"
                                 step="100"
                                 value="0"
-                                class="form-control pago-adicional">
+                                class="form-control pago-adicional"
+                                disabled>
                         </div>
 
                         <div class="col-md-4">
@@ -244,7 +260,8 @@
                                 min="0"
                                 step="100"
                                 value="0"
-                                class="form-control pago-adicional">
+                                class="form-control pago-adicional"
+                                disabled>
                         </div>
 
                         <div class="col-md-4">
@@ -257,9 +274,11 @@
                                 min="0"
                                 step="100"
                                 value="0"
-                                class="form-control pago-adicional">
+                                class="form-control pago-adicional"
+                                disabled>
                         </div>
                     </div>
+                    <div id="detalle-pago-adicional" class="small mt-2 text-muted"></div>
                 </div>
             </div>
 
@@ -314,6 +333,24 @@ function valorNumerico(valor) {
     return Number.isFinite(numero) ? numero : 0;
 }
 
+// Debe coincidir con redondear_a_peso_colombiano() del servidor. Cada línea
+// se redondea a $100 COP antes de sumar para que la diferencia mostrada sea
+// exactamente la misma que se registra en caja.
+function totalLinea(cantidad, precio) {
+    const unidades = (valorNumerico(cantidad) * valorNumerico(precio)) / 100;
+    const inferior = Math.floor(unidades);
+    const fraccion = unidades - inferior;
+
+    // Decimal.quantize() del backend usa ROUND_HALF_EVEN por defecto.
+    // Reproducimos esa regla para los casos exactos de $50 y evitar que el
+    // navegador muestre una diferencia distinta a la que validará Django.
+    if (Math.abs(fraccion - 0.5) < 0.0000001) {
+        return (inferior % 2 === 0 ? inferior : inferior + 1) * 100;
+    }
+
+    return Math.round(unidades) * 100;
+}
+
 function csrfToken() {
     const nombre = "csrftoken=";
 
@@ -340,9 +377,7 @@ function mostrarMensaje(texto, tipo = "danger") {
 function total(items) {
     return items.reduce(
         (acumulado, item) => (
-            acumulado
-            + valorNumerico(item.cantidad)
-            * valorNumerico(item.precio)
+            acumulado + totalLinea(item.cantidad, item.precio)
         ),
         0,
     );
@@ -383,8 +418,7 @@ function renderTabla(tipo) {
             item.cantidad = valorNumerico(this.value);
 
             celdaValor.textContent = dinero.format(
-                valorNumerico(item.precio)
-                * valorNumerico(item.cantidad)
+                totalLinea(item.cantidad, item.precio)
             );
 
             actualizarResumen();
@@ -418,8 +452,7 @@ function renderTabla(tipo) {
         const celdaValor = document.createElement("td");
         celdaValor.className = "text-end";
         celdaValor.textContent = dinero.format(
-            valorNumerico(item.precio)
-            * valorNumerico(item.cantidad)
+            totalLinea(item.cantidad, item.precio)
         );
 
         fila.appendChild(celdaValor);
@@ -443,8 +476,7 @@ function renderTabla(tipo) {
                 item.precio_manual = true;
 
                 celdaValor.textContent = dinero.format(
-                    valorNumerico(item.precio)
-                    * valorNumerico(item.cantidad)
+                    totalLinea(item.cantidad, item.precio)
                 );
 
                 actualizarResumen();
@@ -493,6 +525,7 @@ function actualizarResumen() {
         dinero.format(entregado);
 
     const resultado = document.getElementById("resultado");
+    actualizarPanelPago(diferencia);
 
     if (recibido <= 0) {
         resultado.className = "text-muted";
@@ -527,6 +560,124 @@ function actualizarResumen() {
 
     resultado.className = "text-primary";
     resultado.textContent = "Cambio por valor igual";
+}
+
+function valorPago(id) {
+    return valorNumerico(document.getElementById(id).value);
+}
+
+function establecerPago(id, valor) {
+    document.getElementById(id).value = valor > 0 ? valor : 0;
+}
+
+function actualizarPanelPago(diferencia) {
+    const medio = document.getElementById("medio-pago-adicional");
+    const permiteReembolso = document.getElementById("permite-reembolso");
+    const medioReembolso = document.getElementById("medio-reembolso");
+    const detalle = document.getElementById("detalle-pago-adicional");
+    const campos = {
+        EFECTIVO: document.getElementById("efectivo"),
+        TARJETA: document.getElementById("tarjeta"),
+        TRANSFERENCIA: document.getElementById("transferencia"),
+    };
+
+    if (diferencia <= 0) {
+        medio.disabled = true;
+        medio.value = "";
+        Object.values(campos).forEach((campo) => {
+            campo.disabled = true;
+            campo.value = 0;
+        });
+        permiteReembolso.disabled = diferencia >= 0;
+        if (diferencia >= 0) {
+            permiteReembolso.checked = false;
+            medioReembolso.value = "";
+            medioReembolso.disabled = true;
+        }
+        detalle.textContent = diferencia < 0
+            ? "No se cobra pago adicional. Active el reembolso solo si va a devolver el saldo al cliente."
+            : "No hay diferencia por cobrar.";
+        return;
+    }
+
+    permiteReembolso.checked = false;
+    permiteReembolso.disabled = true;
+    medioReembolso.value = "";
+    medioReembolso.disabled = true;
+    medio.disabled = false;
+
+    const seleccionado = medio.value;
+    Object.entries(campos).forEach(([tipo, campo]) => {
+        campo.disabled = seleccionado !== "COMBINADO" && seleccionado !== tipo;
+        if (campo.disabled) {
+            campo.value = 0;
+        }
+    });
+
+    if (!seleccionado) {
+        detalle.textContent = "Seleccione el medio con el que el cliente pagará la diferencia.";
+        return;
+    }
+
+    const totalIngresado = Object.values(campos).reduce(
+        (acumulado, campo) => acumulado + valorNumerico(campo.value), 0
+    );
+    const vuelto = Math.max(totalIngresado - diferencia, 0);
+    const pendiente = Math.max(diferencia - totalIngresado, 0);
+
+    detalle.className = "small mt-2 " + (pendiente > 0 ? "text-danger" : "text-success");
+    if (vuelto > 0) {
+        detalle.textContent = "Recibido: " + dinero.format(totalIngresado)
+            + " · Vuelto: " + dinero.format(vuelto);
+    } else if (pendiente > 0) {
+        detalle.textContent = "Pendiente por cobrar: " + dinero.format(pendiente);
+    } else {
+        detalle.textContent = "Pago completo: " + dinero.format(diferencia);
+    }
+}
+
+function configurarMedioPago() {
+    const medio = document.getElementById("medio-pago-adicional");
+    const diferencia = total(entregados) - total(recibidos);
+
+    if (diferencia <= 0 || !medio.value) {
+        actualizarPanelPago(diferencia);
+        return;
+    }
+
+    ["efectivo", "tarjeta", "transferencia"].forEach((id) => establecerPago(id, 0));
+    if (medio.value !== "COMBINADO") {
+        establecerPago(medio.value.toLowerCase(), diferencia);
+    }
+    actualizarPanelPago(diferencia);
+}
+
+function pagosParaEnviar(diferencia) {
+    if (diferencia <= 0) {
+        return { efectivo: 0, tarjeta: 0, transferencia: 0 };
+    }
+
+    const efectivo = valorPago("efectivo");
+    const tarjeta = valorPago("tarjeta");
+    const transferencia = valorPago("transferencia");
+    const totalIngresado = efectivo + tarjeta + transferencia;
+
+    if (totalIngresado < diferencia) {
+        throw new Error("El pago adicional es menor que la diferencia del cambio.");
+    }
+
+    // El vuelto sale en efectivo. Solo se registra en caja el efectivo neto,
+    // para que el arqueo conserve la diferencia real del cambio.
+    const vuelto = totalIngresado - diferencia;
+    if (vuelto > efectivo) {
+        throw new Error("El excedente debe poder devolverse en efectivo. Ajuste los valores o use pago combinado.");
+    }
+
+    return {
+        efectivo: efectivo - vuelto,
+        tarjeta: tarjeta,
+        transferencia: transferencia,
+    };
 }
 
 async function buscarProducto(tipo, valor) {
@@ -703,6 +854,14 @@ async function procesarOperacion() {
         return;
     }
 
+    let pagos;
+    try {
+        pagos = pagosParaEnviar(diferencia);
+    } catch (error) {
+        mostrarMensaje(error.message);
+        return;
+    }
+
     const payload = {
         productos_recibidos: recibidos.map(item => ({
             variante_id: item.variante_id,
@@ -735,17 +894,9 @@ async function procesarOperacion() {
         permite_reembolso: permiteReembolso,
         medio_reembolso: medioReembolso,
 
-        efectivo: document.getElementById(
-            "efectivo"
-        ).value || 0,
-
-        tarjeta: document.getElementById(
-            "tarjeta"
-        ).value || 0,
-
-        transferencia: document.getElementById(
-            "transferencia"
-        ).value || 0,
+        efectivo: pagos.efectivo,
+        tarjeta: pagos.tarjeta,
+        transferencia: pagos.transferencia,
     };
 
     const boton = document.getElementById("btn-procesar");
@@ -852,8 +1003,18 @@ async function actualizarPreciosPorTipo() {
 }
 
 document.addEventListener("DOMContentLoaded", function () {
-    activarBuscador("recibido");
-    activarBuscador("entregado");
+activarBuscador("recibido");
+activarBuscador("entregado");
+
+document.getElementById("medio-pago-adicional").addEventListener(
+    "change", configurarMedioPago
+);
+
+document.querySelectorAll(".pago-adicional").forEach((campo) => {
+    campo.addEventListener("input", () => {
+        actualizarPanelPago(total(entregados) - total(recibidos));
+    });
+});
 
     document.getElementById(
         "permite-reembolso"

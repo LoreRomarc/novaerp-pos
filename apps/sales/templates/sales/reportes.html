@@ -180,7 +180,8 @@
                         <th>Estado</th>
                         <th class="text-end">Efectivo</th>
                         <th class="text-end">Transferencia</th>
-                        <th class="text-end">Tarjeta</th>
+                        {# TARJETA: columna preparada para habilitar cuando se active este medio de pago. #}
+                        <th class="text-end d-none">Tarjeta</th>
                         <th class="text-end">Total</th>
                         <th></th>
                     </tr>
@@ -224,7 +225,8 @@
                             <td class="text-end">
                                 ${{ venta.transferencia_caja|floatformat:0|intcomma }}
                             </td>
-                            <td class="text-end">
+                            {# TARJETA: se conserva el cálculo en backend; esta celda se activa al habilitar el medio. #}
+                            <td class="text-end d-none">
                                 ${{ venta.tarjeta_caja|floatformat:0|intcomma }}
                             </td>
                             <td class="text-end fw-bold">

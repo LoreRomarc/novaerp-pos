@@ -1,17 +1,72 @@
-<!DOCTYPE html>
-<html>
+{% load static %}
+<!doctype html>
+<html lang="es">
 <head>
-    <title>Login</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Iniciar sesión | NovaERP</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root { --brand: #182b49; --accent: #2c7a63; --soft: #eef4f7; }
+        body { min-height: 100vh; background: var(--soft); font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif; }
+        .login-shell { min-height: 100vh; }
+        .login-brand { min-height: 100%; color: #fff; padding: clamp(2rem, 7vw, 6rem); background: radial-gradient(circle at 20% 20%, #397a85 0, transparent 38%), linear-gradient(145deg, #10233e, #1f4e59); }
+        .brand-mark { width: 3.4rem; height: 3.4rem; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.35); border-radius: 1rem; background: rgba(255,255,255,.12); font-size: 1.45rem; }
+        .login-card { max-width: 28rem; width: 100%; border: 0; border-radius: 1.25rem; box-shadow: 0 1.25rem 3rem rgba(19, 44, 68, .13); }
+        .form-floating > .form-control { height: 3.7rem; }
+        .form-control:focus { border-color: #2c7a63; box-shadow: 0 0 0 .25rem rgba(44, 122, 99, .14); }
+        .btn-login { min-height: 3.25rem; border: 0; background: var(--brand); font-weight: 600; }
+        .btn-login:hover, .btn-login:focus { background: #0e2038; }
+        @media (max-width: 991.98px) { .login-brand { min-height: auto; padding: 2.25rem; } }
+    </style>
 </head>
 <body>
+    <main class="container-fluid login-shell p-0">
+        <div class="row g-0 min-vh-100">
+            <section class="col-lg-6 d-flex login-brand">
+                <div class="align-self-center">
+                    <div class="brand-mark mb-4"><i class="bi bi-box-seam"></i></div>
+                    <p class="text-uppercase small fw-semibold mb-2" style="letter-spacing:.12em">Gestión comercial</p>
+                    <h1 class="display-5 fw-semibold mb-3">Control claro para cada venta, caja e inventario.</h1>
+                    <p class="lead opacity-75 mb-0">Accede a NovaERP para continuar operando tu sucursal de forma segura.</p>
+                </div>
+            </section>
 
-<h2>Iniciar Sesión</h2>
+            <section class="col-lg-6 d-flex align-items-center justify-content-center p-4 p-md-5">
+                <div class="card login-card">
+                    <div class="card-body p-4 p-md-5">
+                        <div class="d-lg-none brand-mark text-white mb-4" style="background:var(--brand)"><i class="bi bi-box-seam"></i></div>
+                        <p class="text-uppercase small fw-semibold text-success mb-2" style="letter-spacing:.1em">Bienvenido</p>
+                        <h2 class="h3 fw-bold mb-2">Iniciar sesión</h2>
+                        <p class="text-muted mb-4">Ingresa tus credenciales para abrir tu espacio de trabajo.</p>
 
-<form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Entrar</button>
-</form>
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger small py-2">{{ form.non_field_errors }}</div>
+                        {% endif %}
 
+                        <form method="post" novalidate>
+                            {% csrf_token %}
+                            {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
+
+                            <div class="form-floating mb-3">
+                                <input type="text" name="username" id="id_username" class="form-control {% if form.username.errors %}is-invalid{% endif %}" value="{{ form.username.value|default:'' }}" placeholder="Usuario" autocomplete="username" autofocus required>
+                                <label for="id_username"><i class="bi bi-person me-1"></i>Usuario</label>
+                                {% for error in form.username.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                            </div>
+
+                            <div class="form-floating mb-4">
+                                <input type="password" name="password" id="id_password" class="form-control {% if form.password.errors %}is-invalid{% endif %}" placeholder="Contraseña" autocomplete="current-password" required>
+                                <label for="id_password"><i class="bi bi-lock me-1"></i>Contraseña</label>
+                                {% for error in form.password.errors %}<div class="invalid-feedback">{{ error }}</div>{% endfor %}
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-login w-100">Entrar al sistema <i class="bi bi-arrow-right ms-1"></i></button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+        </div>
+    </main>
 </body>
 </html>

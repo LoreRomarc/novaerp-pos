@@ -7,7 +7,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.http import JsonResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.views import View
 from django.views.generic import ListView
 
@@ -126,6 +126,28 @@ class DevolucionListView(
             qs = qs.filter(filtros)
 
         return qs
+
+
+class DevolucionDetalleView(
+    LoginRequiredMixin,
+    RolePermissionMixin,
+    SucursalIsolationMixin,
+    View,
+):
+    """Fragmento JSON para consultar el comprobante sin abandonar el historial."""
+    allowed_roles = DEVOLUCION_ROLES
+
+    def get(self, request, pk):
+        devolucion = get_object_or_404(
+            Devolucion.objects.select_related("usuario", "venta", "turno")
+            .prefetch_related(
+                "items_devueltos__variante__producto_base",
+                "items_entregados__variante__producto_base",
+            ), pk=pk, sucursal=self.get_sucursal(),
+        )
+        return render(request, "sales/devoluciones/detalle_modal.html", {
+            "devolucion": devolucion,
+        })
 
 
 class CambioDirectoView(DevolucionBaseView):

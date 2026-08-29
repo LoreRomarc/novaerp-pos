@@ -3,7 +3,10 @@ from django.urls import path
 
 from apps.administration.api.user_search_api import UserSearchAPI
 from apps.administration.views.dashboard import AdminDashboardView
-from apps.administration.views.empresa_views import EmpresaListView
+from apps.administration.views.empresa_views import (
+    EmpresaListView,
+    EmpresaUpdateView,
+)
 from apps.administration.views.sucursal_views import (
     SucursalListView,
     SucursalCreateView
@@ -33,8 +36,11 @@ from apps.administration.views.catalog_views import (
 from apps.administration.views.precio_views import (
     ListaPrecioListView,
     ListaPrecioCreateView,
+    ListaPrecioUpdateView,
     PrecioVarianteListView,
     PrecioVarianteCreateView,
+    PrecioVarianteUpdateView,
+    PrecioVarianteBusquedaView,
 )
 
 app_name = "administration"
@@ -45,6 +51,7 @@ urlpatterns = [
     path("api/users/search/", UserSearchAPI.as_view(), name="user_search_api"),
 
     path("empresas/", EmpresaListView.as_view(), name="empresa_list"),
+    path("empresas/<int:pk>/editar/", EmpresaUpdateView.as_view(), name="empresa_update",),
 
     # ======================
     # SUCURSALES
@@ -93,6 +100,11 @@ urlpatterns = [
         ListaPrecioCreateView.as_view(),
         name="lista_precio_create"
     ),
+    path(
+        "listas-precios/<int:pk>/editar/",
+        ListaPrecioUpdateView.as_view(),
+        name="lista_precio_update",
+    ),
 
     path(
         "precios-variantes/",
@@ -104,6 +116,16 @@ urlpatterns = [
         "precios-variantes/create/",
         PrecioVarianteCreateView.as_view(),
         name="precio_variante_create"
+    ),
+    path(
+        "precios-variantes/<int:pk>/editar/",
+        PrecioVarianteUpdateView.as_view(),
+        name="precio_variante_update",
+    ),
+    path(
+        "precios-variantes/buscar/",
+        PrecioVarianteBusquedaView.as_view(),
+        name="precio_variante_search",
     ),
 
 

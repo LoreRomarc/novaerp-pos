@@ -265,6 +265,7 @@ class VentaDetalleView(
             )
         )
 
+
 class ReporteCajaView(
     LoginRequiredMixin,
     RolePermissionMixin,

@@ -1,57 +1,48 @@
-{% extends "base.html" %}
+{% extends "administration/base_admin.html" %}
 
-{% block content %}
+{% block title %}Tallas{% endblock %}
 
-<div class="card shadow-sm">
-
-    <div class="card-header d-flex justify-content-between">
-
-        <h5>Tallas</h5>
-
-        <a href="{% url 'administration:talla_create' %}"
-           class="btn btn-primary">
-            Nueva talla
-        </a>
-
+{% block admin_content %}
+<div class="admin-page-header">
+    <div>
+        <div class="admin-eyebrow">Catálogo</div>
+        <h1 class="admin-page-title">Tallas</h1>
+        <p class="admin-page-subtitle">Defina el orden en que se muestran las tallas en productos y ventas.</p>
     </div>
-
-    <div class="card-body">
-
-        <table class="table table-hover">
-
-            <thead>
-                <tr>
-                    <th>Nombre</th>
-                    <th>Orden</th>
-                    <th>Activo</th>
-                </tr>
-            </thead>
-
-            <tbody>
-
-                {% for talla in tallas %}
-
-                <tr>
-                    <td>{{ talla.nombre }}</td>
-                    <td>{{ talla.orden }}</td>
-
-                    <td>
-                        {% if talla.activo %}
-                            ✅
-                        {% else %}
-                            ❌
-                        {% endif %}
-                    </td>
-                </tr>
-
-                {% endfor %}
-
-            </tbody>
-
-        </table>
-
-    </div>
-
+    <a href="{% url 'administration:talla_create' %}" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Nueva talla</a>
 </div>
 
+<div class="admin-card">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">Tallas registradas</h2>
+        <div class="admin-search"><i class="bi bi-search"></i><input id="tallaSearch" type="search" class="form-control" placeholder="Buscar talla"></div>
+    </div>
+    <div class="table-responsive">
+        <table class="table admin-table align-middle">
+            <thead><tr><th>Talla</th><th>Orden</th><th>Estado</th></tr></thead>
+            <tbody id="tallaTable">
+                {% for talla in tallas %}
+                    <tr>
+                        <td class="fw-semibold text-dark">{{ talla.nombre }}</td>
+                        <td>{{ talla.orden }}</td>
+                        <td>{% if talla.activo %}<span class="admin-badge admin-badge-success">Activa</span>{% else %}<span class="admin-badge admin-badge-muted">Inactiva</span>{% endif %}</td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="3"><div class="admin-empty"><i class="bi bi-rulers"></i>No hay tallas registradas.</div></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block content-script %}
+<script>
+    const tallaSearch = document.getElementById("tallaSearch");
+    const tallaRows = document.querySelectorAll("#tallaTable tr");
+    tallaSearch.addEventListener("input", function () {
+        const q = this.value.trim().toLowerCase();
+        tallaRows.forEach((row) => { row.hidden = Boolean(q) && !row.innerText.toLowerCase().includes(q); });
+    });
+</script>
 {% endblock %}

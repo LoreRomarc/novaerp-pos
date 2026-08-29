@@ -6,36 +6,126 @@
     <title>{% block title %}Sistema{% endblock %}</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
 
     {% block content-link %}{% endblock %}
 
     <style>
+    :root {
+        --brand: #182b49;
+        --brand-strong: #10233e;
+        --accent: #2c7a63;
+        --accent-strong: #21614f;
+        --surface: #ffffff;
+        --canvas: #eef4f7;
+        --ink: #172033;
+        --muted: #64748b;
+        --border: #dce6eb;
+        --bs-primary: #182b49;
+        --bs-primary-rgb: 24, 43, 73;
+        --bs-success: #2c7a63;
+        --bs-success-rgb: 44, 122, 99;
+        --bs-link-color: #21614f;
+        --bs-link-hover-color: #182b49;
+    }
+
     body {
         overflow-x: hidden;
-        background: #f4f6f9;
+        background: var(--canvas);
+        color: var(--ink);
+        font-family: Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
     }
+
+    .content {
+        min-height: 100vh;
+    }
+
+    .content .card {
+        border-color: var(--border);
+        border-radius: .9rem;
+        box-shadow: 0 .5rem 1.5rem rgba(24, 43, 73, .06);
+        background: var(--surface);
+    }
+
+    .content .card-header {
+        border-bottom-color: var(--border);
+        background: transparent;
+    }
+
+    .content .table > :not(caption) > * > * {
+        border-color: var(--border);
+    }
+
+    .content .form-control,
+    .content .form-select {
+        border-color: #cddae0;
+    }
+
+    .content .form-control:focus,
+    .content .form-select:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 .2rem rgba(44, 122, 99, .14);
+    }
+
+    .btn-primary {
+        --bs-btn-bg: var(--brand);
+        --bs-btn-border-color: var(--brand);
+        --bs-btn-hover-bg: var(--brand-strong);
+        --bs-btn-hover-border-color: var(--brand-strong);
+        --bs-btn-active-bg: var(--brand-strong);
+        --bs-btn-active-border-color: var(--brand-strong);
+    }
+
+    .btn-success { --bs-btn-bg: var(--accent); --bs-btn-border-color: var(--accent); --bs-btn-hover-bg: var(--accent-strong); --bs-btn-hover-border-color: var(--accent-strong); }
+    .btn-outline-primary { --bs-btn-color: var(--brand); --bs-btn-border-color: #9eafb9; --bs-btn-hover-bg: var(--brand); --bs-btn-hover-border-color: var(--brand); }
+    .btn-outline-secondary, .btn-light { --bs-btn-color: #415466; --bs-btn-border-color: #cddae0; --bs-btn-hover-bg: #e7eff2; --bs-btn-hover-border-color: #cddae0; }
+    .badge, .alert { border-radius: .55rem; }
+    .badge.bg-primary, .text-bg-primary { background-color: var(--brand)!important; }
+    .badge.bg-success, .text-bg-success { background-color: var(--accent)!important; }
+    .badge.bg-secondary, .text-bg-secondary { background-color: #627584!important; }
+    .badge.bg-warning, .text-bg-warning { background-color: #e6b65c!important; }
+    .badge.bg-danger, .text-bg-danger { background-color: #b65352!important; }
+    .bg-dark, .table-dark { background-color: var(--brand)!important; }
+    .text-primary { color: var(--brand)!important; }
+    .text-success { color: var(--accent)!important; }
+    .text-danger { color: #a44343!important; }
+    .text-info { color: var(--accent-strong)!important; }
+    .text-warning { color: #806124!important; }
+    .border-primary { border-color: var(--brand)!important; }
+    .border-success, .border-info { border-color: var(--accent)!important; }
+    .border-warning { border-color: #b58a38!important; }
+    .border-danger { border-color: #b65352!important; }
+    .table-light > :not(caption) > * > * { background-color: #f4f8f9; color: #415466; }
+    .modal-content { border: 0; border-radius: 1rem; box-shadow: 0 1rem 3rem rgba(24,43,73,.2); }
+    .modal-header { border-bottom-color: var(--border); }
+    .modal-footer { border-top-color: var(--border); }
+    .table > :not(caption) > * > * { vertical-align: middle; }
+    .currency, [data-cop] { font-variant-numeric: tabular-nums; }
 
     .sidebar {
         height: 100vh;
-        background: linear-gradient(180deg, #1e1e2f, #151521);
+        background: radial-gradient(circle at 16% 0%, rgba(57,122,133,.42), transparent 32%), linear-gradient(165deg, #10233e, #182b49 64%, #153942);
         color: white;
         position: fixed;
-        width: 260px;
+        width: 272px;
         display: flex;
         flex-direction: column;
     }
 
     .sidebar-title {
-        font-size: 22px;
-        padding: 20px;
-        text-align: center;
-        background-color: #111827;
-        font-weight: bold;
+        padding: 1.35rem 1.25rem 1rem;
+        border-bottom: 1px solid rgba(255,255,255,.12);
     }
+    .sidebar-brand { display: flex; align-items: center; gap: .75rem; font-size: 1.1rem; font-weight: 700; letter-spacing: .01em; }
+    .sidebar-brand-mark, .nav-icon { display: inline-grid; place-items: center; flex: 0 0 auto; }
+    .sidebar-brand-mark { width: 2.25rem; height: 2.25rem; border: 1px solid rgba(255,255,255,.22); border-radius: .7rem; background: rgba(255,255,255,.12); font-size: 1.05rem; }
 
     .sidebar-content {
         flex: 1;
+        min-height: 0;
         overflow-y: auto;
+        overscroll-behavior: contain;
+        padding-bottom: .75rem;
 
         scrollbar-width: thin;
         scrollbar-color: rgba(255,255,255,.15) transparent;
@@ -59,25 +149,29 @@
     }
 
     .sidebar a {
-        color: #bdbdbd;
+        color: rgba(240,248,250,.72);
         text-decoration: none;
-        display: block;
-        padding: 12px 20px;
-        border-left: 3px solid transparent;
-        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        gap: .75rem;
+        margin: .1rem .75rem;
+        padding: .62rem .75rem;
+        border-radius: .6rem;
+        border-left: 0;
+        transition: all .18s ease;
     }
 
     .sidebar a.active {
-        background-color: #2a2a40;
+        background-color: rgba(255,255,255,.14);
         color: white;
-        border-left: 3px solid #6366f1;
+        box-shadow: inset 3px 0 0 #76c2aa;
     }
 
     .sidebar-content::-webkit-scrollbar-thumb {
         background: linear-gradient(
             180deg,
-            rgba(99,102,241,.55),
-            rgba(79,70,229,.55)
+            rgba(118,194,170,.55),
+            rgba(44,122,99,.55)
         );
         border-radius: 20px;
     }
@@ -85,50 +179,61 @@
     .sidebar-content::-webkit-scrollbar-thumb:hover {
         background: linear-gradient(
             180deg,
-            rgba(99,102,241,.85),
-            rgba(79,70,229,.85)
+            rgba(118,194,170,.85),
+            rgba(44,122,99,.85)
         );
     }
 
     .sidebar a:hover {
-        background-color: #2a2a40;
+        background-color: rgba(255,255,255,.09);
         color: white;
     }
 
     .section {
-        margin-top: 15px;
-        font-size: 12px;
-        padding: 10px 20px;
-        color: #6b7280;
+        margin-top: 1rem;
+        font-size: .67rem;
+        letter-spacing: .1em;
+        text-transform: uppercase;
+        padding: .5rem 1.5rem;
+        color: rgba(213,237,238,.52);
     }
 
     .content {
-        margin-left: 260px;
-        padding: 25px;
+        margin-left: 272px;
+        padding: 1.75rem;
     }
 
     .user-box {
-        padding: 15px;
-        background: #111827;
+        padding: 1rem 1.25rem;
+        border-top: 1px solid rgba(255,255,255,.12);
+        background: rgba(4,20,37,.22);
     }
 
     .global-search-results {
         position: absolute;
         width: 220px;
-        background: #1f2937;
-        border-radius: 8px;
+        background: #fff;
+        color: var(--ink);
+        border-radius: .7rem;
+        box-shadow: 0 .75rem 1.5rem rgba(5,20,40,.25);
         overflow: hidden;
         z-index: 999;
     }
 
     .global-search-results a {
-        color: white;
+        color: var(--ink);
         padding: 10px;
         display: block;
     }
 
     .global-search-results a:hover {
-        background: #374151;
+        background: #edf5f4;
+    }
+
+    @media (max-width: 991.98px) {
+        .sidebar { position: static; width: 100%; height: 100vh; min-height: 28rem; }
+        .sidebar-content { min-height: 0; max-height: none; }
+        .content { margin-left: 0; padding: 1rem; }
     }
 
     </style>
@@ -139,48 +244,111 @@
 <div class="sidebar">
 
     <div class="sidebar-title">
-        🚀 ERP
+        <div class="sidebar-brand"><span class="sidebar-brand-mark"><i class="bi bi-box-seam"></i></span><span>NovaERP</span></div>
+
+        <small
+            class="d-block mt-1 fw-normal"
+            style="font-size: 11px; color: rgba(213,237,238,.72); padding-left: 3rem;">
+            {% if sucursal_activa %}
+                 {{ sucursal_activa.nombre }}
+            {% else %}
+                Sin sucursal activa
+            {% endif %}
+        </small>
     </div>
 
     <!-- GLOBAL SEARCH -->
     <div class="p-2 position-relative">
-        <input type="text" id="globalSearch" class="form-control form-control-sm" placeholder="🔍 Buscar...">
+        <input type="text" id="globalSearch" class="form-control form-control-sm" placeholder="Buscar...">
         <div id="globalResults" class="global-search-results"></div>
     </div>
 
+    {% if puede_cambiar_sucursal %}
+        <div class="px-2 pb-2">
+            <a
+                href="{% url 'sales:seleccionar_sucursal' %}"
+                class="btn btn-outline-light btn-sm w-100">
+                <i class="bi bi-buildings nav-icon"></i> Cambiar sucursal
+            </a>
+        </div>
+    {% endif %}
+
     <div class="sidebar-content">
 
-        <div class="section">Operación</div>
+            {% if request.user.is_authenticated and request.user.profile.role == "SUPER_ADMIN" %}
+
+                <div class="section">Administración</div>
+
+                <a href="{% url 'administration:dashboard' %}"><i class="bi bi-grid-1x2 nav-icon"></i> Panel</a>
+                <a href="{% url 'inventory:dashboard' %}"><i class="bi bi-speedometer2 nav-icon"></i> Dashboard</a>
+                <a href="{% url 'administration:empresa_list' %}"><i class="bi bi-building nav-icon"></i> Empresa</a>
+                <a href="{% url 'administration:sucursal_list' %}"><i class="bi bi-buildings nav-icon"></i> Sucursales</a>
+                <a href="{% url 'administration:user_list' %}"><i class="bi bi-people nav-icon"></i> Usuarios</a>
+                <a href="{% url 'administration:color_list' %}"><i class="bi bi-palette nav-icon"></i> Colores</a>
+                <a href="{% url 'administration:tipo_tela_list' %}"><i class="bi bi-layers nav-icon"></i> Tipos de tela</a>
+                <a href="{% url 'administration:talla_list' %}"><i class="bi bi-rulers nav-icon"></i> Tallas</a>
+                <a href="{% url 'administration:cliente_list' %}"><i class="bi bi-person-vcard nav-icon"></i> Clientes</a>
+
+            {% endif %}
+
+            {% if request.user.is_authenticated and request.user.profile %}
+                {% if request.user.profile.role != "CAJERO" %}
+
+                <div class="section">Inventario</div>
+
+                <a href="{% url 'inventory:producto_list' %}"><i class="bi bi-box-seam nav-icon"></i> Productos</a>
+                <a href="{% url 'inventory:variante_list' %}"><i class="bi bi-boxes nav-icon"></i> Variantes</a>
+                <a href="{% url 'administration:lista_precio_list' %}"><i class="bi bi-tags nav-icon"></i> Listas de precio</a>
+                <a href="{% url 'administration:precio_variante_list' %}"><i class="bi bi-currency-dollar nav-icon"></i> Precios de productos</a>
+                <a href="{% url 'inventory:rollo_list' %}"><i class="bi bi-disc nav-icon"></i> Rollos</a>
+                <a href="{% url 'inventory:corte_produccion' %}"><i class="bi bi-scissors nav-icon"></i> Registrar corte</a>
+                <a href="{% url 'inventory:confeccion_lotes' %}"><i class="bi bi-tools nav-icon"></i> Confección</a>
+                <a href="{% url 'inventory:operarios_produccion' %}"><i class="bi bi-person-gear nav-icon"></i> Operarios de producción</a>
+                <a href="{% url 'inventory:operaciones_produccion' %}"><i class="bi bi-clipboard-data nav-icon"></i> Producción por operarios</a>
+                <a href="{% url 'inventory:produccion_list' %}"><i class="bi bi-clock-history nav-icon"></i> Historial de producción</a>
+                <a href="{% url 'inventory:kardex' %}"><i class="bi bi-journal-text nav-icon"></i> Kardex</a>
+                <a href="{% url 'inventory:stock_list' %}"><i class="bi bi-boxes nav-icon"></i> Stock</a>
+                <a href="{% url 'inventory:traslado_list' %}"><i class="bi bi-truck nav-icon"></i> Traslados</a>
+
+                {% endif %}
+            {% endif %}
 
             {% if request.user.is_authenticated and request.user.profile %}
                 {% if request.user.profile.role == "SUPER_ADMIN" or request.user.profile.role == "ADMIN_SUCURSAL" or request.user.profile.role == "CAJERO" %}
+                    <div class="section">Operación</div>
+
+                    {% if puede_gestionar_cajas %}
+                        <a href="{% url 'sales:caja_configuracion' %}">
+                            <i class="bi bi-cash-register nav-icon"></i> Administrar cajas
+                        </a>
+                    {% endif %}
 
                     {% if request.session.turno_id %}
 
                         <a href="{% url 'sales:pos' %}">
-                            <i class="bi bi-cart3"></i> Punto de venta
+                            <i class="bi bi-cart3 nav-icon"></i> Punto de venta
                         </a>
 
                         <a href="{% url 'sales:devolucion_create' %}">
-                            <i class="bi bi-arrow-left-right"></i> Cambios y devoluciones
+                            <i class="bi bi-arrow-left-right nav-icon"></i> Cambios y devoluciones
                         </a>
 
                         <a href="{% url 'sales:reportes' %}">
-                            <i class="bi bi-graph-up"></i> Reporte de ventas
+                            <i class="bi bi-graph-up nav-icon"></i> Reporte de ventas
                         </a>
 
                         <a href="{% url 'sales:caja_dashboard' %}">
-                            <i class="bi bi-cash-register"></i> Operación de caja
+                            <i class="bi bi-cash-register nav-icon"></i> Operación de caja
                         </a>
 
                     {% else %}
 
                         <a href="{% url 'sales:abrir_caja' %}">
-                            <i class="bi bi-unlock"></i> Abrir caja
+                            <i class="bi bi-unlock nav-icon"></i> Abrir caja
                         </a>
 
                         <a href="{% url 'sales:pos' %}">
-                            <i class="bi bi-cart3"></i> Punto de venta
+                            <i class="bi bi-cart3 nav-icon"></i> Punto de venta
                         </a>
 
                     {% endif %}
@@ -193,62 +361,26 @@
                     <div class="section">Auditoría de caja</div>
 
                     <a href="{% url 'sales:caja_historial_cierres' %}">
-                        <i class="bi bi-archive"></i> Cierres y arqueos
+                        <i class="bi bi-archive nav-icon"></i> Cierres y arqueos
                     </a>
 
                     <a href="{% url 'sales:caja_reportes' %}">
-                        <i class="bi bi-cash-stack"></i> Reporte financiero
+                        <i class="bi bi-cash-stack nav-icon"></i> Reporte financiero
                     </a>
 
                     <a href="{% url 'sales:devolucion_list' %}">
-                        <i class="bi bi-clock-history"></i>
+                        <i class="bi bi-clock-history nav-icon"></i>
                         Historial de cambios
                     </a>
 
                 {% endif %}
             {% endif %}
 
-
-        {% if request.user.is_authenticated and request.user.profile.role == "SUPER_ADMIN" %}
-
-            <div class="section">Administración</div>
-
-            <a href="{% url 'administration:dashboard' %}">🧠 Panel</a>
-            <a href="{% url 'inventory:dashboard' %}">📦 Dashboard</a>
-            <a href="{% url 'administration:empresa_list' %}">🏭 Empresa</a>
-            <a href="{% url 'administration:sucursal_list' %}">🏢 Sucursales</a>
-            <a href="{% url 'administration:user_list' %}">👥 Usuarios</a>
-            <a href="{% url 'administration:color_list' %}">🎨 Colores</a>
-            <a href="{% url 'administration:tipo_tela_list' %}">🧵 Tipos Tela</a>
-            <a href="{% url 'administration:talla_list' %}">📏 Tallas</a>
-            <a href="{% url 'administration:cliente_list' %}">🧾 Clientes</a>
-
-        {% endif %}
-
-        {% if request.user.is_authenticated and request.user.profile %}
-            {% if request.user.profile.role != "CAJERO" %}
-
-            <div class="section">Inventario</div>
-
-            <a href="{% url 'inventory:producto_list' %}">🧵 Productos</a>
-            <a href="{% url 'inventory:variante_list' %}">🧩 Variantes</a>
-            <a href="{% url 'administration:lista_precio_list' %}">💰 Listas de Precio</a>
-            <a href="{% url 'administration:precio_variante_list' %}">🏷️ Precios Productos</a>
-            <a href="{% url 'inventory:rollo_list' %}">🧶 Rollos</a>
-            <a href="{% url 'inventory:corte_produccion' %}">✂️ Corte</a>
-            <a href="{% url 'inventory:produccion_list' %}">🏭 Producción</a>
-            <a href="{% url 'inventory:kardex' %}">🔄 Kardex</a>
-            <a href="{% url 'inventory:stock_list' %}">📊 Stock</a>
-            <a href="{% url 'inventory:traslado_list' %}">🚚 Traslados</a>
-
-            {% endif %}
-        {% endif %}
-
     </div>
 
     <div class="user-box">
 
-        <div>👤 {{ request.user.username }}</div>
+        <div class="small"><i class="bi bi-person-circle me-2"></i>{{ request.user.username }}</div>
 
         <form method="post" action="{% url 'logout' %}">
             {% csrf_token %}
@@ -260,7 +392,6 @@
             </button>
 
         </form>
-
 
     </div>
 
@@ -277,7 +408,7 @@
 <script>
 
 /////////////////////////////////////
-// 🎯 ACTIVE SIDEBAR (FIX REAL)
+// ACTIVE SIDEBAR (FIX REAL)
 /////////////////////////////////////
 
 const currentPath = window.location.pathname.replace(/\/$/, "");
@@ -326,7 +457,7 @@ if (!activeSet) {
 }
 
 /////////////////////////////////////
-// 🔎 GLOBAL SEARCH
+// GLOBAL SEARCH
 /////////////////////////////////////
 
 const input = document.getElementById("globalSearch");
@@ -378,7 +509,7 @@ document.addEventListener("click", function(e){
 });
 
 /////////////////////////////////////
-// 💾 RECORDAR SCROLL DEL SIDEBAR
+// RECORDAR SCROLL DEL SIDEBAR
 /////////////////////////////////////
 
 const sidebarContent =

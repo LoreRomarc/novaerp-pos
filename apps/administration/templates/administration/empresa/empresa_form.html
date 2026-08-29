@@ -1,0 +1,108 @@
+{% extends "administration/base_admin.html" %}
+
+{% block title %}Editar empresa{% endblock %}
+
+{% block admin_content %}
+<div class="admin-page-header">
+    <div>
+        <div class="admin-eyebrow">Configuración general</div>
+        <h1 class="admin-page-title">Editar empresa</h1>
+        <p class="admin-page-subtitle">Actualice los datos legales, de contacto y marca comercial.</p>
+    </div>
+
+    <a href="{% url 'administration:empresa_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Volver
+    </a>
+</div>
+
+<form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="row g-4">
+        <div class="col-12 col-lg-8">
+            <div class="admin-card">
+                <div class="admin-card-body">
+                    <div class="admin-form-section-title">Información general</div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ form.nombre.id_for_label }}">Nombre comercial</label>
+                            {{ form.nombre }}
+                            <div class="text-danger small mt-1">{{ form.nombre.errors }}</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ form.razon_social.id_for_label }}">Razón social</label>
+                            {{ form.razon_social }}
+                            <div class="text-danger small mt-1">{{ form.razon_social.errors }}</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ form.nit.id_for_label }}">NIT</label>
+                            {{ form.nit }}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ form.telefono.id_for_label }}">Teléfono</label>
+                            {{ form.telefono }}
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ form.email.id_for_label }}">Correo</label>
+                            {{ form.email }}
+                            <div class="text-danger small mt-1">{{ form.email.errors }}</div>
+                        </div>
+
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ form.sitio_web.id_for_label }}">Sitio web</label>
+                            {{ form.sitio_web }}
+                            <div class="text-danger small mt-1">{{ form.sitio_web.errors }}</div>
+                        </div>
+
+                        <div class="col-md-8">
+                            <label class="form-label" for="{{ form.direccion.id_for_label }}">Dirección</label>
+                            {{ form.direccion }}
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label" for="{{ form.ciudad.id_for_label }}">Ciudad</label>
+                            {{ form.ciudad }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-4">
+            <div class="admin-card">
+                <div class="admin-card-body">
+                    <div class="admin-form-section-title">Identidad visual</div>
+
+                    {% if object.logo %}
+                        <img src="{{ object.logo.url }}" alt="Logo de {{ object.nombre }}" class="img-fluid rounded border mb-3">
+                    {% endif %}
+
+                    <label class="form-label" for="{{ form.logo.id_for_label }}">Logo</label>
+                    {{ form.logo }}
+                    <div class="text-danger small mt-1">{{ form.logo.errors }}</div>
+
+                    <div class="form-check mt-4">
+                        {{ form.activa }}
+                        <label class="form-check-label" for="{{ form.activa.id_for_label }}">Empresa activa</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-flex gap-2 mt-4">
+        <button class="btn btn-primary" type="submit">
+            <i class="bi bi-check-circle"></i> Guardar cambios
+        </button>
+        <a href="{% url 'administration:empresa_list' %}" class="btn btn-light border">Cancelar</a>
+    </div>
+</form>
+{% endblock %}

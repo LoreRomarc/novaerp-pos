@@ -404,28 +404,42 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
 
     <hr />
 
-    <input
-      type="text"
-      id="efectivo"
-      class="form-control form-control-sm mb-2"
-      placeholder="Efectivo"
-    />
-
-    <input
-      type="text"
-      id="transferencia"
-      class="form-control form-control-sm mb-2"
-      placeholder="Transferencia"
-    />
-
-    <div class="mb-2 d-none">
+    <div class="form-floating mb-2">
       <input
         type="text"
-        id="tarjeta"
-        class="form-control form-control-sm mb-2"
-        placeholder="Tarjeta"
+        inputmode="decimal"
+        id="efectivo"
+        class="form-control form-control-sm"
+        placeholder="0"
+        aria-label="Monto recibido en efectivo"
       />
-  </div>
+      <label for="efectivo">Efectivo recibido</label>
+    </div>
+
+    <div class="form-floating mb-2">
+      <input
+        type="text"
+        inputmode="decimal"
+        id="transferencia"
+        class="form-control form-control-sm"
+        placeholder="0"
+        aria-label="Monto recibido por transferencia"
+      />
+      <label for="transferencia">Transferencia</label>
+    </div>
+
+    {# TARJETA: interfaz preparada para activarse cuando el negocio habilite este medio de pago. #}
+    <div class="form-floating mb-2 d-none">
+      <input
+        type="text"
+        inputmode="decimal"
+        id="tarjeta"
+        class="form-control form-control-sm"
+        placeholder="0"
+        aria-label="Monto recibido con tarjeta"
+      />
+      <label for="tarjeta">Tarjeta</label>
+    </div>
 
 
     <div>Total Pagado:<span id="total_pagado">0.00</span></div>
@@ -1138,6 +1152,16 @@ function guardarEstadoVenta(){
         });
       });
 
+      // Al abrir un campo con 0.00, se selecciona completo para que escribir
+      // un monto lo reemplace sin obligar al cajero a borrarlo primero.
+      [inputEfectivo, inputTransferencia].forEach((inp) => {
+        inp.addEventListener("focus", () => {
+          if (toNumber(inp.value) === 0) {
+            setTimeout(() => inp.select(), 0);
+          }
+        });
+      });
+
       function actualizarTotalesPago() {
       const total = Math.round(toNumber($("total").dataset.raw || 0));
 
@@ -1330,6 +1354,40 @@ function guardarEstadoVenta(){
       });
 
     }, true);
+
+    let temporizadorGuardadoEstado;
+
+  function programarGuardadoEstado() {
+      clearTimeout(temporizadorGuardadoEstado);
+
+      temporizadorGuardadoEstado = setTimeout(() => {
+          guardarEstadoVenta();
+      }, 400);
+  }
+
+  [
+      inputCliente,
+      inputObservaciones,
+      inputEfectivo,
+      inputTransferencia,
+      inputTarjeta,
+  ].forEach((input) => {
+      input.addEventListener(
+          "input",
+          programarGuardadoEstado
+      );
+
+      input.addEventListener(
+          "change",
+          programarGuardadoEstado
+      );
+  });
+
+  window.addEventListener("pagehide", function () {
+      if (ventaActualUUID) {
+          guardarEstadoVenta();
+      }
+  });
 
 </script>
 

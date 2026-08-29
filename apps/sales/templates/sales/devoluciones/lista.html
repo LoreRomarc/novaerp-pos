@@ -64,6 +64,7 @@
                         <th class="text-end">Entregado</th>
                         <th class="text-end">Cobrado</th>
                         <th class="text-end">Reembolsado</th>
+                        <th></th>
                     </tr>
                 </thead>
 
@@ -123,10 +124,11 @@
                                 —
                             {% endif %}
                         </td>
+                        <td class="text-end"><button type="button" class="btn btn-sm btn-outline-primary js-ver-devolucion" data-id="{{ devolucion.id }}"><i class="bi bi-eye"></i><span class="visually-hidden">Ver detalle</span></button></td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="9" class="text-center text-muted py-4">
+                        <td colspan="10" class="text-center text-muted py-4">
                             No hay devoluciones o cambios registrados.
                         </td>
                     </tr>
@@ -136,4 +138,10 @@
         </div>
     </div>
 </div>
+<div class="modal fade" id="modalDevolucion" tabindex="-1"><div class="modal-dialog modal-xl modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Detalle de cambio o devolución</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="contenidoDevolucion"></div></div></div></div>
 {% endblock %}
+{% block content-script %}<script>
+const modalDevolucion = new bootstrap.Modal(document.getElementById("modalDevolucion"));
+const contenidoDevolucion = document.getElementById("contenidoDevolucion");
+document.querySelectorAll(".js-ver-devolucion").forEach((boton) => boton.addEventListener("click", async () => { contenidoDevolucion.textContent = "Cargando detalle…"; modalDevolucion.show(); try { const url = "{% url 'sales:devolucion_detalle' 0 %}".replace("/0/", `/${boton.dataset.id}/`); const respuesta = await fetch(url, {headers:{"X-Requested-With":"XMLHttpRequest"}}); if(!respuesta.ok) throw new Error("No fue posible cargar el detalle."); contenidoDevolucion.innerHTML = await respuesta.text(); } catch(error) { contenidoDevolucion.innerHTML = `<div class="alert alert-danger mb-0">${error.message}</div>`; } }));
+</script>{% endblock %}

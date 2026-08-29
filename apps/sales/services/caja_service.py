@@ -584,74 +584,76 @@ class CajaService:
 
         resumen = {
             "monto_inicial": turno.monto_inicial,
+
+            # Ventas normales, sin cambios.
             "ventas_efectivo": Decimal("0.00"),
             "ventas_tarjeta": Decimal("0.00"),
             "ventas_transferencia": Decimal("0.00"),
-            "ingresos": Decimal("0.00"),
-            "egresos": Decimal("0.00"),
-            "retiros": Decimal("0.00"),
-            "devoluciones": Decimal("0.00"),
+
+            # Excedentes cobrados por cambios.
+            "cambios_efectivo": Decimal("0.00"),
+            "cambios_tarjeta": Decimal("0.00"),
+            "cambios_transferencia": Decimal("0.00"),
+
+            # Reembolsos efectuados.
             "devoluciones_efectivo": Decimal("0.00"),
             "devoluciones_tarjeta": Decimal("0.00"),
             "devoluciones_transferencia": Decimal("0.00"),
+
+            "ingresos": Decimal("0.00"),
+            "egresos": Decimal("0.00"),
+            "retiros": Decimal("0.00"),
             "ajustes": Decimal("0.00"),
         }
 
         for movimiento in movimientos:
             monto = movimiento.monto
+            medio = movimiento.medio_pago
 
-            if movimiento.tipo in {
-                CajaMovimiento.Tipo.VENTA,
-                CajaMovimiento.Tipo.CAMBIO,
-            }:
-                if movimiento.medio_pago == CajaMovimiento.MedioPago.EFECTIVO:
+            if movimiento.tipo == CajaMovimiento.Tipo.VENTA:
+                if medio == CajaMovimiento.MedioPago.EFECTIVO:
                     resumen["ventas_efectivo"] += monto
 
-                elif movimiento.medio_pago == CajaMovimiento.MedioPago.TARJETA:
+                elif medio == CajaMovimiento.MedioPago.TARJETA:
                     resumen["ventas_tarjeta"] += monto
 
-                elif movimiento.medio_pago == CajaMovimiento.MedioPago.TRANSFERENCIA:
+                elif medio == CajaMovimiento.MedioPago.TRANSFERENCIA:
                     resumen["ventas_transferencia"] += monto
 
+            elif movimiento.tipo == CajaMovimiento.Tipo.CAMBIO:
+                if medio == CajaMovimiento.MedioPago.EFECTIVO:
+                    resumen["cambios_efectivo"] += monto
+
+                elif medio == CajaMovimiento.MedioPago.TARJETA:
+                    resumen["cambios_tarjeta"] += monto
+
+                elif medio == CajaMovimiento.MedioPago.TRANSFERENCIA:
+                    resumen["cambios_transferencia"] += monto
+
+            elif movimiento.tipo == CajaMovimiento.Tipo.DEVOLUCION:
+                if medio == CajaMovimiento.MedioPago.EFECTIVO:
+                    resumen["devoluciones_efectivo"] += monto
+
+                elif medio == CajaMovimiento.MedioPago.TARJETA:
+                    resumen["devoluciones_tarjeta"] += monto
+
+                elif medio == CajaMovimiento.MedioPago.TRANSFERENCIA:
+                    resumen["devoluciones_transferencia"] += monto
+
             elif movimiento.tipo == CajaMovimiento.Tipo.INGRESO:
-                if movimiento.medio_pago == CajaMovimiento.MedioPago.EFECTIVO:
+                if medio == CajaMovimiento.MedioPago.EFECTIVO:
                     resumen["ingresos"] += monto
 
             elif movimiento.tipo == CajaMovimiento.Tipo.EGRESO:
-                if movimiento.medio_pago == CajaMovimiento.MedioPago.EFECTIVO:
+                if medio == CajaMovimiento.MedioPago.EFECTIVO:
                     resumen["egresos"] += monto
 
             elif movimiento.tipo == CajaMovimiento.Tipo.RETIRO_BOVEDA:
                 resumen["retiros"] += monto
 
-            elif movimiento.tipo == CajaMovimiento.Tipo.DEVOLUCION:
-                resumen["devoluciones"] += monto
-
-                if movimiento.medio_pago == CajaMovimiento.MedioPago.EFECTIVO:
-                    resumen["devoluciones_efectivo"] += monto
-
-                elif movimiento.medio_pago == CajaMovimiento.MedioPago.TARJETA:
-                    resumen["devoluciones_tarjeta"] += monto
-
-                elif movimiento.medio_pago == CajaMovimiento.MedioPago.TRANSFERENCIA:
-                    resumen["devoluciones_transferencia"] += monto
-
             elif movimiento.tipo == CajaMovimiento.Tipo.AJUSTE:
-                if movimiento.medio_pago == CajaMovimiento.MedioPago.EFECTIVO:
+                if medio == CajaMovimiento.MedioPago.EFECTIVO:
                     resumen["ajustes"] += monto
-
-        resumen["efectivo_esperado"] = (
-            resumen["monto_inicial"]
-            + resumen["ventas_efectivo"]
-            + resumen["ingresos"]
-            + resumen["ajustes"]
-            - resumen["egresos"]
-            - resumen["retiros"]
-            - resumen["devoluciones_efectivo"]
-        )
-
-        if resumen["efectivo_esperado"] < 0:
-            resumen["efectivo_esperado"] = Decimal("0.00")
 
         resumen["ventas_total"] = (
             resumen["ventas_efectivo"]
@@ -659,9 +661,43 @@ class CajaService:
             + resumen["ventas_transferencia"]
         )
 
+        resumen["cambios_total"] = (
+            resumen["cambios_efectivo"]
+            + resumen["cambios_tarjeta"]
+            + resumen["cambios_transferencia"]
+        )
+
+        resumen["devoluciones_total"] = (
+            resumen["devoluciones_efectivo"]
+            + resumen["devoluciones_tarjeta"]
+            + resumen["devoluciones_transferencia"]
+        )
+
+        # Efectivo generado o retirado durante el turno,
+        # sin incluir la base inicial.
+        resumen["efectivo_operacion_neto"] = (
+            resumen["ventas_efectivo"]
+            + resumen["cambios_efectivo"]
+            + resumen["ingresos"]
+            + resumen["ajustes"]
+            - resumen["egresos"]
+            - resumen["retiros"]
+            - resumen["devoluciones_efectivo"]
+        )
+
+        # Efectivo físico que debe existir al cierre.
+        resumen["efectivo_esperado"] = (
+            resumen["monto_inicial"]
+            + resumen["efectivo_operacion_neto"]
+        )
+
         resumen["pagos_no_efectivo"] = (
             resumen["ventas_tarjeta"]
             + resumen["ventas_transferencia"]
+            + resumen["cambios_tarjeta"]
+            + resumen["cambios_transferencia"]
+            - resumen["devoluciones_tarjeta"]
+            - resumen["devoluciones_transferencia"]
         )
 
         return resumen
@@ -1471,25 +1507,28 @@ class CajaService:
                     }
                 )
 
-            cadena = "|".join(
-                [
-                    hash_anterior,
-                    str(movimiento.turno_id),
-                    str(movimiento.numero_secuencia),
-                    str(movimiento.sucursal_id),
-                    str(movimiento.caja_id),
-                    str(movimiento.usuario_id),
-                    movimiento.tipo,
-                    movimiento.medio_pago or "",
-                    str(movimiento.monto),
-                    str(
-                        movimiento.referencia_venta_id
-                        or ""
-                    ),
-                    movimiento.observacion,
-                    movimiento.creado_en.isoformat(),
-                ]
-            )
+            partes_hash = [
+                hash_anterior,
+                str(movimiento.turno_id),
+                str(movimiento.numero_secuencia),
+                str(movimiento.sucursal_id),
+                str(movimiento.caja_id),
+                str(movimiento.usuario_id),
+                movimiento.tipo,
+                movimiento.medio_pago or "",
+                str(movimiento.monto),
+                str(movimiento.referencia_venta_id or ""),
+                movimiento.observacion,
+                movimiento.creado_en.isoformat(),
+            ]
+
+            if movimiento.referencia_devolucion_id:
+                partes_hash.insert(
+                    -2,
+                    str(movimiento.referencia_devolucion_id),
+                )
+
+            cadena = "|".join(partes_hash)
 
             calculado = hashlib.sha256(
                 cadena.encode("utf-8")

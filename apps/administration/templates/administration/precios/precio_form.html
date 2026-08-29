@@ -1,29 +1,192 @@
-{% extends "base.html" %}
+{% extends "administration/base_admin.html" %}
 
-{% block content %}
+{% block title %}{% if modo_edicion %}Editar precio{% else %}Asignar precio{% endif %}{% endblock %}
 
-<div class="card shadow-sm">
-
-    <div class="card-header bg-white">
-        <h5>Asignar Precio</h5>
+{% block admin_content %}
+<div class="admin-page-header">
+    <div>
+        <div class="admin-eyebrow">Configuración comercial</div>
+        <h1 class="admin-page-title">{% if modo_edicion %}Editar precio en grupo{% else %}Asignar precio en grupo{% endif %}</h1>
+        <p class="admin-page-subtitle">{% if modo_edicion %}Se cargaron los precios y sucursales existentes para que pueda actualizarlos sin volver a crearlos.{% else %}Una sola captura actualiza el precio de la variante en todas las sedes seleccionadas.{% endif %}</p>
     </div>
 
-    <div class="card-body">
-
-        <form method="post">
-
-            {% csrf_token %}
-
-            {{ form.as_p }}
-
-            <button class="btn btn-success">
-                Guardar
-            </button>
-
-        </form>
-
-    </div>
-
+    <a href="{% url 'administration:precio_variante_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Volver
+    </a>
 </div>
 
+<form method="post">
+    {% csrf_token %}
+    {% if form.non_field_errors %}<div class="alert alert-danger">{{ form.non_field_errors }}</div>{% endif %}
+
+    <div class="row justify-content-center">
+        <div class="col-12 col-xl-8">
+            <div class="admin-card">
+                <div class="admin-card-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label" for="buscarVariante">Producto o variante</label>
+                            <div class="position-relative">
+                                <input
+                                    id="buscarVariante"
+                                    type="search"
+                                    class="form-control"
+                                    placeholder="Buscar por SKU, producto, color o tela"
+                                    autocomplete="off">
+                                <div id="resultadosVariante" class="list-group position-absolute w-100 shadow-sm d-none" style="z-index: 10;"></div>
+                            </div>
+                            <div id="varianteSeleccionada" class="small text-success mt-2"></div>
+                            <div class="d-none">{{ form.variante }}</div>
+                            <div class="form-text">{% if modo_edicion %}La variante no cambia durante la edición; actualice sus precios o sucursales.{% else %}Escriba al menos dos caracteres y seleccione la talla, color y tela exactos.{% endif %}</div>
+                            <div class="text-danger small mt-1">{{ form.variante.errors }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ form.precio_mayorista.id_for_label }}">Precio mayorista</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                {{ form.precio_mayorista }}
+                            </div>
+                            <div class="text-danger small mt-1">{{ form.precio_mayorista.errors }}</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label" for="{{ form.precio_detal.id_for_label }}">Precio detal</label>
+                            <div class="input-group">
+                                <span class="input-group-text">$</span>
+                                {{ form.precio_detal }}
+                            </div>
+                            <div class="form-text">Puede registrar ambos precios en este único guardado.</div>
+                            <div class="text-danger small mt-1">{{ form.precio_detal.errors }}</div>
+                        </div>
+                    </div>
+
+                    <section class="admin-form-section">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h2 class="admin-form-section-title mb-0">Aplicar en sucursales</h2>
+                            <button class="btn btn-sm btn-link text-decoration-none p-0" id="seleccionarTodas" type="button">Seleccionar todas</button>
+                        </div>
+                        <p class="form-text mt-0">El precio se crea o actualiza en la lista elegida de cada sucursal seleccionada.</p>
+
+                        <div class="row g-2">
+                            {% for opcion in form.sucursales %}
+                                <div class="col-12 col-sm-6">
+                                    <label class="border rounded p-3 d-flex align-items-center gap-2 w-100 h-100">
+                                        {{ opcion.tag }}
+                                        <span>{{ opcion.choice_label }}</span>
+                                    </label>
+                                </div>
+                            {% empty %}
+                                <div class="col-12 text-muted">No existen sucursales activas.</div>
+                            {% endfor %}
+                        </div>
+                        <div class="text-danger small mt-1">{{ form.sucursales.errors }}</div>
+                    </section>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-4">
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle"></i> {% if modo_edicion %}Actualizar precio en sucursales{% else %}Guardar precio en sucursales{% endif %}</button>
+                <a href="{% url 'administration:precio_variante_list' %}" class="btn btn-light border">Cancelar</a>
+            </div>
+        </div>
+    </div>
+</form>
+{% endblock %}
+
+{% block content-script %}
+<script>
+    const botonTodas = document.getElementById("seleccionarTodas");
+    const checksSucursal = document.querySelectorAll("input[name='sucursales']");
+
+    botonTodas.addEventListener("click", function () {
+        const seleccionar = Array.from(checksSucursal).some((check) => !check.checked);
+        checksSucursal.forEach((check) => { check.checked = seleccionar; });
+        botonTodas.textContent = seleccionar ? "Quitar selección" : "Seleccionar todas";
+    });
+
+    const buscarVariante = document.getElementById("buscarVariante");
+    const resultadosVariante = document.getElementById("resultadosVariante");
+    const selectVariante = document.getElementById("{{ form.variante.id_for_label }}");
+    const varianteSeleccionada = document.getElementById("varianteSeleccionada");
+    let tiempoBusqueda;
+    const modoEdicion = {{ modo_edicion|yesno:"true,false" }};
+
+    function mostrarSeleccionActual() {
+        const opcion = selectVariante.options[selectVariante.selectedIndex];
+        varianteSeleccionada.textContent = opcion && opcion.value
+            ? `Seleccionado: ${opcion.text}`
+            : "";
+    }
+
+    function ocultarResultados() {
+        resultadosVariante.replaceChildren();
+        resultadosVariante.classList.add("d-none");
+    }
+
+    buscarVariante.addEventListener("input", function () {
+        if (modoEdicion) return;
+        clearTimeout(tiempoBusqueda);
+        const consulta = this.value.trim();
+
+        if (consulta.length < 2) {
+            ocultarResultados();
+            return;
+        }
+
+        tiempoBusqueda = setTimeout(async () => {
+            try {
+                const respuesta = await fetch(
+                    `{% url 'administration:precio_variante_search' %}?q=${encodeURIComponent(consulta)}`
+                );
+
+                if (!respuesta.ok) {
+                    throw new Error("No fue posible buscar productos.");
+                }
+
+                const contenido = await respuesta.json();
+                const variantes = contenido.results || [];
+                resultadosVariante.replaceChildren();
+
+                if (!variantes.length) {
+                    const vacio = document.createElement("div");
+                    vacio.className = "list-group-item text-muted small";
+                    vacio.textContent = "No se encontraron variantes.";
+                    resultadosVariante.appendChild(vacio);
+                }
+
+                variantes.forEach((variante) => {
+                    const boton = document.createElement("button");
+                    boton.type = "button";
+                    boton.className = "list-group-item list-group-item-action";
+                    boton.textContent = `${variante.text} · SKU: ${variante.sku}`;
+                    boton.addEventListener("click", () => {
+                        selectVariante.innerHTML = "";
+                        const opcion = new Option(variante.text, variante.id, true, true);
+                        selectVariante.add(opcion);
+                        buscarVariante.value = variante.text;
+                        mostrarSeleccionActual();
+                        ocultarResultados();
+                    });
+                    resultadosVariante.appendChild(boton);
+                });
+
+                resultadosVariante.classList.remove("d-none");
+            } catch (error) {
+                console.error(error);
+                ocultarResultados();
+            }
+        }, 250);
+    });
+
+    document.addEventListener("click", (evento) => {
+        if (!evento.target.closest("#buscarVariante, #resultadosVariante")) {
+            ocultarResultados();
+        }
+    });
+
+    if (modoEdicion) {
+        buscarVariante.value = "{{ variante_actual.producto_base.nombre|escapejs }} · {{ variante_actual.sku|escapejs }}";
+        buscarVariante.readOnly = true;
+    }
+    mostrarSeleccionActual();
+</script>
 {% endblock %}

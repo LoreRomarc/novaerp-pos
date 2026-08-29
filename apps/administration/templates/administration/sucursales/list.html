@@ -1,70 +1,78 @@
-{% extends "base.html" %}
+{% extends "administration/base_admin.html" %}
 
-{% block content %}
+{% block title %}Sucursales{% endblock %}
 
-<div class="card shadow-sm border-0">
-    <div class="card-header d-flex justify-content-between">
-        <h5>Sucursales</h5>
-        <a href="{% url 'administration:sucursal_create' %}" class="btn btn-primary btn-sm">➕ Crear</a>
+{% block admin_content %}
+<div class="admin-page-header">
+    <div>
+        <div class="admin-eyebrow">Organización</div>
+        <h1 class="admin-page-title">Sucursales</h1>
+        <p class="admin-page-subtitle">Administre las sedes desde las que opera el negocio.</p>
     </div>
 
-    <div class="card-body">
+    <a href="{% url 'administration:sucursal_create' %}" class="btn btn-primary">
+        <i class="bi bi-plus-lg"></i> Nueva sucursal
+    </a>
+</div>
 
-        <input type="text" id="sucursalSearch" class="form-control mb-3" placeholder="Buscar...">
+<div class="admin-card">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">Sedes registradas</h2>
+        <div class="admin-search">
+            <i class="bi bi-search"></i>
+            <input id="sucursalSearch" type="search" class="form-control" placeholder="Buscar sede o dirección">
+        </div>
+    </div>
 
-        <table class="table table-hover">
+    <div class="table-responsive">
+        <table class="table admin-table align-middle">
             <thead>
                 <tr>
-                    <th>Nombre</th>
+                    <th>Sucursal</th>
+                    <th>Empresa</th>
                     <th>Dirección</th>
+                    <th>Lista predeterminada</th>
                     <th>Estado</th>
                 </tr>
             </thead>
-
             <tbody id="sucursalTable">
-                {% for s in sucursales %}
-                <tr>
-                    <td>{{ s.nombre }}</td>
-                    <td>{{ s.direccion }}</td>
-                    <td>
-                        {% if s.activa %}
-                            <span class="badge bg-success">Activa</span>
-                        {% else %}
-                            <span class="badge bg-secondary">Inactiva</span>
-                        {% endif %}
-                    </td>
-                </tr>
+                {% for sucursal in sucursales %}
+                    <tr>
+                        <td class="fw-semibold text-dark">{{ sucursal.nombre }}</td>
+                        <td>{{ sucursal.empresa|default:"—" }}</td>
+                        <td>{{ sucursal.direccion }}</td>
+                        <td>{{ sucursal.lista_precio_default|default:"Sin definir" }}</td>
+                        <td>
+                            {% if sucursal.activa %}
+                                <span class="admin-badge admin-badge-success">Activa</span>
+                            {% else %}
+                                <span class="admin-badge admin-badge-muted">Inactiva</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="5">
+                            <div class="admin-empty"><i class="bi bi-shop"></i>No hay sucursales registradas.</div>
+                        </td>
+                    </tr>
                 {% endfor %}
             </tbody>
         </table>
-
     </div>
 </div>
-
 {% endblock %}
-
 
 {% block content-script %}
 <script>
-const inputSuc = document.getElementById("sucursalSearch");
-const tableSuc = document.getElementById("sucursalTable");
+    const inputSucursal = document.getElementById("sucursalSearch");
+    const filasSucursal = document.querySelectorAll("#sucursalTable tr");
 
-const originalSucHTML = tableSuc.innerHTML;
-
-inputSuc.addEventListener("keyup", function () {
-
-    let q = this.value.toLowerCase();
-
-    if (q.length === 0) {
-        tableSuc.innerHTML = originalSucHTML;
-        return;
-    }
-
-    let rows = tableSuc.querySelectorAll("tr");
-
-    rows.forEach(row => {
-        row.style.display = row.innerText.toLowerCase().includes(q) ? "" : "none";
+    inputSucursal.addEventListener("input", function () {
+        const consulta = this.value.trim().toLowerCase();
+        filasSucursal.forEach((fila) => {
+            fila.hidden = Boolean(consulta) && !fila.innerText.toLowerCase().includes(consulta);
+        });
     });
-});
 </script>
 {% endblock %}

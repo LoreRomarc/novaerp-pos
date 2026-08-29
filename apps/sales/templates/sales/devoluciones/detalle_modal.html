@@ -1,0 +1,16 @@
+{% load humanize %}
+<div class="row g-3 mb-3">
+    <div class="col-md-4"><small class="text-muted">Comprobante</small><div class="fw-semibold">#{{ devolucion.id }} · {{ devolucion.get_tipo_display }}</div></div>
+    <div class="col-md-4"><small class="text-muted">Fecha y usuario</small><div>{{ devolucion.creada|date:"d/m/Y H:i" }} · {{ devolucion.usuario }}</div></div>
+    <div class="col-md-4"><small class="text-muted">Referencia</small><div>{% if devolucion.venta_id %}Venta #{{ devolucion.venta_id }}{% else %}{{ devolucion.referencia_externa|default:"Cambio directo" }}{% endif %}</div></div>
+    <div class="col-12"><small class="text-muted">Motivo</small><div>{{ devolucion.motivo }}</div></div>
+</div>
+<div class="row g-2 mb-4">
+    <div class="col-6 col-md-3"><div class="border rounded p-2"><small class="text-muted d-block">Recibido</small><strong>${{ devolucion.total_devuelto|floatformat:0|intcomma }}</strong></div></div>
+    <div class="col-6 col-md-3"><div class="border rounded p-2"><small class="text-muted d-block">Entregado</small><strong>${{ devolucion.total_entregado|floatformat:0|intcomma }}</strong></div></div>
+    <div class="col-6 col-md-3"><div class="border rounded p-2"><small class="text-muted d-block">Cobrado</small><strong class="text-success">${{ devolucion.monto_cobrado|floatformat:0|intcomma }}</strong></div></div>
+    <div class="col-6 col-md-3"><div class="border rounded p-2"><small class="text-muted d-block">Reembolsado</small><strong class="text-danger">${{ devolucion.monto_reembolsado|floatformat:0|intcomma }}</strong></div></div>
+</div>
+<h6 class="mb-2">Prendas recibidas</h6>
+<div class="table-responsive mb-4"><table class="table table-sm"><thead class="table-light"><tr><th>Producto</th><th>Estado</th><th class="text-end">Cant.</th><th class="text-end">Precio</th><th class="text-end">Total</th></tr></thead><tbody>{% for item in devolucion.items_devueltos.all %}<tr><td>{{ item.variante }}</td><td>{{ item.get_estado_prenda_display }}</td><td class="text-end">{{ item.cantidad|floatformat:0 }}</td><td class="text-end">${{ item.precio_unitario|floatformat:0|intcomma }}</td><td class="text-end">${{ item.total|floatformat:0|intcomma }}</td></tr>{% empty %}<tr><td colspan="5" class="text-muted text-center">Sin prendas recibidas.</td></tr>{% endfor %}</tbody></table></div>
+{% if devolucion.items_entregados.exists %}<h6 class="mb-2">Prendas entregadas</h6><div class="table-responsive"><table class="table table-sm"><thead class="table-light"><tr><th>Producto</th><th class="text-end">Cant.</th><th class="text-end">Precio</th><th class="text-end">Total</th></tr></thead><tbody>{% for item in devolucion.items_entregados.all %}<tr><td>{{ item.variante }}</td><td class="text-end">{{ item.cantidad|floatformat:0 }}</td><td class="text-end">${{ item.precio_unitario|floatformat:0|intcomma }}</td><td class="text-end">${{ item.total|floatformat:0|intcomma }}</td></tr>{% endfor %}</tbody></table></div>{% endif %}

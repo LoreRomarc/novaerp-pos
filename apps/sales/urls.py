@@ -11,6 +11,7 @@ from apps.sales.views_devoluciones import (
     CambioDirectoProcesarView,
     CambioDirectoView,
     CambioProductoBusquedaView,
+    DevolucionDetalleView,
     DevolucionListView,
 )
 from apps.sales.views_caja import (
@@ -19,6 +20,7 @@ from apps.sales.views_caja import (
     CajaArqueoView,
     CajaAsignarCajeroView,
     CajaAsignarSupervisorView,
+    CajaConfiguracionView,
     CajaDashboardView,
     CajaDesasignarCajeroView,
     CajaEgresoView,
@@ -62,6 +64,7 @@ urlpatterns = [
     path("pos/guardar/", POSGuardarEstadoView.as_view(), name="pos_guardar"),
 
     path("caja/", CajaDashboardView.as_view(), name="caja_dashboard"),
+    path("caja/configuracion/",CajaConfiguracionView.as_view(),name="caja_configuracion",),
     path("caja/abrir/", AbrirCajaView.as_view(), name="abrir_caja"),
     path("caja/cerrar/", CerrarCajaView.as_view(), name="cerrar_caja"),
     path("caja/ingreso/", CajaIngresoView.as_view(), name="caja_ingreso"),
@@ -86,6 +89,7 @@ urlpatterns = [
     # DEVOLUCIONES Y CAMBIOS
     # ======================================================
     path("devoluciones/",DevolucionListView.as_view(), name="devolucion_list",),
+    path("devoluciones/<int:pk>/detalle/", DevolucionDetalleView.as_view(), name="devolucion_detalle"),
     path("devoluciones/nuevo/", CambioDirectoView.as_view(), name="devolucion_create",),
     path("devoluciones/procesar/", CambioDirectoProcesarView.as_view(), name="devolucion_procesar",),
     path("devoluciones/buscar-producto/",CambioProductoBusquedaView.as_view(), name="devolucion_buscar_producto",),

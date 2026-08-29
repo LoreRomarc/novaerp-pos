@@ -9,7 +9,7 @@ from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.views import View
 
-from apps.inventory.models import ProductoVariante
+from apps.inventory.models import ProductoVariante, Stock
 from apps.sales.services.carrito_service import CarritoService
 from apps.sales.services.pos_service import POSService
 from apps.sales.services.serializers import serializar_carrito
@@ -355,7 +355,7 @@ class ProductoAutocompleteView(POSBaseView):
         try:
             sucursal = self.get_sucursal()
 
-            variantes = (
+            variantes = list(
                 ProductoVariante.objects
                 .select_related(
                     "producto_base",
@@ -363,7 +363,6 @@ class ProductoAutocompleteView(POSBaseView):
                     "tipo_tela",
                     "talla",
                 )
-                .prefetch_related("stocks__sucursal")
                 .filter(
                     Q(sku__icontains=q)
                     | Q(codigo_barras__icontains=q)
@@ -372,28 +371,33 @@ class ProductoAutocompleteView(POSBaseView):
                     | Q(tipo_tela__nombre__icontains=q)
                     | Q(talla__nombre__icontains=q)
                 )
-                .distinct()[:25]
+                .distinct()
+                .order_by("producto_base__nombre", "sku")[:25]
             )
+
+            # Se consulta el stock de la sucursal activa directamente. Así un
+            # producto devuelto en esta sede aparece aunque existan registros
+            # de stock en otras sucursales o el prefetch cambie de orden.
+            stocks_actuales = {
+                stock.variante_id: stock.cantidad
+                for stock in Stock.objects.filter(
+                    sucursal=sucursal,
+                    variante_id__in=[variante.id for variante in variantes],
+                )
+            }
+            stocks_otras = {}
+            for stock in Stock.objects.select_related("sucursal").filter(
+                variante_id__in=[variante.id for variante in variantes],
+            ).exclude(sucursal=sucursal):
+                stocks_otras.setdefault(stock.variante_id, []).append({
+                    "sucursal": stock.sucursal.nombre,
+                    "cantidad": float(stock.cantidad),
+                })
 
             resultados = []
 
             for variante in variantes:
-                stocks = list(variante.stocks.all())
-
-                stock_actual = next(
-                    (
-                        stock
-                        for stock in stocks
-                        if stock.sucursal_id == sucursal.id
-                    ),
-                    None,
-                )
-
-                cantidad_actual = (
-                    stock_actual.cantidad
-                    if stock_actual
-                    else 0
-                )
+                cantidad_actual = stocks_actuales.get(variante.id, 0)
 
                 resultados.append(
                     {
@@ -402,14 +406,7 @@ class ProductoAutocompleteView(POSBaseView):
                         "sku": variante.sku,
                         "stock": float(cantidad_actual),
                         "sin_stock": cantidad_actual <= 0,
-                        "otras_sucursales": [
-                            {
-                                "sucursal": stock.sucursal.nombre,
-                                "cantidad": float(stock.cantidad),
-                            }
-                            for stock in stocks
-                            if stock.sucursal_id != sucursal.id
-                        ],
+                        "otras_sucursales": stocks_otras.get(variante.id, []),
                     }
                 )
 

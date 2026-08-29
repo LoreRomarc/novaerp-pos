@@ -4,15 +4,16 @@ from django.urls import reverse_lazy
 
 from apps.customers.models import Cliente
 from apps.administration.forms import ClienteForm
+from apps.administration.mixins import SuperAdminRequiredMixin
 
 
-class ClienteListView(ListView):
+class ClienteListView(SuperAdminRequiredMixin, ListView):
     model = Cliente
     template_name = "administration/customers/list.html"
     context_object_name = "clientes"
 
 
-class ClienteCreateView(CreateView):
+class ClienteCreateView(SuperAdminRequiredMixin, CreateView):
     model = Cliente
     form_class = ClienteForm
     template_name = "administration/customers/form.html"

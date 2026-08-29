@@ -1,49 +1,83 @@
-{% extends "base.html" %}
+{% extends "administration/base_admin.html" %}
 
-{% block content %}
+{% block title %}Administración{% endblock %}
 
-<h3 class="mb-4">Panel de Administración</h3>
-
-<div class="row">
-
-    <div class="col-md-3">
-        <a href="{% url 'administration:user_list' %}" class="card p-3 text-center shadow-sm">
-            👥 Usuarios
-        </a>
+{% block admin_content %}
+<div class="admin-page-header">
+    <div>
+        <div class="admin-eyebrow">Configuración</div>
+        <h1 class="admin-page-title">Panel de administración</h1>
+        <p class="admin-page-subtitle">
+            Gestione la estructura, usuarios, catálogos y precios del ERP.
+        </p>
     </div>
-
-    <div class="col-md-3">
-        <a href="{% url 'administration:sucursal_list' %}" class="card p-3 text-center shadow-sm">
-            🏢 Sucursales
-        </a>
-    </div>
-
-    <div class="col-md-3">
-        <a href="{% url 'administration:cliente_list' %}" class="card p-3 text-center shadow-sm">
-            🧾 Clientes
-        </a>
-    </div>
-
-    <div class="col-md-3">
-        <a href="{% url 'administration:tipo_tela_list' %}"
-        class="card p-3 text-center shadow-sm">
-            🧵 Tipos de Tela
-        </a>
-    </div>
-
-    <div class="col-md-3">
-        <a href="{% url 'administration:talla_list' %}"
-        class="card p-3 text-center shadow-sm">
-            📏 Tallas
-        </a>
-    </div>
-
-    <div class="col-md-3">
-        <a href="{% url 'administration:color_list' %}" class="card p-3 text-center shadow-sm">
-            🎨 Colores
-        </a>
-    </div>
-
 </div>
 
+<section class="mb-4">
+    <h2 class="h6 fw-semibold text-dark mb-3">Organización</h2>
+    <div class="row g-3">
+        <div class="col-12 col-md-6 col-xl-3">
+            <a class="admin-nav-card" href="{% url 'administration:empresa_list' %}">
+                <span class="admin-nav-icon"><i class="bi bi-building"></i></span>
+                <div class="fw-semibold">Empresa</div>
+                <small class="text-muted">Datos legales y comerciales.</small>
+            </a>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <a class="admin-nav-card" href="{% url 'administration:sucursal_list' %}">
+                <span class="admin-nav-icon"><i class="bi bi-shop"></i></span>
+                <div class="fw-semibold">Sucursales</div>
+                <small class="text-muted">Sedes operativas del negocio.</small>
+            </a>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <a class="admin-nav-card" href="{% url 'administration:user_list' %}">
+                <span class="admin-nav-icon"><i class="bi bi-people"></i></span>
+                <div class="fw-semibold">Usuarios</div>
+                <small class="text-muted">Accesos, roles y sucursales.</small>
+            </a>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <a class="admin-nav-card" href="{% url 'administration:cliente_list' %}">
+                <span class="admin-nav-icon"><i class="bi bi-person-vcard"></i></span>
+                <div class="fw-semibold">Clientes</div>
+                <small class="text-muted">Base de clientes y tipo de compra.</small>
+            </a>
+        </div>
+    </div>
+</section>
+
+<section>
+    <h2 class="h6 fw-semibold text-dark mb-3">Catálogo y precios</h2>
+    <div class="row g-3">
+        <div class="col-12 col-md-6 col-xl-3">
+            <a class="admin-nav-card" href="{% url 'administration:color_list' %}">
+                <span class="admin-nav-icon"><i class="bi bi-palette"></i></span>
+                <div class="fw-semibold">Colores</div>
+                <small class="text-muted">Colores disponibles en variantes.</small>
+            </a>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <a class="admin-nav-card" href="{% url 'administration:tipo_tela_list' %}">
+                <span class="admin-nav-icon"><i class="bi bi-grid-3x3-gap"></i></span>
+                <div class="fw-semibold">Tipos de tela</div>
+                <small class="text-muted">Materias primas y descripciones.</small>
+            </a>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <a class="admin-nav-card" href="{% url 'administration:talla_list' %}">
+                <span class="admin-nav-icon"><i class="bi bi-rulers"></i></span>
+                <div class="fw-semibold">Tallas</div>
+                <small class="text-muted">Orden de presentación de tallas.</small>
+            </a>
+        </div>
+        <div class="col-12 col-md-6 col-xl-3">
+            <a class="admin-nav-card" href="{% url 'administration:lista_precio_list' %}">
+                <span class="admin-nav-icon"><i class="bi bi-tags"></i></span>
+                <div class="fw-semibold">Listas de precios</div>
+                <small class="text-muted">Precios por sucursal y canal.</small>
+            </a>
+        </div>
+    </div>
+</section>
 {% endblock %}

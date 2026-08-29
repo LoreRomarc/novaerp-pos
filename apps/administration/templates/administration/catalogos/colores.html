@@ -1,60 +1,50 @@
-{% extends "base.html" %}
+{% extends "administration/base_admin.html" %}
 
-{% block content %}
+{% block title %}Colores{% endblock %}
 
-<div class="card shadow-sm border-0">
-
-    <div class="card-header bg-white d-flex justify-content-between align-items-center">
-
-        <h5 class="mb-0">Colores</h5>
-
-        <a href="{% url 'administration:color_create' %}"
-           class="btn btn-primary btn-sm">
-            ➕ Nuevo Color
-        </a>
-
+{% block admin_content %}
+<div class="admin-page-header">
+    <div>
+        <div class="admin-eyebrow">Catálogo</div>
+        <h1 class="admin-page-title">Colores</h1>
+        <p class="admin-page-subtitle">Colores disponibles para las variantes de producto.</p>
     </div>
-
-    <div class="card-body">
-
-        <input type="text"
-               id="searchInput"
-               class="form-control mb-3"
-               placeholder="Buscar color...">
-
-        <table class="table table-hover" id="dataTable">
-
-            <thead>
-                <tr>
-                    <th>Nombre</th>
-                    <th>Color</th>
-                </tr>
-            </thead>
-
-            <tbody>
-
-                {% for c in colores %}
-                <tr>
-                    <td>{{ c.nombre }}</td>
-
-                    <td>
-                        <div style="
-                            width:30px;
-                            height:30px;
-                            background:{{ c.codigo_hex }};
-                            border:1px solid #ccc;
-                        ">
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-
-            </tbody>
-
-        </table>
-
-    </div>
-
+    <a href="{% url 'administration:color_create' %}" class="btn btn-primary"><i class="bi bi-plus-lg"></i> Nuevo color</a>
 </div>
 
+<div class="admin-card">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">Colores registrados</h2>
+        <div class="admin-search"><i class="bi bi-search"></i><input id="colorSearch" type="search" class="form-control" placeholder="Buscar color"></div>
+    </div>
+    <div class="table-responsive">
+        <table class="table admin-table align-middle">
+            <thead><tr><th>Color</th><th>Código hexadecimal</th><th>Vista previa</th></tr></thead>
+            <tbody id="colorTable">
+                {% for color in colores %}
+                    <tr>
+                        <td class="fw-semibold text-dark">{{ color.nombre }}</td>
+                        <td><code>{{ color.codigo_hex|default:"Sin código" }}</code></td>
+                        <td>
+                            <span class="d-inline-block border rounded-circle" style="width: 28px; height: 28px; background: {{ color.codigo_hex|default:'#e5e7eb' }};" title="{{ color.codigo_hex }}"></span>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr><td colspan="3"><div class="admin-empty"><i class="bi bi-palette"></i>No hay colores registrados.</div></td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block content-script %}
+<script>
+    const colorSearch = document.getElementById("colorSearch");
+    const colorRows = document.querySelectorAll("#colorTable tr");
+    colorSearch.addEventListener("input", function () {
+        const q = this.value.trim().toLowerCase();
+        colorRows.forEach((row) => { row.hidden = Boolean(q) && !row.innerText.toLowerCase().includes(q); });
+    });
+</script>
 {% endblock %}

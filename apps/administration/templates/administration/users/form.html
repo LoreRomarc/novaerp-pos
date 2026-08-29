@@ -1,48 +1,84 @@
-{% extends "base.html" %}
+{% extends "administration/base_admin.html" %}
 
-{% block title %}Crear Usuario{% endblock %}
+{% block title %}{% if object %}Editar usuario{% else %}Nuevo usuario{% endif %}{% endblock %}
 
-{% block content %}
-
-<div class="card shadow-sm border-0 col-md-6">
-    <div class="card-header bg-white">
-        <h5>Crear Usuario</h5>
+{% block admin_content %}
+<div class="admin-page-header">
+    <div>
+        <div class="admin-eyebrow">Acceso y seguridad</div>
+        <h1 class="admin-page-title">{% if object %}Editar usuario{% else %}Nuevo usuario{% endif %}</h1>
+        <p class="admin-page-subtitle">
+            {% if object %}Actualice los datos, permisos o sucursal del usuario.{% else %}Cree un acceso y defina su nivel de operación.{% endif %}
+        </p>
     </div>
 
-    <div class="card-body">
-        <form method="post">
-            {% csrf_token %}
-
-            <div class="mb-3">
-                <label>Usuario</label>
-                {{ form.username }}
-            </div>
-
-            <div class="mb-3">
-                <label>Email</label>
-                {{ form.email }}
-            </div>
-
-            <div class="mb-3">
-                <label>Password</label>
-                {{ form.password }}
-            </div>
-
-            <div class="mb-3">
-                <label>Rol</label>
-                {{ form.role }}
-            </div>
-
-            <div class="mb-3">
-                <label>Sucursal</label>
-                {{ form.sucursal }}
-            </div>
-
-            <button class="btn btn-success w-100">
-                💾 Guardar Usuario
-            </button>
-        </form>
-    </div>
+    <a href="{% url 'administration:user_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i> Volver
+    </a>
 </div>
 
+<form method="post">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+        <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+    {% endif %}
+
+    <div class="row justify-content-center">
+        <div class="col-12 col-xl-8">
+            <div class="admin-card">
+                <div class="admin-card-body">
+                    <section class="admin-form-section">
+                        <h2 class="admin-form-section-title">Datos de acceso</h2>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="{{ form.username.id_for_label }}">Usuario</label>
+                                {{ form.username }}
+                                <div class="text-danger small mt-1">{{ form.username.errors }}</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="{{ form.email.id_for_label }}">Correo electrónico</label>
+                                {{ form.email }}
+                                <div class="text-danger small mt-1">{{ form.email.errors }}</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="{{ form.password.id_for_label }}">Contraseña</label>
+                                {{ form.password }}
+                                {% if form.password.help_text %}
+                                    <div class="form-text">{{ form.password.help_text }}</div>
+                                {% endif %}
+                                <div class="text-danger small mt-1">{{ form.password.errors }}</div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="admin-form-section">
+                        <h2 class="admin-form-section-title">Permisos operativos</h2>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label" for="{{ form.role.id_for_label }}">Rol</label>
+                                {{ form.role }}
+                                <div class="form-text">El rol determina los módulos y operaciones disponibles.</div>
+                                <div class="text-danger small mt-1">{{ form.role.errors }}</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label" for="{{ form.sucursal.id_for_label }}">Sucursal</label>
+                                {{ form.sucursal }}
+                                <div class="form-text">Es obligatoria para roles que trabajan en una sede específica.</div>
+                                <div class="text-danger small mt-1">{{ form.sucursal.errors }}</div>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2 mt-4">
+                <button class="btn btn-primary" type="submit">
+                    <i class="bi bi-check-circle"></i> Guardar usuario
+                </button>
+                <a href="{% url 'administration:user_list' %}" class="btn btn-light border">Cancelar</a>
+            </div>
+        </div>
+    </div>
+</form>
 {% endblock %}

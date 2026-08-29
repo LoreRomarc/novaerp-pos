@@ -4,13 +4,23 @@ from django.urls import path
 from apps.inventory.api.search_views import VarianteSearchAPI
 
 from apps.inventory.views_dashboard import InventoryDashboardView
-from apps.inventory.views_kardex import KardexListView
+from apps.inventory.views_kardex import KardexDetalleView, KardexListView
 from apps.inventory.views_produccion import CorteProduccionView
 from apps.inventory.views_rollos import (
     RolloCreateView,
     RolloListView
 )
 
+from apps.inventory.views_confeccion import (
+    ConfeccionLotesView,
+    ConfeccionRegistroView,
+)
+from apps.inventory.views_operaciones_produccion import (
+    OperacionProduccionListView,
+)
+from apps.inventory.views_operarios_produccion import (
+    OperarioProduccionView,
+)
 from apps.inventory.views_productos import (
     ProductoListView,
     ProductoCreateView,
@@ -47,6 +57,10 @@ urlpatterns = [
     # ======================================================
     path( "produccion/",ProduccionListView.as_view(),name="produccion_list"),
     path("produccion/corte/",CorteProduccionView.as_view(), name="corte_produccion"),
+    path("produccion/operarios/",OperarioProduccionView.as_view(), name="operarios_produccion",),
+    path("produccion/confeccion/",  ConfeccionLotesView.as_view(), name="confeccion_lotes", ),
+    path( "produccion/confeccion/<int:lote_id>/", ConfeccionRegistroView.as_view(), name="confeccion_registrar",),
+    path( "produccion/historial-operaciones/", OperacionProduccionListView.as_view(), name="operaciones_produccion",),
 
     # ======================================================
     # ROLLOS
@@ -80,6 +94,7 @@ urlpatterns = [
     # MOVIMIENTOS
     # ======================================================
     path( "movimientos/kardex/", KardexListView.as_view(), name="kardex" ),
+    path("movimientos/kardex/<int:pk>/detalle/", KardexDetalleView.as_view(), name="kardex_detalle"),
 
     # ======================================================
     # VARIANTES

@@ -1,5 +1,6 @@
 <!--apps/sales/templates/sales/caja/dashboard.html-->
 {% extends "base.html" %}
+{% load humanize %}
 
 {% block content %}
 <div class="container-fluid py-4">
@@ -56,11 +57,14 @@
         </div>
 
         <div class="row g-3 mb-4">
+
             <div class="col-12 col-sm-6 col-xl-3">
                 <div class="card border-0 shadow-sm h-100">
                     <div class="card-body">
                         <div class="text-muted small">Base inicial</div>
-                        <div class="fs-4 fw-bold">${{ resumen.monto_inicial|floatformat:0 }}</div>
+                        <div class="fs-4 fw-bold">
+                            ${{ resumen.monto_inicial|floatformat:0|intcomma }}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -68,9 +72,11 @@
             <div class="col-12 col-sm-6 col-xl-3">
                 <div class="card border-0 shadow-sm h-100 border-start border-4 border-success">
                     <div class="card-body">
-                        <div class="text-muted small">Efectivo esperado</div>
+                        <div class="text-muted small">
+                            Efectivo esperado en caja
+                        </div>
                         <div class="fs-4 fw-bold text-success">
-                            ${{ resumen.efectivo_esperado|floatformat:0 }}
+                            ${{ resumen.efectivo_esperado|floatformat:0|intcomma }}
                         </div>
                     </div>
                 </div>
@@ -79,28 +85,15 @@
             <div class="col-12 col-sm-6 col-xl-3">
                 <div class="card border-0 shadow-sm h-100">
                     <div class="card-body">
-                        <div class="text-muted small">Ventas en efectivo</div>
-                        <div class="fs-4 fw-bold">${{ resumen.ventas_efectivo|floatformat:0 }}</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-12 col-sm-6 col-xl-3">
-                <div class="card border-0 shadow-sm h-100">
-                    <div class="card-body">
-                        <div class="text-muted small">Ventas con tarjeta</div>
-                        <div class="fs-4 fw-bold">${{ resumen.ventas_tarjeta|floatformat:0 }}</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-12 col-sm-6 col-xl-3">
-                <div class="card border-0 shadow-sm h-100">
-                    <div class="card-body">
-                        <div class="text-muted small">Transferencias</div>
+                        <div class="text-muted small">
+                            Efectivo neto del turno
+                        </div>
                         <div class="fs-4 fw-bold">
-                            ${{ resumen.ventas_transferencia|floatformat:0 }}
+                            ${{ resumen.efectivo_operacion_neto|floatformat:0|intcomma }}
                         </div>
+                        <small class="text-muted">
+                            Sin incluir base inicial
+                        </small>
                     </div>
                 </div>
             </div>
@@ -108,21 +101,71 @@
             <div class="col-12 col-sm-6 col-xl-3">
                 <div class="card border-0 shadow-sm h-100 border-start border-4 border-primary">
                     <div class="card-body">
-                        <div class="text-muted small">Ingresos manuales</div>
+                        <div class="text-muted small">
+                            Ventas totales del turno
+                        </div>
                         <div class="fs-4 fw-bold text-primary">
-                            ${{ resumen.ingresos|floatformat:0 }}
+                            ${{ resumen.ventas_total|floatformat:0|intcomma }}
+                        </div>
+                        <small class="text-muted">
+                            No incluye base ni cambios
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">
+                            Ventas en efectivo
+                        </div>
+                        <div class="fs-4 fw-bold">
+                            ${{ resumen.ventas_efectivo|floatformat:0|intcomma }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {# TARJETA: tarjeta queda implementada en backend, pero se oculta hasta habilitar ese medio de pago. #}
+            <div class="col-12 col-sm-6 col-xl-3 d-none">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">
+                            Ventas por tarjeta
+                        </div>
+                        <div class="fs-4 fw-bold">
+                            ${{ resumen.ventas_tarjeta|floatformat:0|intcomma }}
                         </div>
                     </div>
                 </div>
             </div>
 
             <div class="col-12 col-sm-6 col-xl-3">
-                <div class="card border-0 shadow-sm h-100 border-start border-4 border-warning">
+                <div class="card border-0 shadow-sm h-100">
                     <div class="card-body">
-                        <div class="text-muted small">Egresos manuales</div>
-                        <div class="fs-4 fw-bold text-warning">
-                            ${{ resumen.egresos|floatformat:0 }}
+                        <div class="text-muted small">
+                            Ventas por transferencia
                         </div>
+                        <div class="fs-4 fw-bold">
+                            ${{ resumen.ventas_transferencia|floatformat:0|intcomma }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card border-0 shadow-sm h-100 border-start border-4 border-info">
+                    <div class="card-body">
+                        <div class="text-muted small">
+                            Entradas por cambios
+                        </div>
+                        <div class="fs-4 fw-bold text-info">
+                            ${{ resumen.cambios_total|floatformat:0|intcomma }}
+                        </div>
+                        <small class="text-muted">
+                            Efectivo: ${{ resumen.cambios_efectivo|floatformat:0|intcomma }}
+                        </small>
                     </div>
                 </div>
             </div>
@@ -130,13 +173,43 @@
             <div class="col-12 col-sm-6 col-xl-3">
                 <div class="card border-0 shadow-sm h-100 border-start border-4 border-danger">
                     <div class="card-body">
-                        <div class="text-muted small">Retiros a bóveda</div>
+                        <div class="text-muted small">
+                            Salidas por devoluciones
+                        </div>
                         <div class="fs-4 fw-bold text-danger">
-                            ${{ resumen.retiros|floatformat:0 }}
+                            ${{ resumen.devoluciones_total|floatformat:0|intcomma }}
+                        </div>
+                        <small class="text-muted">
+                            Efectivo: ${{ resumen.devoluciones_efectivo|floatformat:0|intcomma }}
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">Ingresos manuales</div>
+                        <div class="fs-4 fw-bold text-success">
+                            ${{ resumen.ingresos|floatformat:0|intcomma }}
                         </div>
                     </div>
                 </div>
             </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card border-0 shadow-sm h-100">
+                    <div class="card-body">
+                        <div class="text-muted small">
+                            Egresos y retiros
+                        </div>
+                        <div class="fs-4 fw-bold text-warning">
+                            ${{ resumen.egresos|add:resumen.retiros|floatformat:0|intcomma }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
 
         <div class="card border-0 shadow-sm mb-4">

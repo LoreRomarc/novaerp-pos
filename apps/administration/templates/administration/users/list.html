@@ -1,118 +1,187 @@
-{% extends "base.html" %}
+{% extends "administration/base_admin.html" %}
 
-{% block content %}
+{% block title %}Usuarios{% endblock %}
 
-<div class="card shadow-sm border-0">
-
-    <div class="card-header d-flex justify-content-between">
-        <h5>Usuarios</h5>
-        <a href="{% url 'administration:user_create' %}" class="btn btn-primary btn-sm">
-            ➕ Crear
-        </a>
+{% block admin_content %}
+<div class="admin-page-header">
+    <div>
+        <div class="admin-eyebrow">Acceso y seguridad</div>
+        <h1 class="admin-page-title">Usuarios</h1>
+        <p class="admin-page-subtitle">Administre los accesos, roles y sucursales asignadas.</p>
     </div>
 
-    <div class="card-body">
+    <a href="{% url 'administration:user_create' %}" class="btn btn-primary">
+        <i class="bi bi-person-plus"></i> Nuevo usuario
+    </a>
+</div>
 
-        <input type="text" id="userSearch" class="form-control mb-3" placeholder="Buscar usuario...">
+<div class="admin-card">
+    <div class="admin-card-header">
+        <h2 class="admin-card-title">Usuarios registrados</h2>
 
-        <table class="table table-hover">
+        <div class="admin-search">
+            <i class="bi bi-search"></i>
+            <input
+                id="userSearch"
+                type="search"
+                class="form-control"
+                placeholder="Buscar usuario o correo"
+                autocomplete="off">
+        </div>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table admin-table align-middle">
             <thead>
                 <tr>
                     <th>Usuario</th>
-                    <th>Email</th>
+                    <th>Correo</th>
                     <th>Rol</th>
                     <th>Sucursal</th>
-                    <th></th>
+                    <th class="text-end">Acciones</th>
                 </tr>
             </thead>
-
             <tbody id="userTable">
                 {% for user in users %}
-                <tr>
-                    <td>{{ user.username }}</td>
-                    <td>{{ user.email }}</td>
-                    <td>{{ user.profile.role }}</td>
-                    <td>{{ user.profile.sucursal|default:"-" }}</td>
-                    <td>
-                        <a href="{% url 'administration:user_update' user.id %}" class="btn btn-sm btn-warning">✏️</a>
-                        <a href="{% url 'administration:user_delete' user.id %}" class="btn btn-sm btn-danger">🗑</a>
-                    </td>
-                </tr>
+                    <tr>
+                        <td>
+                            <div class="fw-semibold text-dark">{{ user.username }}</div>
+                            {% if user.get_full_name %}
+                                <div class="small text-muted">{{ user.get_full_name }}</div>
+                            {% endif %}
+                        </td>
+                        <td>{{ user.email|default:"—" }}</td>
+                        <td>
+                            {% if user.profile %}
+                                <span class="admin-badge admin-badge-muted">
+                                    {{ user.profile.get_role_display }}
+                                </span>
+                            {% else %}
+                                <span class="admin-badge admin-badge-danger">Sin perfil</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ user.profile.sucursal|default:"Todas las sucursales" }}</td>
+                        <td class="text-end text-nowrap">
+                            <a
+                                href="{% url 'administration:user_update' user.id %}"
+                                class="btn btn-sm btn-outline-primary admin-action-icon"
+                                title="Editar usuario"
+                                aria-label="Editar usuario {{ user.username }}">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a
+                                href="{% url 'administration:user_delete' user.id %}"
+                                class="btn btn-sm btn-outline-danger admin-action-icon ms-1"
+                                title="Eliminar usuario"
+                                aria-label="Eliminar usuario {{ user.username }}">
+                                <i class="bi bi-trash"></i>
+                            </a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="5">
+                            <div class="admin-empty">
+                                <i class="bi bi-people"></i>
+                                No hay usuarios registrados.
+                            </div>
+                        </td>
+                    </tr>
                 {% endfor %}
             </tbody>
         </table>
-
     </div>
 </div>
-
 {% endblock %}
 
-
 {% block content-script %}
-
 <script>
-const inputUser = document.getElementById("userSearch");
-const tableUser = document.getElementById("userTable");
+    const inputUser = document.getElementById("userSearch");
+    const tableUser = document.getElementById("userTable");
+    const originalUserHTML = tableUser.innerHTML;
+    let timeoutUser;
 
-const originalUserHTML = tableUser.innerHTML;
+    function crearCelda(texto) {
+        const celda = document.createElement("td");
+        celda.textContent = texto || "—";
+        return celda;
+    }
 
-let timeoutUser;
+    function mostrarUsuarios(usuarios) {
+        tableUser.replaceChildren();
 
-inputUser.addEventListener("keyup", function () {
+        if (!usuarios.length) {
+            const fila = document.createElement("tr");
+            const celda = document.createElement("td");
+            celda.colSpan = 5;
+            celda.innerHTML = '<div class="admin-empty"><i class="bi bi-search"></i>Sin resultados para esta búsqueda.</div>';
+            fila.appendChild(celda);
+            tableUser.appendChild(fila);
+            return;
+        }
 
-    clearTimeout(timeoutUser);
+        usuarios.forEach((usuario) => {
+            const fila = document.createElement("tr");
+            const usuarioCelda = document.createElement("td");
+            const usuarioNombre = document.createElement("div");
+            usuarioNombre.className = "fw-semibold text-dark";
+            usuarioNombre.textContent = usuario.username;
+            usuarioCelda.appendChild(usuarioNombre);
+            fila.appendChild(usuarioCelda);
+            fila.appendChild(crearCelda(usuario.email));
 
-    const q = this.value.trim();
+            const rolCelda = document.createElement("td");
+            const rol = document.createElement("span");
+            rol.className = "admin-badge admin-badge-muted";
+            rol.textContent = usuario.role || "Sin perfil";
+            rolCelda.appendChild(rol);
+            fila.appendChild(rolCelda);
+            fila.appendChild(crearCelda(usuario.sucursal || "Todas las sucursales"));
 
-    timeoutUser = setTimeout(async () => {
+            const acciones = document.createElement("td");
+            acciones.className = "text-end text-nowrap";
+            const editar = document.createElement("a");
+            editar.href = `{% url 'administration:user_list' %}${usuario.id}/edit/`;
+            editar.className = "btn btn-sm btn-outline-primary admin-action-icon";
+            editar.setAttribute("aria-label", `Editar usuario ${usuario.username}`);
+            editar.innerHTML = '<i class="bi bi-pencil"></i>';
+            acciones.appendChild(editar);
 
-        if (q.length === 0) {
+            const eliminar = document.createElement("a");
+            eliminar.href = `{% url 'administration:user_list' %}${usuario.id}/delete/`;
+            eliminar.className = "btn btn-sm btn-outline-danger admin-action-icon ms-1";
+            eliminar.setAttribute("aria-label", `Eliminar usuario ${usuario.username}`);
+            eliminar.innerHTML = '<i class="bi bi-trash"></i>';
+            acciones.appendChild(eliminar);
+            fila.appendChild(acciones);
+            tableUser.appendChild(fila);
+        });
+    }
+
+    inputUser.addEventListener("input", function () {
+        clearTimeout(timeoutUser);
+        const consulta = this.value.trim();
+
+        if (!consulta) {
             tableUser.innerHTML = originalUserHTML;
             return;
         }
 
-        if (q.length < 2) return;
+        timeoutUser = setTimeout(async () => {
+            try {
+                const respuesta = await fetch(
+                    `{% url 'administration:user_search_api' %}?q=${encodeURIComponent(consulta)}`
+                );
 
-        try {
-            const res = await fetch(`/admin-panel/api/users/search/?q=${q}`);
-            const data = await res.json();
+                if (!respuesta.ok) {
+                    throw new Error("No fue posible buscar usuarios.");
+                }
 
-            tableUser.innerHTML = "";
-
-            if (data.length === 0) {
-                tableUser.innerHTML = `
-                    <tr>
-                        <td colspan="5" class="text-center text-muted">
-                            Sin resultados
-                        </td>
-                    </tr>
-                `;
-                return;
+                mostrarUsuarios(await respuesta.json());
+            } catch (error) {
+                console.error(error);
             }
-
-            data.forEach(u => {
-                const row = document.createElement("tr");
-
-                row.innerHTML = `
-                    <td>${u.username}</td>
-                    <td>${u.email}</td>
-                    <td>${u.role}</td>
-                    <td>${u.sucursal || "-"}</td>
-                    <td>
-                        <a href="/admin-panel/usuarios/${u.id}/edit/" class="btn btn-sm btn-warning">✏️</a>
-                        <a href="/admin-panel/usuarios/${u.id}/delete/" class="btn btn-sm btn-danger">🗑</a>
-                    </td>
-                `;
-
-                tableUser.appendChild(row);
-            });
-
-        } catch (e) {
-            console.error("Error búsqueda:", e);
-        }
-
-    }, 300);
-});
+        }, 300);
+    });
 </script>
-
 {% endblock %}

@@ -1,948 +1,523 @@
-<!-- apps/inventory/templates/inventory/corte_produccion.html -->
-
 {% extends "base.html" %}
 
+{% block title %}Registrar corte{% endblock %}
+
 {% block content %}
-
 <style>
-
-.card-erp {
-
-    background:#ffffff;
-    border-radius:16px;
-    padding:28px;
-
-    box-shadow:
-    0 10px 30px rgba(15,23,42,.06);
-
-}
-
-.header {
-
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-
-    margin-bottom:25px;
-
-}
-
-.header h2,
-.header h3 {
-
-    margin:0;
-    color:#111827;
-    font-weight:600;
-
-}
-
-.badge {
-
-    background:#eff6ff;
-    color:#2563eb;
-
-    padding:6px 12px;
-
-    border-radius:20px;
-
-    font-size:13px;
-
-    font-weight:500;
-
-}
-
-.context-box {
-
-    display:flex;
-    gap:30px;
-
-    background:#f8fafc;
-
-    border:1px solid #e5e7eb;
-
-    padding:14px 18px;
-
-    border-radius:12px;
-
-    color:#475569;
-
-    font-size:14px;
-
-}
-
-.rollo-card {
-
-    margin-top:20px;
-
-    border:1px solid #e5e7eb;
-
-    border-radius:14px;
-
-    padding:22px;
-
-    background:white;
-
-    box-shadow:
-    0 4px 15px rgba(0,0,0,.04);
-
-}
-
-.form-control,
-.form-select {
-
-    height:42px;
-
-    border-radius:10px;
-
-    border:1px solid #d1d5db;
-
-}
-
-.form-control:focus,
-.form-select:focus {
-
-    border-color:#2563eb;
-
-    box-shadow:
-    0 0 0 3px rgba(37,99,235,.12);
-
-}
-
-.items-header {
-
-    margin-top:25px;
-
-    display:grid;
-
-    grid-template-columns:
-    2fr 1fr 1fr 1fr 120px 40px;
-
-    gap:10px;
-
-
-    background:#f8fafc;
-
-    padding:12px;
-
-    border-radius:10px;
-
-    color:#475569;
-
-    font-size:13px;
-
-    font-weight:600;
-
-}
-
-.item-row {
-
-
-    display:grid;
-
-    grid-template-columns:
-    2fr 1fr 1fr 1fr 120px 40px;
-
-    gap:10px;
-
-    margin-top:10px;
-
-}
-
-.info-grid {
-
-
-    display:grid;
-
-    grid-template-columns:
-    repeat(5,1fr);
-
-    gap:12px;
-
-    margin-top:15px;
-
-}
-
-.info-box {
-
-    background:#f8fafc;
-
-    border-radius:10px;
-
-    padding:12px;
-
-    font-size:13px;
-
-    border:1px solid #e5e7eb;
-
-}
-
-.summary {
-
-
-    display:flex;
-
-    gap:15px;
-
-    margin:20px 0;
-
-}
-
-
-
-.summary div {
-
-
-    background:white;
-
-    border:1px solid #e5e7eb;
-
-    border-radius:12px;
-
-    padding:15px 25px;
-
-
-    box-shadow:
-
-    0 4px 12px rgba(0,0,0,.04);
-
-}
-
-
-
-.btn-action {
-
-
-    border:none;
-
-    border-radius:10px;
-
-    padding:10px 18px;
-
-    font-size:14px;
-
-    font-weight:500;
-
-    cursor:pointer;
-
-}
-
-.rollo-actions {
-
-    display:flex;
-
-    justify-content:center;
-
-    margin:25px 0 10px 0;
-
-}
-
-
-.btn-primary {
-
-
-    background:#2563eb;
-
-    color:white;
-
-}
-
-.btn-secondary {
-
-    background:white;
-
-    color:#2563eb;
-
-    border:1px dashed #93c5fd;
-
-    padding:10px 22px;
-
-    border-radius:12px;
-
-    font-weight:500;
-
-}
-
-.btn-add-line {
-
-    margin-top:15px;
-
-    background:transparent;
-
-    border:1px dashed #cbd5e1;
-
-    color:#64748b;
-
-    padding:7px 14px;
-
-    border-radius:8px;
-
-    font-size:13px;
-
-    font-weight:500;
-
-    cursor:pointer;
-
-}
-
-.btn-add-line:hover {
-
-    background:#f8fafc;
-
-    color:#2563eb;
-
-    border-color:#93c5fd;
-
-}
-
-.btn-secondary:hover {
-
-    background:#eff6ff;
-
-}
-
-.btn-primary:hover {
-
-    background:#1d4ed8;
-
-}
-
-.btn-secondary {
-
-
-    background:#f1f5f9;
-
-    color:#334155;
-
-    border:1px solid #e2e8f0;
-
-}
-
-.btn-secondary:hover {
-
-
-    background:#e2e8f0;
-
-}
-
-.rollo-form{
-    display:grid;
-    grid-template-columns:2fr 1fr;
-    gap:18px;
-    margin:18px 0;
-}
-
-.btn-remove-rollo {
-
-    width:32px;
-    height:32px;
-
-    border-radius:50%;
-
-    border:none;
-
-    background:#fee2e2;
-
-    color:#dc2626;
-
-    font-size:20px;
-
-    line-height:20px;
-
-    display:flex;
-
-    align-items:center;
-
-    justify-content:center;
-
-    cursor:pointer;
-
-}
-
-
-.btn-remove-rollo:hover {
-
-    background:#fecaca;
-
-}
-
-@media(max-width:1000px){
-
-.info-grid,
-.items-header,
-.item-row {
-
-grid-template-columns:1fr;
-
-}
-
-
-}
-
+    .corte-wrap {
+        max-width: 1500px;
+        margin: auto;
+    }
+
+    .rollo-block {
+        border: 1px solid #dee2e6;
+        border-radius: 10px;
+        margin-bottom: 10px;
+        overflow: hidden;
+        background: #fff;
+    }
+
+    .rollo-header {
+        display: grid;
+        grid-template-columns: minmax(260px, 2fr) 150px 150px auto auto;
+        gap: 8px;
+        align-items: center;
+        padding: 10px;
+        background: #f8f9fa;
+    }
+
+    .item-row,
+    .item-head {
+        display: grid;
+        grid-template-columns: minmax(190px, 2fr) 120px 120px 90px 90px minmax(150px, 1fr) 38px;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .item-head {
+        padding: 8px 10px;
+        font-size: .75rem;
+        color: #6c757d;
+        background: #fff;
+        border-top: 1px solid #e9ecef;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .item-row {
+        padding: 7px 10px;
+        border-bottom: 1px solid #f0f0f0;
+    }
+
+    .item-row:last-child {
+        border-bottom: 0;
+    }
+
+    .form-control,
+    .form-select {
+        min-height: 34px;
+        font-size: .88rem;
+    }
+
+    .rollo-footer {
+        padding: 8px 10px;
+        background: #fcfcfc;
+        border-top: 1px solid #e9ecef;
+    }
+
+    @media (max-width: 1050px) {
+        .rollo-header,
+        .item-row,
+        .item-head {
+            grid-template-columns: 1fr;
+        }
+
+        .item-head {
+            display: none;
+        }
+    }
 </style>
 
+<div class="container-fluid corte-wrap">
 
-<div class="card-erp">
-
-    <!-- CONTEXTO -->
-    <div class="context-box">
-
+    <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
-        👤 <b>{{request.user.username}}</b>
+            <h2 class="mb-0">Registrar corte</h2>
+            <small class="text-muted">
+                El corte consume tela; las prendas pasan a inventario
+                únicamente después de registrar confección.
+            </small>
         </div>
 
-        <div>
-        🏢 {{request.user.profile.sucursal.nombre|default:"Sin sucursal"}}
-        </div>
-
-        <div>
-        📅 {% now "d/m/Y H:i" %}
-        </div>
-
+        <a
+            href="{% url 'inventory:confeccion_lotes' %}"
+            class="btn btn-outline-secondary">
+            Confección pendiente
+        </a>
     </div>
 
-
-    <!-- MENSAJES -->
-    {% if messages %}
-        {% for message in messages %}
-            <div class="msg {% if message.tags == 'error' %}msg-error{% else %}msg-success{% endif %}">
-                {{ message }}
-            </div>
-        {% endfor %}
+    {% if error_message %}
+        <div class="alert alert-danger py-2">
+            {{ error_message }}
+        </div>
     {% endif %}
-
-    <!-- HEADER -->
-    <div class="header">
-        <h2>Proceso de Corte</h2>
-        <span class="badge">Producción</span>
-    </div>
 
     <form method="post" id="formCorte">
         {% csrf_token %}
 
-        <!-- ROLLOS -->
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-body py-2">
+                <div class="row text-center">
+                    <div class="col">
+                        <small class="text-muted">Rollos</small>
+                        <div class="fw-bold" id="totalRollos">0</div>
+                    </div>
 
-        <label>
-            <strong>Rollos Utilizados</strong>
-        </label>
+                    <div class="col">
+                        <small class="text-muted">Metros</small>
+                        <div class="fw-bold" id="totalMetros">0.00</div>
+                    </div>
+
+                    <div class="col">
+                        <small class="text-muted">Prendas</small>
+                        <div class="fw-bold" id="totalPrendas">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <div id="rollosContainer"></div>
 
-
-        <div class="rollo-actions">
-
+        <div class="d-flex justify-content-between align-items-center mt-3">
             <button
                 type="button"
-                class="btn-action btn-secondary"
-                onclick="addRollo()"
-            >
+                class="btn btn-outline-primary"
+                onclick="addRollo()">
                 + Agregar rollo
             </button>
 
+            <button class="btn btn-success px-4">
+                Registrar corte
+            </button>
         </div>
-
-
-        <hr>
-
-
-        <!-- ITEMS -->
-        <div class="header">
-            <h3>Producción por Talla</h3>
-        </div>
-
-        <!-- RESUMEN -->
-        <div class="summary">
-
-            <div>
-            Rollos:
-            <b id="totalRollos">0</b>
-            </div>
-
-            <div>
-            Metros:
-            <b id="totalMetros">0.00</b>
-            </div>
-
-            <div>
-            Prendas:
-            <b id="totalPrendas">0</b>
-            </div>
-
-        </div>
-
-
-        <button
-        type="submit"
-        class="btn-action btn-blue">
-
-        Ejecutar Corte
-
-        </button>
-
-
     </form>
 
 </div>
 
 <script>
+function opcionesRollos() {
+    return `
+        <option value="">Seleccione rollo</option>
+        {% for r in rollos %}
+        <option
+            value="{{ r.id }}"
+            data-tela="{{ r.tipo_tela.id }}"
+            data-tela-nombre="{{ r.tipo_tela.nombre }}"
+            data-color="{{ r.color.id }}"
+            data-color-nombre="{{ r.color.nombre }}"
+            data-disponible="{{ r.cantidad_disponible }}">
+            {{ r.codigo }} · {{ r.tipo_tela.nombre }}
+            · {{ r.color.nombre }} · {{ r.cantidad_disponible }} m
+        </option>
+        {% endfor %}
+    `;
+}
+
+function opcionesProductos() {
+    return `
+        {% for producto in productos %}
+        <option value="{{ producto.id }}">
+            {{ producto.nombre }}
+        </option>
+        {% endfor %}
+    `;
+}
+
+function opcionesTallas() {
+    return `
+        {% for talla in tallas %}
+        <option value="{{ talla.nombre }}">
+            {{ talla.nombre }}
+        </option>
+        {% endfor %}
+    `;
+}
+
+function opcionesCortadores() {
+    return `
+        <option value="">Cortador</option>
+        {% for cortador in cortadores %}
+        <option value="{{ cortador.id }}">
+            {{ cortador.nombre }}
+        </option>
+        {% endfor %}
+    `;
+}
 
 function addRollo() {
+    const bloque = document.createElement("section");
 
-    const uid = Date.now();
+    bloque.className = "rollo-block";
 
-    const html = `
+    bloque.innerHTML = `
+        <div class="rollo-header">
+            <select
+                class="form-select rollo-select"
+                name="rollo_id[]"
+                required>
+                ${opcionesRollos()}
+            </select>
 
-    <div class="rollo-card">
+            <input
+                type="number"
+                min="0.01"
+                step="0.01"
+                class="form-control metros-input"
+                placeholder="Metros"
+                required>
 
-        <div class="header">
-
-            <h3>Rollo</h3>
+            <small class="text-muted restante">
+                Disponible: —
+            </small>
 
             <button
                 type="button"
-                class="btn-remove-rollo"
-                title="Eliminar rollo"
-                onclick="this.closest('.rollo-card').remove();calcularTotal();"
-                >
-                X
+                class="btn btn-sm btn-outline-primary agregar-item">
+                + Prenda
             </button>
 
+            <button
+                type="button"
+                class="btn btn-sm btn-outline-danger eliminar-rollo">
+                ×
+            </button>
         </div>
 
-        <div class="rollo-form">
-
-            <select 
-                class="form-select"
-                name="rollo_id[]"
-                onchange="actualizarNombres(this); validarRollosDuplicados();"
-                required
-            >
-
-                <option value="">
-                    Seleccione un rollo
-                </option>
-
-                {% for r in rollos %}
-
-                <option
-                    value="{{r.id}}"
-                    data-tela="{{r.tipo_tela.id}}"
-                    data-tela-nombre="{{r.tipo_tela.nombre}}"
-                    data-color="{{r.color.id}}"
-                    data-color-nombre="{{r.color.nombre}}"
-                    data-disponible="{{r.cantidad_disponible}}"
-                    data-costo="{{r.costo_por_metro}}"
-                >
-
-                    {{r.codigo}}
-                    |
-                    {{r.tipo_tela.nombre}}
-                    |
-                    {{r.color.nombre}}
-                    |
-                    {{r.cantidad_disponible}} mts
-
-                </option>
-
-
-                {% endfor %}
-
-            </select>
-
-            
-
-            <input
-                class="form-control metros-input"
-                type="number"
-                step="0.01"
-                min="0.01"
-                placeholder="Metros consumidos"
-                class="metros-input"
-                oninput="actualizarRestante(this.closest('.rollo-card'))"
-                required
-            >
-            </div>
-
-
-        <div class="rollo-info" style="display:none;margin-top:15px">
-
-            <div class="summary">
-
-                <div><b>Tela:</b> <span class="info-tela"></span></div>
-
-                <div><b>Color:</b> <span class="info-color"></span></div>
-
-                <div><b>Disponible:</b> <span class="info-stock"></span> mts</div>
-
-                <div><b>Costo:</b> $<span class="info-costo"></span> / metro</div>
-
-                <div><b>Restarán:</b> <span class="info-restante"></span> mts</div>
-
-            </div>
-
-        </div>
-
-       
-
-        <div class="items-header">
-
+        <div class="item-head">
             <div>Producto</div>
-
             <div>Tela</div>
-
             <div>Color</div>
-
             <div>Talla</div>
-
-            <div>Cantidad</div>
-
+            <div>Cant.</div>
+            <div>Cortador</div>
             <div></div>
-
         </div>
 
         <div class="items"></div>
 
-        <button
-            type="button"
-            class="btn-add-line"
-            onclick="addItem(this)"
-        >
-
-            + Agregar Variante
-
-        </button>
-
-    </div>
-
+        <div class="rollo-footer">
+            <small class="text-muted">
+                Agregue las prendas correspondientes a este rollo.
+            </small>
+        </div>
     `;
+
+    bloque.querySelector(".rollo-select")
+        .addEventListener("change", function () {
+            configurarRollo(bloque);
+        });
+
+    bloque.querySelector(".metros-input")
+        .addEventListener("input", function () {
+            actualizarRestante(bloque);
+            calcularTotales();
+        });
+
+    bloque.querySelector(".agregar-item")
+        .addEventListener("click", function () {
+            addItem(bloque);
+        });
+
+    bloque.querySelector(".eliminar-rollo")
+        .addEventListener("click", function () {
+            bloque.remove();
+            calcularTotales();
+        });
 
     document
         .getElementById("rollosContainer")
-        .insertAdjacentHTML("beforeend", html);
+        .appendChild(bloque);
 
+    calcularTotales();
 }
 
-function validarRollosDuplicados(){
+function configurarRollo(bloque) {
+    const select = bloque.querySelector(".rollo-select");
 
-    const usados=[];
-
-    let repetido=false;
-
-    document
-        .querySelectorAll("select[name='rollo_id[]']")
-        .forEach(s=>{
-
-            if(!s.value){
-                return;
-            }
-
-            if(usados.includes(s.value)){
-
-                repetido=true;
-
-            }
-
-            usados.push(s.value);
-
-        });
-
-    if(repetido){
-
-        alert("Ese rollo ya fue agregado.");
-
-    }
-
-}
-
-function actualizarNombres(select){
-
-    const card = select.closest(".rollo-card");
-
-    if(!select.value){
+    if (!select.value) {
         return;
     }
 
-    const rollo = select.value;
+    const repetidos = [
+        ...document.querySelectorAll(".rollo-select"),
+    ].filter(item => item.value === select.value);
 
-    card.querySelector(".metros-input").name = `metros_${rollo}`;
+    if (repetidos.length > 1) {
+        alert("Ese rollo ya fue seleccionado.");
+        select.value = "";
+        return;
+    }
 
-    const option = select.selectedOptions[0];
+    const opcion = select.selectedOptions[0];
+    const rolloId = select.value;
 
-    card.querySelectorAll(".item-row").forEach(function(fila){
+    bloque.querySelector(".metros-input").name =
+        `metros_${rolloId}`;
 
-        renombrarFila(fila, rollo);
-
-        fila.querySelector(".tela-view").value = option.dataset.telaNombre;
-        fila.querySelector(".tela-hidden").value = option.dataset.tela;
-
-        fila.querySelector(".color-view").value = option.dataset.colorNombre;
-        fila.querySelector(".color-hidden").value = option.dataset.color;
-
+    bloque.querySelectorAll(".item-row").forEach(fila => {
+        renombrarFila(fila, rolloId);
+        fila.querySelector(".tela-view").value =
+            opcion.dataset.telaNombre;
+        fila.querySelector(".tela-hidden").value =
+            opcion.dataset.tela;
+        fila.querySelector(".color-view").value =
+            opcion.dataset.colorNombre;
+        fila.querySelector(".color-hidden").value =
+            opcion.dataset.color;
     });
 
-    const info = card.querySelector(".rollo-info");
-
-    info.style.display = "block";
-
-    info.querySelector(".info-tela").textContent = option.dataset.telaNombre;
-    info.querySelector(".info-color").textContent = option.dataset.colorNombre;
-    info.querySelector(".info-stock").textContent = option.dataset.disponible;
-    info.querySelector(".info-costo").textContent = option.dataset.costo;
-
-    actualizarRestante(card);
-
+    actualizarRestante(bloque);
 }
 
-function actualizarRestante(card){
+function actualizarRestante(bloque) {
+    const select = bloque.querySelector(".rollo-select");
 
-    const select = card.querySelector("select[name='rollo_id[]']");
-
-    if(!select.value){
+    if (!select.value) {
         return;
     }
 
-    const disponible = parseFloat(
+    const disponible = Number(
         select.selectedOptions[0].dataset.disponible
     );
 
-    const usados=parseFloat(
-        card.querySelector(".metros-input").value||0
+    const metros = Number(
+        bloque.querySelector(".metros-input").value || 0
     );
 
-    const restante=(disponible-usados).toFixed(2);
+    const restante = disponible - metros;
+    const etiqueta = bloque.querySelector(".restante");
 
-    const span=card.querySelector(".info-restante");
+    etiqueta.textContent =
+        `Disponible: ${disponible.toFixed(2)} m · Restan: `
+        + `${restante.toFixed(2)} m`;
 
-    span.innerHTML=restante;
-
-    if(usados>disponible){
-
-        span.style.color="red";
-
-    }else{
-
-        span.style.color="green";
-
-    }
-
+    etiqueta.className = restante < 0
+        ? "text-danger restante"
+        : "text-muted restante";
 }
 
-function addItem(btn){
+function addItem(bloque) {
+    const select = bloque.querySelector(".rollo-select");
 
-    const card = btn.closest(".rollo-card");
-
-    const rolloSelect = card.querySelector("select[name='rollo_id[]']");
-
-    if(!rolloSelect.value){
-
-        alert("Seleccione primero el rollo");
-
+    if (!select.value) {
+        alert("Seleccione primero el rollo.");
         return;
-
     }
 
-    const rollo = rolloSelect.value;
+    const opcion = select.selectedOptions[0];
+    const fila = document.createElement("div");
 
-    const option = rolloSelect.selectedOptions[0];
+    fila.className = "item-row";
 
-    const div = document.createElement("div");
-
-    div.className = "grid-item item-row";
-
-    div.innerHTML = `
-
-        <select>
-
-        {% for p in productos %}
-
-        <option value="{{p.id}}">
-        {{p.nombre}}
-        </option>
-
-        {% endfor %}
-
+    fila.innerHTML = `
+        <select class="form-select producto-select">
+            ${opcionesProductos()}
         </select>
 
         <input
-        type="text"
-        class="tela-view"
-        readonly>
+            class="form-control tela-view"
+            readonly>
+
+        <input type="hidden" class="tela-hidden">
 
         <input
-        type="hidden"
-        class="tela-hidden">
+            class="form-control color-view"
+            readonly>
 
-        <input
-        type="text"
-        class="color-view"
-        readonly>
+        <input type="hidden" class="color-hidden">
 
-        <input
-        type="hidden"
-        class="color-hidden">
-
-        <select>
-
-        {% for t in tallas %}
-
-        <option value="{{t.nombre}}">
-        {{t.nombre}}
-        </option>
-
-        {% endfor %}
-
+        <select class="form-select talla-select">
+            ${opcionesTallas()}
         </select>
 
         <input
-        type="number"
-        min="1"
-        step="1"
-        value="1"
-        oninput="calcularTotal()">
+            type="number"
+            min="1"
+            step="1"
+            value="1"
+            class="form-control cantidad-input">
+
+        <select class="form-select cortador-select" required>
+            ${opcionesCortadores()}
+        </select>
 
         <button
-        type="button"
-        class="btn-danger"
-        onclick="this.parentElement.remove();calcularTotal();">
-
-        ✕
-
+            type="button"
+            class="btn btn-sm btn-outline-danger eliminar-item">
+            ×
         </button>
+    `;
 
-        `;
+    fila.querySelector(".tela-view").value =
+        opcion.dataset.telaNombre;
+    fila.querySelector(".tela-hidden").value =
+        opcion.dataset.tela;
+    fila.querySelector(".color-view").value =
+        opcion.dataset.colorNombre;
+    fila.querySelector(".color-hidden").value =
+        opcion.dataset.color;
 
-    card.querySelector(".items").appendChild(div);
+    renombrarFila(fila, select.value);
 
-    renombrarFila(div, rollo);
+    fila.querySelector(".cantidad-input")
+        .addEventListener("input", calcularTotales);
 
-    div.querySelector(".tela-view").value = option.dataset.telaNombre;
-    div.querySelector(".tela-hidden").value = option.dataset.tela;
+    fila.querySelector(".eliminar-item")
+        .addEventListener("click", function () {
+            fila.remove();
+            calcularTotales();
+        });
 
-    div.querySelector(".color-view").value = option.dataset.colorNombre;
-    div.querySelector(".color-hidden").value = option.dataset.color;
-
-    calcularTotal();
-
+    bloque.querySelector(".items").appendChild(fila);
+    calcularTotales();
 }
 
-function renombrarFila(fila,rollo){
+function renombrarFila(fila, rolloId) {
+    fila.querySelector(".producto-select").name =
+        `producto_${rolloId}[]`;
 
-    const producto=fila.children[0];
+    fila.querySelector(".tela-hidden").name =
+        `tela_${rolloId}[]`;
 
-    const telaTexto=fila.querySelector(".tela-view");
+    fila.querySelector(".color-hidden").name =
+        `color_${rolloId}[]`;
 
-    const telaHidden=fila.querySelector(".tela-hidden");
+    fila.querySelector(".talla-select").name =
+        `talla_${rolloId}[]`;
 
-    const colorTexto=fila.querySelector(".color-view");
+    fila.querySelector(".cantidad-input").name =
+        `cantidad_${rolloId}[]`;
 
-    const colorHidden=fila.querySelector(".color-hidden");
-
-    const talla=fila.querySelectorAll("select")[1];
-
-    const cantidad=fila.querySelector("input[type='number']");
-
-    producto.name=`producto_${rollo}[]`;
-
-    telaHidden.name=`tela_${rollo}[]`;
-
-    colorHidden.name=`color_${rollo}[]`;
-
-    talla.name=`talla_${rollo}[]`;
-
-    cantidad.name=`cantidad_${rollo}[]`;
-
+    fila.querySelector(".cortador-select").name =
+        `cortador_${rolloId}[]`;
 }
 
-
-function calcularTotal(){
-
-    let prendas=0;
-    let metros=0;
-
-    document
-    .querySelectorAll("input[name^='cantidad_']")
-    .forEach(i=>{
-
-        prendas+=parseInt(i.value||0);
-
-    });
-
-    document
-    .querySelectorAll(".metros-input")
-    .forEach(i=>{
-
-        metros+=parseFloat(i.value||0);
-
-    });
-
-    document.getElementById("totalPrendas").innerHTML=prendas;
-
-    document.getElementById("totalMetros").innerHTML=
-        metros.toFixed(2);
-
-    document.getElementById("totalRollos").innerHTML=
-        document.querySelectorAll(".rollo-card").length;
-
-}
-
-
-document
-.getElementById("formCorte")
-.addEventListener("submit",function(e){
-
-    let error=false;
-
-    document
-    .querySelectorAll(".rollo-card")
-    .forEach(function(card){
-
-        const metros=
-        card.querySelector(".metros-input").value;
-
-        if(!metros){
-
-            error=true;
-
-        }
-
-        const filas=
-        card.querySelectorAll(".item-row");
-
-        if(filas.length===0){
-
-            error=true;
-
-        }
-
-    });
-
-    if(
-        !confirm(
-        "Se ejecutará el corte y se actualizará el inventario.\n\n¿Desea continuar?"
-        )
-    ){
-
-        e.preventDefault();
-
-        return;
-
-    }
-
-    if(error){
-
-        e.preventDefault();
-
-        alert(
-            "Todos los rollos deben tener metros y al menos una variante."
+function calcularTotales() {
+    const metros = [...document.querySelectorAll(".metros-input")]
+        .reduce(
+            (total, input) => total + Number(input.value || 0),
+            0
         );
 
-    }
+    const prendas = [
+        ...document.querySelectorAll(".cantidad-input"),
+    ].reduce(
+        (total, input) => total + Number(input.value || 0),
+        0
+    );
 
-});
+    document.getElementById("totalRollos").textContent =
+        document.querySelectorAll(".rollo-block").length;
 
+    document.getElementById("totalMetros").textContent =
+        metros.toFixed(2);
+
+    document.getElementById("totalPrendas").textContent =
+        prendas;
+}
+
+document
+    .getElementById("formCorte")
+    .addEventListener("submit", function (event) {
+        const bloques = [
+            ...document.querySelectorAll(".rollo-block"),
+        ];
+
+        let error = "";
+
+        if (!bloques.length) {
+            error = "Debe registrar al menos un rollo.";
+        }
+
+        bloques.forEach(bloque => {
+            const rollo = bloque.querySelector(".rollo-select");
+            const metros = bloque.querySelector(".metros-input");
+            const items = bloque.querySelectorAll(".item-row");
+
+            if (!rollo.value || !metros.value || !items.length) {
+                error = (
+                    "Cada rollo requiere metros y al menos "
+                    + "una prenda."
+                );
+            }
+
+            bloque
+                .querySelectorAll(".cortador-select")
+                .forEach(selector => {
+                    if (!selector.value) {
+                        error = (
+                            "Debe seleccionar el cortador "
+                            + "en cada prenda."
+                        );
+                    }
+                });
+        });
+
+        if (error) {
+            event.preventDefault();
+            alert(error);
+            return;
+        }
+
+        if (!confirm(
+            "Se consumirá la tela y se registrarán los cortadores.\n\n"
+            + "Las prendas quedarán pendientes de confección "
+            + "y aún no entrarán a inventario.\n\n"
+            + "¿Desea continuar?"
+        )) {
+            event.preventDefault();
+        }
+    });
 
 addRollo();
-
-
 </script>
-
 {% endblock %}

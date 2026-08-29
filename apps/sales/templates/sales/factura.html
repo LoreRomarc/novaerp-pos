@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load humanize %}
 {% block content %}
 
 <div class="container mt-4">
@@ -31,25 +32,26 @@
                     <tr>
                         <td>{{ item.producto.nombre }}</td>
                         <td>{{ item.cantidad }}</td>
-                        <td>${{ item.precio_unitario }}</td>
-                        <td>${{ item.total_linea }}</td>
+                        <td>${{ item.precio_unitario|floatformat:0|intcomma }}</td>
+                        <td>${{ item.total_linea|floatformat:0|intcomma }}</td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
 
             <div class="text-end">
-                <p>Subtotal: ${{ venta.subtotal }}</p>
-                <p>IVA: ${{ venta.total_iva }}</p>
-                <h5>Total: ${{ venta.total }}</h5>
+                <p>Subtotal: ${{ venta.subtotal|floatformat:0|intcomma }}</p>
+                <p>IVA: ${{ venta.total_iva|floatformat:0|intcomma }}</p>
+                <h5>Total: ${{ venta.total|floatformat:0|intcomma }}</h5>
             </div>
 
             <hr>
 
             <div class="text-end">
-                <p>Efectivo: ${{ venta.monto_efectivo }}</p>
-                <p>Transferencia: ${{ venta.monto_transferencia }}</p>
-                <p>Tarjeta: ${{ venta.monto_tarjeta }}</p>
+                <p>Efectivo: ${{ venta.monto_efectivo|floatformat:0|intcomma }}</p>
+                <p>Transferencia: ${{ venta.monto_transferencia|floatformat:0|intcomma }}</p>
+                {# TARJETA: medio implementado en modelo/servicio; se habilita cuando el negocio lo use. #}
+                {# <p>Tarjeta: ${{ venta.monto_tarjeta|floatformat:0|intcomma }}</p> #}
             </div>
 
             {% if venta.estado == "CERRADA" %}

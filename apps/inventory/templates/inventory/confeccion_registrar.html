@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Registrar confección{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-0">Confección {{ lote.referencia }}</h2>
+            <small class="text-muted">
+                Solo las cantidades registradas entrarán a inventario.
+            </small>
+        </div>
+
+        <a
+            href="{% url 'inventory:confeccion_lotes' %}"
+            class="btn btn-outline-secondary">
+            Volver
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags|default:'info' }}">
+                {{ message }}
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    {% if not costureras %}
+        <div class="alert alert-warning">
+            Debe crear al menos una costurera antes de registrar
+            confección.
+
+            <a
+                href="{% url 'inventory:operarios_produccion' %}"
+                class="alert-link">
+                Gestionar operarios
+            </a>
+        </div>
+    {% endif %}
+
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-body">
+
+                <div class="row align-items-end">
+                    <div class="col-md-5">
+                        <label class="form-label">
+                            Aplicar costurera a todas las líneas
+                        </label>
+
+                        <select
+                            id="costurera-general"
+                            class="form-select">
+                            <option value="">
+                                Seleccione si aplica
+                            </option>
+
+                            {% for costurera in costureras %}
+                            <option value="{{ costurera.id }}">
+                                {{ costurera.nombre }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-md-7">
+                        <small class="text-muted">
+                            Puede cambiar la costurera individualmente
+                            en cada línea.
+                        </small>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Producto</th>
+                            <th>Talla</th>
+                            <th class="text-end">Cortadas</th>
+                            <th class="text-end">Confeccionadas</th>
+                            <th class="text-end">Pendientes</th>
+                            <th style="min-width: 180px;">Costurera</th>
+                            <th style="min-width: 110px;">Cantidad</th>
+                        </tr>
+                    </thead>
+
+                    <tbody>
+                        {% for detalle in detalles %}
+                        <tr>
+                            <td>
+                                <strong>
+                                    {{ detalle.variante.producto_base.nombre }}
+                                </strong>
+                                <br>
+                                <small class="text-muted">
+                                    {{ detalle.variante.tipo_tela.nombre }}
+                                    · {{ detalle.variante.color.nombre }}
+                                </small>
+                            </td>
+
+                            <td>
+                                {{ detalle.variante.talla.nombre }}
+                            </td>
+
+                            <td class="text-end">
+                                {{ detalle.cantidad }}
+                            </td>
+
+                            <td class="text-end">
+                                {{ detalle.confeccionadas }}
+                            </td>
+
+                            <td class="text-end fw-bold">
+                                {{ detalle.pendientes }}
+                            </td>
+
+                            <td>
+                                <select
+                                    name="costurera_{{ detalle.id }}"
+                                    class="form-select form-select-sm costurera-select">
+                                    <option value="">
+                                        Seleccione
+                                    </option>
+
+                                    {% for costurera in costureras %}
+                                    <option value="{{ costurera.id }}">
+                                        {{ costurera.nombre }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+
+                            <td>
+                                <input
+                                    type="number"
+                                    name="cantidad_{{ detalle.id }}"
+                                    min="0"
+                                    max="{{ detalle.pendientes }}"
+                                    step="1"
+                                    value="0"
+                                    class="form-control form-control-sm"
+                                    {% if not costureras %}disabled{% endif %}>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td
+                                colspan="7"
+                                class="text-center text-success py-4">
+                                El lote ya está totalmente confeccionado.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if detalles and costureras %}
+            <div class="card-footer bg-white text-end">
+                <button class="btn btn-success">
+                    Registrar confección e ingresar stock
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </form>
+</div>
+
+<script>
+document
+    .getElementById("costurera-general")
+    ?.addEventListener("change", function () {
+        document
+            .querySelectorAll(".costurera-select")
+            .forEach(function (selector) {
+                selector.value = this.value;
+            }, this);
+    });
+</script>
+{% endblock %}

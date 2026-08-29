@@ -1,76 +1,28 @@
 {% extends "base.html" %}
+{% load humanize %}
 
+{% block title %}Kardex{% endblock %}
 {% block content %}
-
-<div class="container-fluid">
-
-    <div class="d-flex justify-content-between mb-3">
-        <h2>📊 Kardex</h2>
-
-        <form method="get" class="d-flex gap-2">
-            <input type="number" name="variante" placeholder="ID Variante" class="form-control" value="{{ request.GET.variante }}">
-            <button class="btn btn-dark">Filtrar</button>
-        </form>
+<div class="container-fluid py-2">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+        <div><h2 class="mb-1">Kardex</h2><p class="text-muted mb-0">Movimientos de inventario de la sucursal activa.</p></div>
+        <form method="get" class="d-flex gap-2"><input type="number" name="variante" placeholder="ID de variante" class="form-control" value="{{ request.GET.variante }}"><button class="btn btn-primary"><i class="bi bi-funnel me-1"></i> Filtrar</button></form>
     </div>
-
-    <div class="card shadow-sm">
-
-        <div class="table-responsive">
-
-            <table class="table table-sm align-middle">
-
-                <thead class="table-light">
-                    <tr>
-                        <th>Fecha</th>
-                        <th>Producto</th>
-                        <th>Tipo</th>
-                        <th class="text-end">Cantidad</th>
-                        <th class="text-end">Saldo</th>
-                        <th>Usuario</th>
-                    </tr>
-                </thead>
-
-                <tbody>
-
-                {% for m in movimientos %}
-
-                    <tr>
-
-                        <td>{{ m.creado|date:"Y-m-d H:i" }}</td>
-
-                        <td>
-                            {{ m.variante.producto_base.nombre }}
-                            ({{ m.variante.talla }})
-                        </td>
-
-                        <td>
-                            <span class="badge bg-secondary">
-                                {{ m.tipo }}
-                            </span>
-                        </td>
-
-                        <td class="text-end">
-                            {{ m.cantidad }}
-                        </td>
-
-                        <td class="text-end">
-                            <strong>{{ m.saldo_post_movimiento }}</strong>
-                        </td>
-
-                        <td>{{ m.usuario|default:"Sistema" }}</td>
-
-                    </tr>
-
-                {% endfor %}
-
-                </tbody>
-
-            </table>
-
-        </div>
-
-    </div>
-
+    <div class="card border-0"><div class="table-responsive"><table class="table table-hover align-middle mb-0"><thead class="table-light"><tr><th>Fecha</th><th>Producto</th><th>Movimiento</th><th class="text-end">Cantidad</th><th class="text-end">Saldo</th><th>Usuario</th><th></th></tr></thead><tbody>
+    {% for m in movimientos %}<tr>
+        <td class="text-nowrap small">{{ m.creado|date:"d/m/Y H:i" }}</td>
+        <td><div class="fw-semibold">{{ m.variante.producto_base.nombre }}</div><small class="text-muted">{{ m.variante.sku }} · {{ m.variante.talla }}</small></td>
+        <td><span class="badge {% if m.cantidad < 0 %}text-bg-secondary{% else %}text-bg-primary{% endif %}">{{ m.tipo_legible }}</span></td>
+        <td class="text-end fw-semibold {% if m.cantidad < 0 %}text-danger{% else %}text-success{% endif %}">{% if m.cantidad > 0 %}+{% endif %}{{ m.cantidad|floatformat:0|intcomma }}</td>
+        <td class="text-end currency">{{ m.saldo_post_movimiento|floatformat:0|intcomma }}</td><td class="small">{{ m.usuario|default:"Sistema" }}</td>
+        <td class="text-end"><button class="btn btn-sm btn-outline-primary js-kardex-detalle" type="button" data-id="{{ m.id }}"><i class="bi bi-eye"></i></button></td>
+    </tr>{% empty %}<tr><td colspan="7" class="text-center text-muted py-5">No hay movimientos para los filtros elegidos.</td></tr>{% endfor %}
+    </tbody></table></div></div>
 </div>
-
+<div class="modal fade" id="modalKardex" tabindex="-1"><div class="modal-dialog modal-lg modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Detalle de movimiento</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="contenidoKardex"></div></div></div></div>
 {% endblock %}
+{% block content-script %}<script>
+const modalKardex = new bootstrap.Modal(document.getElementById("modalKardex"));
+const contenidoKardex = document.getElementById("contenidoKardex");
+document.querySelectorAll(".js-kardex-detalle").forEach((boton) => boton.addEventListener("click", async () => { contenidoKardex.textContent = "Cargando detalle…"; modalKardex.show(); try { const url = "{% url 'inventory:kardex_detalle' 0 %}".replace("/0/", `/${boton.dataset.id}/`); const respuesta = await fetch(url); const data = await respuesta.json(); if (!respuesta.ok || !data.success) throw new Error("No fue posible cargar el detalle."); const m = data.movimiento; const t = data.traslado; let html = `<div class="row g-3 mb-3"><div class="col-md-6"><small class="text-muted">Movimiento</small><div class="fw-semibold">${m.tipo}</div></div><div class="col-md-6"><small class="text-muted">Referencia</small><div class="fw-semibold">${m.referencia}</div></div><div class="col-md-6"><small class="text-muted">Producto</small><div>${m.producto}</div></div><div class="col-md-3"><small class="text-muted">Cantidad</small><div class="fw-semibold ${Number(m.cantidad) < 0 ? 'text-danger' : 'text-success'}">${Number(m.cantidad) > 0 ? '+' : ''}${m.cantidad}</div></div><div class="col-md-3"><small class="text-muted">Saldo</small><div>${m.saldo}</div></div></div>`; if (t) html += `<hr><h6 class="mb-3">Traslado ${t.numero}</h6><div class="row g-3 mb-3"><div class="col-md-6"><small class="text-muted">Ruta</small><div>${t.origen} <i class="bi bi-arrow-right mx-1"></i> ${t.destino}</div></div><div class="col-md-3"><small class="text-muted">Tipo</small><div>${t.tipo}</div></div><div class="col-md-3"><small class="text-muted">Estado</small><div>${t.estado}</div></div><div class="col-12"><small class="text-muted">Motivo</small><div>${t.motivo}</div></div><div class="col-12"><small class="text-muted">Observaciones</small><div>${t.observaciones}</div></div></div><div class="table-responsive"><table class="table table-sm"><thead><tr><th>Producto</th><th class="text-end">Cantidad</th><th>Observación</th></tr></thead><tbody>${t.items.map(i => `<tr><td>${i.producto}</td><td class="text-end">${i.cantidad}</td><td>${i.observacion || '—'}</td></tr>`).join('')}</tbody></table></div>`; contenidoKardex.innerHTML = html; } catch (error) { contenidoKardex.innerHTML = `<div class="alert alert-danger mb-0">${error.message}</div>`; } }));
+</script>{% endblock %}

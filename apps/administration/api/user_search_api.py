@@ -2,9 +2,10 @@ from django.http import JsonResponse
 from django.views import View
 
 from apps.administration.services.user_search_service import UserSearchService
+from apps.administration.mixins import SuperAdminRequiredMixin
 
 
-class UserSearchAPI(View):
+class UserSearchAPI(SuperAdminRequiredMixin, View):
 
     def get(self, request):
         query = request.GET.get("q", "")

@@ -47,6 +47,13 @@ class SetupWizardMiddleware:
 
         if SetupChecker.sistema_configurado():
 
+            ruta_setup = reverse("setup:wizard")
+
+            # Nadie debe volver a ejecutar ni visualizar el asistente
+            # después de terminar la instalación.
+            if request.path.startswith(ruta_setup):
+                return redirect("inicio")
+
             return self.get_response(request)
 
 
