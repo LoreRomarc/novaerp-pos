@@ -9,7 +9,8 @@ from apps.administration.views.empresa_views import (
 )
 from apps.administration.views.sucursal_views import (
     SucursalListView,
-    SucursalCreateView
+    SucursalCreateView,
+    SucursalUpdateView,
 )
 
 from apps.administration.views.user_views import (
@@ -58,6 +59,11 @@ urlpatterns = [
     # ======================
     path("sucursales/", SucursalListView.as_view(), name="sucursal_list"),
     path("sucursales/create/", SucursalCreateView.as_view(), name="sucursal_create"),
+    path(
+        "sucursales/<int:pk>/editar/",
+        SucursalUpdateView.as_view(),
+        name="sucursal_update",
+    ),
 
     # ======================
     # USUARIOS

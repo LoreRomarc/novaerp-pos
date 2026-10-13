@@ -7,6 +7,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views.generic import TemplateView, View
 from django.contrib.auth import get_user_model
 from django.db.models import Q
@@ -238,10 +239,37 @@ class CajaConfiguracionView(
 
     template_name = "sales/caja/configuracion.html"
 
+    def _obtener_sucursal_configuracion(self, request):
+        """Resuelve la sede elegida explícitamente para administrar sus cajas."""
+        sucursal_id = (
+            request.POST.get("sucursal_id")
+            or request.GET.get("sucursal")
+        )
+
+        if not sucursal_id:
+            return self.get_sucursal()
+
+        sucursal = Sucursal.objects.filter(
+            pk=sucursal_id,
+            activa=True,
+        ).first()
+        if not sucursal:
+            raise ValidationError(
+                "Seleccione una sucursal activa válida para administrar cajas."
+            )
+        return sucursal
+
+    @staticmethod
+    def _redirigir_configuracion(sucursal):
+        return redirect(
+            f"{reverse('sales:caja_configuracion')}?sucursal={sucursal.id}"
+        )
+
     def _contexto(self, sucursal, error=None):
         return {
             "sucursal": sucursal,
             "error": error,
+            "sucursales": Sucursal.objects.filter(activa=True).order_by("nombre"),
             "cajas": (
                 Caja.objects
                 .filter(sucursal=sucursal)
@@ -250,7 +278,16 @@ class CajaConfiguracionView(
         }
 
     def get(self, request):
-        sucursal = self.get_sucursal()
+        try:
+            sucursal = self._obtener_sucursal_configuracion(request)
+        except ValidationError as error:
+            sucursal = self.get_sucursal()
+            return render(
+                request,
+                self.template_name,
+                self._contexto(sucursal, error.messages[0]),
+                status=400,
+            )
 
         return render(
             request,
@@ -259,7 +296,16 @@ class CajaConfiguracionView(
         )
 
     def post(self, request):
-        sucursal = self.get_sucursal()
+        try:
+            sucursal = self._obtener_sucursal_configuracion(request)
+        except ValidationError as error:
+            sucursal = self.get_sucursal()
+            return render(
+                request,
+                self.template_name,
+                self._contexto(sucursal, error.messages[0]),
+                status=400,
+            )
 
         accion = request.POST.get("accion", "crear")
         caja_id = request.POST.get("caja_id")
@@ -273,7 +319,7 @@ class CajaConfiguracionView(
             if accion == "cambiar_estado":
                 caja.activa = not caja.activa
                 caja.save(update_fields=["activa"])
-                return redirect("sales:caja_configuracion")
+                return self._redirigir_configuracion(sucursal)
 
             codigo = (request.POST.get("codigo") or "").strip().upper()
             nombre = (request.POST.get("nombre") or "").strip()
@@ -290,7 +336,7 @@ class CajaConfiguracionView(
                 return render(request, self.template_name, self._contexto(
                     sucursal, "No fue posible actualizar: el código ya existe o los datos no son válidos."
                 ), status=400)
-            return redirect("sales:caja_configuracion")
+            return self._redirigir_configuracion(sucursal)
 
         codigo = (request.POST.get("codigo") or "").strip().upper()
         nombre = (request.POST.get("nombre") or "").strip()
@@ -339,7 +385,7 @@ class CajaConfiguracionView(
                 status=400,
             )
 
-        return redirect("sales:caja_configuracion")
+        return self._redirigir_configuracion(sucursal)
         
 class CajaDashboardView(
     LoginRequiredMixin,

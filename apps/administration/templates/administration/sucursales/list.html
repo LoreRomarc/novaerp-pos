@@ -33,6 +33,7 @@
                     <th>Dirección</th>
                     <th>Lista predeterminada</th>
                     <th>Estado</th>
+                    <th class="text-end">Acciones</th>
                 </tr>
             </thead>
             <tbody id="sucursalTable">
@@ -49,10 +50,19 @@
                                 <span class="admin-badge admin-badge-muted">Inactiva</span>
                             {% endif %}
                         </td>
+                        <td class="text-end table-actions">
+                            <a
+                                class="btn btn-sm btn-outline-primary"
+                                href="{% url 'administration:sucursal_update' sucursal.pk %}"
+                                title="Editar sucursal">
+                                <i class="bi bi-pencil"></i>
+                                <span class="visually-hidden">Editar {{ sucursal.nombre }}</span>
+                            </a>
+                        </td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="5">
+                        <td colspan="6">
                             <div class="admin-empty"><i class="bi bi-shop"></i>No hay sucursales registradas.</div>
                         </td>
                     </tr>
