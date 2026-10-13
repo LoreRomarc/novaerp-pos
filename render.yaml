@@ -30,3 +30,7 @@ services:
         value: "0"
       - key: POSTGRES_CONN_MAX_AGE
         value: "60"
+      # Django 5.1 se prueba con Python 3.12; no usar el valor predeterminado
+      # más reciente de Render para evitar incompatibilidades inesperadas.
+      - key: PYTHON_VERSION
+        value: "3.12.7"
