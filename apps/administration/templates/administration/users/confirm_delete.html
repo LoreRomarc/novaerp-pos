@@ -13,6 +13,7 @@
                 <p class="admin-page-subtitle mb-4">
                     Se eliminará el acceso de <strong>{{ object.username }}</strong>. Esta operación no se puede deshacer.
                 </p>
+                {% if error %}<div class="alert alert-warning text-start small">{{ error }}</div>{% endif %}
 
                 <form method="post" class="d-flex justify-content-center gap-2">
                     {% csrf_token %}

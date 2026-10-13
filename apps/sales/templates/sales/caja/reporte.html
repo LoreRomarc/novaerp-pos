@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Reporte financiero{% endblock %}
+
+{% block content %}
+<style>
+    .financial-hero { background: linear-gradient(135deg, #10233e, #1d4a55); color: #fff; border-radius: 1rem; padding: 1.25rem; }
+    .financial-hero .text-muted { color: rgba(255,255,255,.72)!important; }
+    .financial-metric { border-left: 4px solid #2c7a63; }
+    .financial-metric.is-out { border-left-color: #b65352; }
+    .movement-type { display: inline-flex; align-items: center; gap: .35rem; font-size: .78rem; font-weight: 700; white-space: nowrap; }
+    .movement-type.in::before, .movement-type.out::before, .movement-type.neutral::before { content: ""; width: .5rem; height: .5rem; border-radius: 50%; background: #2c7a63; }
+    .movement-type.out::before { background: #b65352; }
+    .movement-type.neutral::before { background: #64748b; }
+</style>
+<div class="container-fluid py-2">
+    <div class="financial-hero d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-3">
+        <div><div class="text-uppercase small fw-semibold" style="letter-spacing:.08em">Control financiero</div><h2 class="mb-1">Reporte financiero</h2><p class="text-muted mb-0">Movimientos de caja, turnos y trazabilidad de {{ sucursal_reporte.nombre }}.</p></div>
+        <a class="btn btn-light" href="{% url 'sales:caja_dashboard' %}"><i class="bi bi-cash-coin me-1"></i> Operación de caja</a>
+    </div>
+
+    <form method="get" data-auto-filter class="card mb-3"><div class="card-body"><div class="row g-2 align-items-end">
+        <div class="col-md-3"><label class="form-label" for="inicio">Desde</label><input class="form-control" id="inicio" name="inicio" type="date" value="{{ inicio }}"></div>
+        <div class="col-md-3"><label class="form-label" for="fin">Hasta</label><input class="form-control" id="fin" name="fin" type="date" value="{{ fin }}"></div>
+        {% if puede_filtrar_sucursales %}<div class="col-md-3"><label class="form-label" for="sucursal">Sucursal</label><select class="form-select" id="sucursal" name="sucursal">{% for opcion in sucursales %}<option value="{{ opcion.id }}" {% if sucursal_id == opcion.id|stringformat:"s" %}selected{% endif %}>{{ opcion.nombre }}</option>{% endfor %}</select></div>{% endif %}
+        <div class="col-md-3"><label class="form-label" for="caja">Caja</label><select class="form-select" id="caja" name="caja"><option value="">Todas las cajas</option>{% for caja in cajas %}<option value="{{ caja.id }}" {% if caja_id == caja.id|stringformat:"s" %}selected{% endif %}>{{ caja.nombre }} · {{ caja.codigo }}</option>{% endfor %}</select></div>
+        <div class="col-md-3"><label class="form-label" for="estado">Estado del turno</label><select class="form-select" id="estado" name="estado"><option value="">Todos</option><option value="ABIERTO" {% if estado == "ABIERTO" %}selected{% endif %}>Abierto</option><option value="CERRADO_CAJERO" {% if estado == "CERRADO_CAJERO" %}selected{% endif %}>Cerrado por cajero</option><option value="CERRADO_SUPERVISOR" {% if estado == "CERRADO_SUPERVISOR" %}selected{% endif %}>Cerrado por supervisor</option><option value="AUDITADO" {% if estado == "AUDITADO" %}selected{% endif %}>Auditado</option></select></div>
+        <div class="col-md-3"><label class="form-label" for="medio_pago">Método de pago</label><select class="form-select" id="medio_pago" name="medio_pago"><option value="">Todos los movimientos</option><option value="EFECTIVO" {% if medio_pago == "EFECTIVO" %}selected{% endif %}>Efectivo</option><option value="TRANSFERENCIA" {% if medio_pago == "TRANSFERENCIA" %}selected{% endif %}>Transferencia</option><option value="COMBINADO" {% if medio_pago == "COMBINADO" %}selected{% endif %}>Combinado</option><option value="CREDITO" {% if medio_pago == "CREDITO" %}selected{% endif %}>Crédito / abonos</option></select></div>
+        <div class="col-12 d-flex flex-wrap gap-2"><button class="btn btn-primary"><i class="bi bi-funnel me-1"></i> Actualizar</button><button class="btn btn-outline-secondary" type="submit" formaction="{% url 'sales:caja_reportes_pdf' %}" formtarget="_blank"><i class="bi bi-file-earmark-pdf me-1"></i> Descargar PDF</button><a class="btn btn-outline-secondary" href="{% url 'sales:caja_reportes' %}">Limpiar</a></div>
+    </div></div></form>
+
+    <div class="row g-2 mb-3">
+        <div class="col-12 col-sm-6 col-xl-3"><div class="card financial-metric h-100"><div class="card-body"><div class="text-muted small">Ventas en efectivo</div><div class="fs-5 fw-bold text-success">${{ resumen.ventas_efectivo|floatformat:0|intcomma }}</div><small class="text-muted">Cobros de ventas del período</small></div></div></div>
+        <div class="col-12 col-sm-6 col-xl-3"><div class="card financial-metric h-100"><div class="card-body"><div class="text-muted small">Abonos a crédito</div><div class="fs-5 fw-bold text-success">${{ resumen.abonos_total|floatformat:0|intcomma }}</div><small class="text-muted">Efectivo: ${{ resumen.abonos_efectivo|floatformat:0|intcomma }} · Transferencia: ${{ resumen.abonos_transferencia|floatformat:0|intcomma }}</small></div></div></div>
+        <div class="col-12 col-sm-6 col-xl-3"><div class="card financial-metric is-out h-100"><div class="card-body"><div class="text-muted small">Efectivo retirado</div><div class="fs-5 fw-bold text-danger">${{ resumen.egresos|add:resumen.retiros_boveda|floatformat:0|intcomma }}</div><small class="text-muted">Egresos y retiros a bóveda</small></div></div></div>
+        <div class="col-12 col-sm-6 col-xl-3"><div class="card financial-metric h-100"><div class="card-body"><div class="text-muted small">Efectivo operativo neto</div><div class="fs-5 fw-bold">${{ resumen.efectivo_operacion_neto|floatformat:0|intcomma }}</div><small class="text-muted">Incluye ventas, abonos, ingresos, egresos y retiros</small></div></div></div>
+        <div class="col-12 col-sm-6 col-xl-3"><div class="card financial-metric h-100"><div class="card-body"><div class="text-muted small">Transferencias recibidas</div><div class="fs-5 fw-bold">${{ resumen.ventas_transferencia|add:resumen.abonos_transferencia|floatformat:0|intcomma }}</div><small class="text-muted">Ventas y abonos del período</small></div></div></div>
+        <div class="col-12 col-sm-6 col-xl-3"><div class="card financial-metric h-100"><div class="card-body"><div class="text-muted small">Saldo en bóveda</div><div class="fs-5 fw-bold">${{ saldo_boveda|floatformat:0|intcomma }}</div><small class="text-muted">Saldo actual sucursal</small></div></div></div>
+    </div>
+
+    <div class="card mb-3"><div class="card-header d-flex justify-content-between align-items-center"><h5 class="mb-0">Movimientos financieros</h5><span class="badge text-bg-secondary">{{ resumen.cantidad_movimientos }} registros</span></div><div class="table-responsive"><table class="table table-hover mb-0"><thead class="table-light"><tr><th>Fecha</th><th>Tipo</th><th>Caja</th><th>Medio</th><th>Usuario</th><th>Referencia / observación</th><th class="text-end">Monto</th><th></th></tr></thead><tbody>{% for mov in movimientos %}<tr><td class="small text-nowrap">{{ mov.creado_en|date:"d/m/Y H:i" }}</td><td>{% if mov.tipo == 'EGRESO' or mov.tipo == 'RETIRO_BOVEDA' or mov.tipo == 'DEVOLUCION' %}<span class="movement-type out">{{ mov.get_tipo_display }}</span>{% elif mov.tipo == 'APERTURA' or mov.tipo == 'AJUSTE' %}<span class="movement-type neutral">{{ mov.get_tipo_display }}</span>{% else %}<span class="movement-type in">{{ mov.get_tipo_display }}</span>{% endif %}</td><td>{{ mov.caja.codigo }}</td><td>{{ mov.get_medio_pago_display|default:"—" }}</td><td>{{ mov.usuario|default:"Sistema" }}</td><td class="text-muted small">{% if mov.observacion %}{{ mov.observacion|truncatechars:55 }}{% elif mov.referencia_venta_id %}Venta #{{ mov.referencia_venta_id }}{% elif mov.referencia_devolucion_id %}Cambio o devolución #{{ mov.referencia_devolucion_id }}{% else %}—{% endif %}</td><td class="text-end fw-semibold {% if mov.tipo == 'EGRESO' or mov.tipo == 'RETIRO_BOVEDA' or mov.tipo == 'DEVOLUCION' %}text-danger{% else %}text-success{% endif %}">${{ mov.monto|floatformat:0|intcomma }}</td><td class="text-end table-actions"><div class="action-buttons"><button class="btn btn-sm btn-outline-primary js-ver-movimiento" data-id="{{ mov.id }}" type="button" title="Ver detalle"><i class="bi bi-eye"></i><span class="visually-hidden">Ver detalle</span></button></div></td></tr>{% empty %}<tr><td colspan="8" class="text-center text-muted py-5">No hay movimientos para los filtros seleccionados.</td></tr>{% endfor %}</tbody></table></div></div>
+    <div class="card"><div class="card-header"><h5 class="mb-0">Control de turnos</h5></div><div class="card-body"><div class="row g-3"><div class="col-6 col-md-4"><small class="text-muted d-block">Turnos</small><strong class="fs-5">{{ resumen_turnos.cantidad_turnos }}</strong></div><div class="col-6 col-md-4"><small class="text-muted d-block">Auditados</small><strong class="fs-5 text-success">{{ resumen_turnos.turnos_auditados }}</strong></div><div class="col-12 col-md-4"><small class="text-muted d-block">Diferencias acumuladas</small><strong class="fs-5 {% if resumen_turnos.diferencias < 0 %}text-danger{% else %}text-success{% endif %}">${{ resumen_turnos.diferencias|floatformat:0|intcomma }}</strong></div></div></div></div>
+</div>
+
+<div class="modal fade" id="modalMovimientoFinanciero" tabindex="-1" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Detalle del movimiento</h5><button class="btn-close" type="button" data-bs-dismiss="modal"></button></div><div id="contenidoMovimientoFinanciero" class="modal-body">Cargando…</div></div></div></div>
+{% endblock %}
+
+{% block content-script %}
+<script>
+    const modalMovimientoFinanciero = new bootstrap.Modal(document.getElementById("modalMovimientoFinanciero"));
+    const contenidoMovimientoFinanciero = document.getElementById("contenidoMovimientoFinanciero");
+    document.querySelectorAll(".js-ver-movimiento").forEach((boton) => boton.addEventListener("click", async () => {
+        contenidoMovimientoFinanciero.textContent = "Cargando…";
+        modalMovimientoFinanciero.show();
+        try {
+            const url = "{% url 'sales:caja_movimiento_detalle' 0 %}".replace("/0/", `/${boton.dataset.id}/`);
+            const respuesta = await fetch(url, { headers: { "X-Requested-With": "XMLHttpRequest" } });
+            if (!respuesta.ok) throw new Error("No fue posible cargar el movimiento.");
+            contenidoMovimientoFinanciero.innerHTML = await respuesta.text();
+        } catch (error) { contenidoMovimientoFinanciero.innerHTML = `<div class="alert alert-danger mb-0">${error.message}</div>`; }
+    }));
+</script>
+{% endblock %}

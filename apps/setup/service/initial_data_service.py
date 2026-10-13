@@ -38,7 +38,7 @@ class InitialDataService:
         # COLORES BASE
         # ==========================================
         colores = [
-
+            ("SIN DEFINIR", "#6B7280"),
             ("NEGRO", "#000000"),
             ("BLANCO", "#FFFFFF"),
             ("AZUL REY", "#0000FF"),
@@ -82,13 +82,22 @@ class InitialDataService:
         # TALLAS
         # ==========================================
 
+        # Catálogo inicial flexible para la operación actual. Las tallas
+        # existentes nunca se eliminan ni se renombran: cada variante conserva
+        # su relación y se puede migrar el catálogo gradualmente.
         tallas = [
-            ("XS",1),
-            ("S",2),
-            ("M",3),
-            ("L",4),
-            ("XL",5),
-            ("XXL",6),
+            ("ADULTO", 1),
+            ("NIÑO", 2),
+            ("16", 3),
+            ("S", 4),
+            ("M", 5),
+            ("L", 6),
+            ("XL", 7),
+            ("2XL", 8),
+            ("3XL", 9),
+            ("4XL", 10),
+            ("UNICA", 11),
+            ("PLUS", 12),
         ]
 
 

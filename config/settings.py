@@ -18,16 +18,59 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def cargar_entorno_local():
+    """Carga .env local sin dependencia adicional.
+
+    El archivo está ignorado por Git y permite desarrollar sin guardar claves
+    en settings.py. En producción systemd suministra las mismas variables.
+    """
+    archivo = BASE_DIR / ".env"
+    if not archivo.exists():
+        return
+
+    for linea in archivo.read_text(encoding="utf-8").splitlines():
+        linea = linea.strip()
+        if not linea or linea.startswith("#") or "=" not in linea:
+            continue
+        clave, valor = linea.split("=", 1)
+        os.environ.setdefault(clave.strip(), valor.strip().strip('"').strip("'"))
+
+
+cargar_entorno_local()
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-ab1*60u^f$hu@f+j)(%_%+ru%0^&up4dnp)g+ax5dw=&r(8^#_'
+SECRET_KEY = os.environ.get(
+    "DJANGO_SECRET_KEY",
+    "django-insecure-local-development-only-change-me",
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get("DJANGO_DEBUG", "True").lower() in {"1", "true", "yes"}
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get(
+        "DJANGO_ALLOWED_HOSTS",
+        "localhost,127.0.0.1",
+    ).split(",")
+    if host.strip()
+]
+
+# Render define este host automáticamente. Mantenerlo aquí evita tener que
+# copiarlo manualmente en cada despliegue de prueba.
+render_host = os.environ.get("RENDER_EXTERNAL_HOSTNAME", "").strip()
+if render_host and render_host not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(render_host)
+
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
+]
 
 
 # Application definition
@@ -69,6 +112,12 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
+# WhiteNoise solo se activa cuando el entorno de despliegue lo solicita. Así
+# el proyecto local puede seguir funcionando aunque el paquete se instale
+# exclusivamente durante el build del proveedor.
+if os.environ.get("DJANGO_USE_WHITENOISE", "False").lower() in {"1", "true", "yes"}:
+    MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
+
 ROOT_URLCONF = 'config.urls'
 
 TEMPLATES = [
@@ -93,16 +142,31 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'novaerp',
-        'USER': 'postgres',
-        'PASSWORD': 'DB2026',
-        'HOST': 'localhost',
-        'PORT': '5432',
+database_url = os.environ.get("DATABASE_URL", "").strip()
+if database_url:
+    # Render, Neon y otros proveedores entregan una sola URL de conexión.
+    # Se importa bajo demanda para no alterar el entorno local existente.
+    import dj_database_url
+
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=database_url,
+            conn_max_age=int(os.environ.get("POSTGRES_CONN_MAX_AGE", "60")),
+            conn_health_checks=True,
+        )
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('POSTGRES_DB', 'novaerp'),
+            'USER': os.environ.get('POSTGRES_USER', 'postgres'),
+            'PASSWORD': os.environ.get('POSTGRES_PASSWORD', ''),
+            'HOST': os.environ.get('POSTGRES_HOST', 'localhost'),
+            'PORT': os.environ.get('POSTGRES_PORT', '5432'),
+            'CONN_MAX_AGE': int(os.environ.get('POSTGRES_CONN_MAX_AGE', '60')),
+        }
+    }
 
 
 # Password validation
@@ -127,9 +191,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'es-co'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'America/Bogota'
 
 USE_I18N = True
 
@@ -141,6 +205,28 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / "static"]
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+if os.environ.get("DJANGO_USE_WHITENOISE", "False").lower() in {"1", "true", "yes"}:
+    STORAGES = {
+        "staticfiles": {
+            "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+        },
+    }
+
+# Las variables se activan automáticamente cuando DEBUG=False. El proxy (Nginx,
+# Caddy, etc.) debe terminar HTTPS y enviar X-Forwarded-Proto correctamente.
+if not DEBUG:
+    SECURE_SSL_REDIRECT = os.environ.get("DJANGO_SECURE_SSL_REDIRECT", "True").lower() in {"1", "true", "yes"}
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_HSTS_SECONDS = int(os.environ.get("DJANGO_HSTS_SECONDS", "31536000"))
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    # Solo habilitar preload en un dominio definitivo que cumpla sus requisitos.
+    SECURE_HSTS_PRELOAD = os.environ.get("DJANGO_HSTS_PRELOAD", "False").lower() in {"1", "true", "yes"}
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = "same-origin"
 
 LOGIN_URL = "/accounts/login/"
 LOGIN_REDIRECT_URL = "/"

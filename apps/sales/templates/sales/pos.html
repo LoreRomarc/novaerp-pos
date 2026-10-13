@@ -6,7 +6,8 @@
 
 <style>
   .pos-wrapper {
-    height: calc(100vh - 50px);
+    height: 100vh;
+    margin: -1.75rem;
   }
 
   /* SOLO POS, NO GLOBAL */
@@ -17,50 +18,69 @@
 
   .pos-wrapper {
     display: grid;
-    grid-template-columns: 1fr 380px;
+    grid-template-columns: minmax(0, 1fr) 350px;
     height: 100vh;
+    min-height: 0;
   }
 
   .pos-left {
-    padding: 25px;
+    padding: 0 20px 20px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
   }
 
-  /* ===== TIPO VENTA ===== */
+  /* ===== TIPO DE PRECIO ===== */
+  .pos-toolbar {
+    display: flex;
+    align-items: stretch;
+    min-width: 0;
+    border-bottom: 1px solid #dce6eb;
+    background: #edf3f5;
+    margin: 0 -20px 1rem;
+    padding: 0 20px;
+  }
+
   .tipo-venta-bar {
     display: flex;
-    gap: 10px;
-    margin-bottom: 12px;
+    align-self: center;
+    gap: 2px;
+    margin: 0 8px 0 0;
+    padding: 3px;
+    border: 1px solid #cfdde3;
+    border-radius: .5rem;
+    background: #fff;
   }
 
   .tipo-btn {
-    flex: 1;
-    padding: 8px;
-    border-radius: 8px;
-    border: 1px solid #ddd;
-    background: #fff;
-    font-weight: 600;
+    padding: 5px 10px;
+    border-radius: .32rem;
+    border: 1px solid transparent;
+    background: transparent;
+    color: #415466;
+    font-size: .78rem;
+    font-weight: 650;
     cursor: pointer;
     transition: 0.2s;
   }
 
   .tipo-btn.activo {
-    background: #198754;
+    background: #182b49;
     color: white;
-    border-color: #198754;
+    border-color: #182b49;
+    box-shadow: 0 .2rem .5rem rgba(24, 43, 73, .16);
   }
 
   .tipo-btn:hover {
-    transform: translateY(-1px);
+    color: #182b49;
+    background: #f1f6f7;
   }
 
   .search-row {
     display: grid;
     grid-template-columns: 1fr 100px 110px;
     gap: 10px;
-    margin-bottom: 15px;
+    margin: 0 0 1.15rem;
     position: relative;
   }
 
@@ -80,14 +100,33 @@
   .table-area {
     flex: 1;
     overflow-y: auto;
+    min-height: 0;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(24,43,73,.28) transparent;
   }
+
+  .table-area::-webkit-scrollbar,
+  .pos-right::-webkit-scrollbar { width: 5px; }
+  .table-area::-webkit-scrollbar-track,
+  .pos-right::-webkit-scrollbar-track { background: transparent; }
+  .table-area::-webkit-scrollbar-thumb,
+  .pos-right::-webkit-scrollbar-thumb { background: rgba(24,43,73,.28); border-radius: 99px; }
+  .table-area::-webkit-scrollbar-thumb:hover,
+  .pos-right::-webkit-scrollbar-thumb:hover { background: rgba(24,43,73,.46); }
+  .table-area thead th { position: sticky; top: 0; z-index: 2; background: #fff; box-shadow: 0 1px 0 #dce6eb; }
 
   .pos-right {
     background: white;
     border-left: 1px solid #eaeaea;
-    padding: 20px;
+    padding: .9rem 20px 20px;
     display: flex;
     flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(24,43,73,.28) transparent;
   }
 
   .keypad {
@@ -96,6 +135,15 @@
     gap: 6px;
     margin-bottom: 15px;
   }
+
+  .payment-method {
+    padding: .75rem;
+    border: 1px solid #dce6eb;
+    border-radius: .75rem;
+    background: #f8fbfc;
+  }
+
+  .payment-panel[hidden] { display: none !important; }
 
   .keypad button {
     height: 42px;
@@ -114,104 +162,86 @@
     font-weight: 700;
   }
 
-  .pos-tabs{
-
+.pos-tabs{
     display:flex;
-
+    flex:1 1 auto;
     align-items:center;
-
-    gap:8px;
-
-    padding:8px 15px;
-
-    border-bottom:1px solid #ddd;
-
-    background:white;
-
+    gap:6px;
+    min-width:0;
+    padding:0;
+    background:transparent;
+    overflow:hidden;
 }
 
 .tabs-container{
-
     display:flex;
-
-    gap:6px;
-
+    flex:1 1 auto;
+    min-width:0;
+    gap:3px;
     overflow-x:auto;
+    overflow-y:hidden;
+    scrollbar-width:none;
+    -ms-overflow-style:none;
+}
 
+.tabs-container::-webkit-scrollbar{
+    display:none;
 }
 
 .tab-venta{
-
     display:flex;
-
     align-items:center;
-
-    gap:8px;
-
-    padding:8px 15px;
-
-    background:#efefef;
-
+    gap:7px;
+    padding:8px 13px;
+    border:1px solid #dce6eb;
+    border-bottom:0;
+    background:#dfe9ed;
+    color:#52677a;
     border-radius:10px 10px 0 0;
-
     cursor:pointer;
-
     white-space:nowrap;
-
 }
 
 .tab-venta.active{
-
-    background:#0d6efd;
-
-    color:white;
-
+    position:relative;
+    margin-bottom:-1px;
+    background:white;
+    color:#182b49;
+    border-color:#cfdde3;
+    font-weight:700;
 }
 
 .tab-venta .cerrar{
-
     cursor:pointer;
-
     font-weight:bold;
-
+    opacity:.68;
 } 
+
+@media (max-width: 991.98px) {
+  .pos-wrapper { margin: -1rem; grid-template-columns: 1fr; height: auto; min-height: 100vh; }
+  .pos-left, .pos-right { padding: 0 1rem 1rem; }
+  .pos-toolbar { flex-wrap: wrap; margin: 0 -1rem 1rem; padding: 0 1rem; }
+  .tipo-venta-bar { order: 2; width: 100%; margin: 0; border-radius: 0; border-width: 1px 0 0; justify-content: flex-start; }
+}
 </style>
 
 <script type="module">
 import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
 </script>
 
-<div class="pos-tabs">
-
-    <button class="btn btn-success btn-sm"
-            onclick="crearNuevaVenta()">
-        +
-    </button>
-
-    <div id="tabsVentas" class="tabs-container">
-
-    </div>
-
-</div>
-
 <div class="pos-wrapper">
   <div class="pos-left">
-    <!-- BOTONES TIPO VENTA -->
-    <div class="tipo-venta-bar">
-      <button
-        id="btnDetal"
-        class="tipo-btn activo"
-        onclick="cambiarTipo('DETAL')"
-      >
-        🛒 Detal
-      </button>
-      <button
-        id="btnMayorista"
-        class="tipo-btn"
-        onclick="cambiarTipo('MAYORISTA')"
-      >
-        📦 Mayorista
-      </button>
+    <div class="pos-toolbar">
+      <div class="pos-tabs">
+        <button class="btn btn-primary btn-sm" onclick="crearNuevaVenta()" title="Nueva venta">
+            <i class="bi bi-plus-lg"></i><span class="visually-hidden">Nueva venta</span>
+        </button>
+        <div id="tabsVentas" class="tabs-container"></div>
+      </div>
+      <div class="tipo-venta-bar" aria-label="Tipo de precio">
+        <button id="btnMayorista" class="tipo-btn activo" onclick="cambiarTipo('MAYORISTA')">Mayorista</button>
+        <button id="btnDetal" class="tipo-btn" onclick="cambiarTipo('DETAL')">Detal</button>
+      </div>
     </div>
 
     <div class="search-row">
@@ -371,6 +401,14 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
     <hr>
 
     <div class="mb-2">
+        <label class="small text-muted" for="vendedor">Vendedor <span class="text-muted">(opcional)</span></label>
+        <select id="vendedor" class="form-select form-select-sm">
+          <option value="">Sin asignar</option>
+          {% for vendedor in vendedores %}<option value="{{ vendedor.id }}">{{ vendedor.nombre }}</option>{% endfor %}
+        </select>
+    </div>
+
+    <div class="mb-2">
         <label class="small text-muted">
             Cliente
         </label>
@@ -398,13 +436,25 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
     </div>
 
 
+    <div class="d-flex justify-content-between mb-2"><span>Artículos</span><strong id="cantidad_items">0</strong></div>
     <div class="mb-2">Subtotal: <span id="subtotal">0.00</span></div>
     <div class="mb-2">IVA: <span id="iva">0.00</span></div>
     <div class="total-final mb-2">Total: <span id="total">0.00</span></div>
 
     <hr />
 
-    <div class="form-floating mb-2">
+    <div class="payment-method mb-2">
+      <label class="small text-muted mb-1" for="metodo-pago">Método de pago</label>
+      <select id="metodo-pago" class="form-select form-select-sm" aria-describedby="ayuda-metodo-pago">
+        <option value="EFECTIVO" selected>Efectivo</option>
+        <option value="TRANSFERENCIA">Transferencia</option>
+        <option value="COMBINADO">Combinado</option>
+        <option value="CREDITO">Crédito / abono</option>
+      </select>
+      <div id="ayuda-metodo-pago" class="form-text">El monto se propone automáticamente y puede editarse.</div>
+    </div>
+
+    <div id="panel-efectivo" class="form-floating mb-2 payment-panel">
       <input
         type="text"
         inputmode="decimal"
@@ -416,7 +466,7 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
       <label for="efectivo">Efectivo recibido</label>
     </div>
 
-    <div class="form-floating mb-2">
+    <div id="panel-transferencia" class="form-floating mb-2 payment-panel" hidden>
       <input
         type="text"
         inputmode="decimal"
@@ -503,8 +553,12 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
       const inputEfectivo = $("efectivo");
       const inputTransferencia = $("transferencia");
       const inputTarjeta = $("tarjeta");
+      const inputMetodoPago = $("metodo-pago");
+      const panelEfectivo = $("panel-efectivo");
+      const panelTransferencia = $("panel-transferencia");
       const inputCliente = $("cliente");
       const inputObservaciones = $("observaciones");
+      const inputVendedor = $("vendedor");
 
 
       const btnCerrar = $("btnCerrar");
@@ -572,6 +626,7 @@ function guardarEstadoVenta(){
         transferencia:toNumber(inputTransferencia.value),
 
         tarjeta:toNumber(inputTarjeta.value)
+        ,vendedor_id: inputVendedor.value || null
 
     });
 
@@ -618,6 +673,7 @@ function guardarEstadoVenta(){
 
               tab.innerHTML=`
 
+                  <i class="bi bi-receipt-cutoff" aria-hidden="true"></i>
                   <span>${nombre}</span>
 
                   <span class="cerrar"
@@ -723,9 +779,11 @@ function guardarEstadoVenta(){
               inputTransferencia.value=venta.transferencia;
 
               inputTarjeta.value=venta.tarjeta;
+              inputVendedor.value=venta.vendedor_id || "";
 
               setTipoVentaUI(venta.tipo_venta);
 
+              sincronizarMetodoPagoConMontos();
               actualizarTotalesPago();
 
               renderTabs();
@@ -916,6 +974,20 @@ function guardarEstadoVenta(){
         }, 250);
       });
 
+      async function agregarCodigoEscaneado() {
+        const codigo = inputBuscar.value.trim();
+        if (!codigo) return false;
+        const respuesta = await fetch(
+          "{% url 'sales:pos_autocomplete' %}?q=" + encodeURIComponent(codigo)
+        );
+        if (!respuesta.ok) return false;
+        const data = await respuesta.json();
+        const producto = data.results && data.results[0];
+        if (!data.coincidencia_codigo || !producto) return false;
+        seleccionarProducto(producto.id);
+        return true;
+      }
+
       /* =========================================================
        TECLADO FÍSICO
     ========================================================= */
@@ -923,6 +995,12 @@ function guardarEstadoVenta(){
 
         if (e.key === "Enter") {
           e.preventDefault();
+
+          // Lectores USB/Bluetooth configurados como teclado finalizan el
+          // escaneo con Enter. Se consulta de nuevo para no depender del
+          // debounce del autocompletado.
+          agregarCodigoEscaneado().then((agregado) => {
+            if (agregado) return;
 
           // 🔥 igual que dashboard: usar selección activa
           if (productosAutocomplete.length > 0) {
@@ -934,7 +1012,8 @@ function guardarEstadoVenta(){
               return;
             }
           }
-
+          alert("No se encontró un producto con ese código.");
+          });
           return;
         }
 
@@ -1064,6 +1143,7 @@ function guardarEstadoVenta(){
 
         inputCliente.value = data.cliente || "";
         inputObservaciones.value = data.observaciones || "";
+        inputVendedor.value = data.vendedor_id || "";
 
         inputEfectivo.value = data.efectivo || "";
         inputTransferencia.value = data.transferencia || "";
@@ -1104,12 +1184,20 @@ function guardarEstadoVenta(){
         });
 
         tablaItems.appendChild(fragment);
+        $("cantidad_items").innerText = data.items.reduce(
+          (total, item) => total + toNumber(item.cantidad), 0
+        );
 
         $("subtotal").innerText = money(data.subtotal);
         $("iva").innerText = money(data.iva);
         $("total").innerText = money(data.total);
         $("total").dataset.raw = toNumber(data.total);
 
+        if (pagoEditadoManualmente) {
+          sincronizarMetodoPagoConMontos();
+        } else {
+          actualizarVistaMetodoPago(true);
+        }
         actualizarTotalesPago();
       }
 
@@ -1152,18 +1240,66 @@ function guardarEstadoVenta(){
         });
       });
 
-      // Al abrir un campo con 0.00, se selecciona completo para que escribir
-      // un monto lo reemplace sin obligar al cajero a borrarlo primero.
+      // Un pago es un valor operativo: al tocarlo se selecciona por completo
+      // para reemplazarlo de inmediato, igual que la cantidad de una línea.
       [inputEfectivo, inputTransferencia].forEach((inp) => {
         inp.addEventListener("focus", () => {
-          if (toNumber(inp.value) === 0) {
-            setTimeout(() => inp.select(), 0);
-          }
+          setTimeout(() => inp.select(), 0);
         });
       });
 
+      function totalVentaActual() {
+        return Math.round(toNumber($("total").dataset.raw || 0));
+      }
+
+      function sincronizarMetodoPagoConMontos() {
+        const efectivo = toNumber(inputEfectivo.value);
+        const transferencia = toNumber(inputTransferencia.value);
+        if (efectivo > 0 && transferencia > 0) {
+          inputMetodoPago.value = "COMBINADO";
+        } else if (transferencia > 0) {
+          inputMetodoPago.value = "TRANSFERENCIA";
+        } else {
+          inputMetodoPago.value = "EFECTIVO";
+        }
+        actualizarVistaMetodoPago(false);
+      }
+
+      function actualizarVistaMetodoPago(proponerMonto = false) {
+        const metodo = inputMetodoPago.value;
+        const total = totalVentaActual();
+        const esCredito = metodo === "CREDITO";
+        panelEfectivo.hidden = metodo === "TRANSFERENCIA";
+        panelTransferencia.hidden = metodo === "EFECTIVO";
+
+        if (proponerMonto) {
+          if (metodo === "EFECTIVO") {
+            inputEfectivo.value = total || "";
+            inputTransferencia.value = "";
+          } else if (metodo === "TRANSFERENCIA") {
+            inputEfectivo.value = "";
+            inputTransferencia.value = total || "";
+          } else if (metodo === "COMBINADO") {
+            // En combinado el cajero reparte el total entre ambos medios.
+            inputEfectivo.value = total || "";
+            inputTransferencia.value = "";
+          } else {
+            // Crédito: el abono inicial es opcional; no se propone el total.
+            inputEfectivo.value = "";
+            inputTransferencia.value = "";
+          }
+          pagoEditadoManualmente = false;
+        }
+        actualizarTotalesPago();
+      }
+
+      inputMetodoPago.addEventListener("change", () => {
+        actualizarVistaMetodoPago(true);
+        programarGuardadoEstado();
+      });
+
       function actualizarTotalesPago() {
-      const total = Math.round(toNumber($("total").dataset.raw || 0));
+      const total = totalVentaActual();
 
       const efectivo = Math.round(toNumber(inputEfectivo.value));
       const transferencia = Math.round(toNumber(inputTransferencia.value));
@@ -1175,13 +1311,18 @@ function guardarEstadoVenta(){
       $("total_pagado").innerText = money(totalPagado);
 
       const infoPago = $("info_pago");
+      const esCredito = inputMetodoPago.value === "CREDITO";
 
       if (saldo > 0) {
         infoPago.innerText = "Vuelto: " + money(saldo);
         infoPago.className = "fw-bold text-success mb-2";
       } else if (saldo < 0) {
-        infoPago.innerText = "Faltante: " + money(Math.abs(saldo));
-        infoPago.className = "fw-bold text-danger mb-2";
+        infoPago.innerText = esCredito
+          ? "Saldo a crédito: " + money(Math.abs(saldo))
+          : "Faltante: " + money(Math.abs(saldo));
+        infoPago.className = esCredito
+          ? "fw-bold text-warning mb-2"
+          : "fw-bold text-danger mb-2";
       } else if (total > 0) {
         infoPago.innerText = "Pago completo";
         infoPago.className = "fw-bold text-primary mb-2";
@@ -1189,13 +1330,20 @@ function guardarEstadoVenta(){
         infoPago.innerText = "";
       }
 
-      btnCerrar.disabled = !(total > 0 && totalPagado >= total);
+      btnCerrar.disabled = !(total > 0 && (totalPagado >= total || esCredito));
     }
 
       /* =========================================================
         CERRAR / CANCELAR VENTA
     ========================================================= */
       function cerrarVenta() {
+      // Abrir la ventana durante el clic evita que el navegador bloquee el
+      // comprobante. Se carga únicamente después de confirmar la venta.
+      const debeImprimirTicket = {{ impresion_ticket_navegador|yesno:"true,false" }};
+      const ventanaTicket = debeImprimirTicket
+        ? window.open("about:blank", "ticket_venta", "popup=yes,width=420,height=680")
+        : null;
+
       postJSON("{% url 'sales:pos_cerrar' %}", {
         venta_uuid:ventaActualUUID,
         efectivo: toNumber(inputEfectivo.value),
@@ -1204,11 +1352,26 @@ function guardarEstadoVenta(){
 
         cliente: inputCliente.value,
         observaciones: inputObservaciones.value
+        ,vendedor_id: inputVendedor.value || null
+        ,credito: inputMetodoPago.value === "CREDITO"
 
       }).then((response) => {
         if (!response.success) {
+          if (ventanaTicket) ventanaTicket.close();
           alert(response.error);
           return;
+        }
+
+        if (response.data.imprimir_ticket && response.data.ticket_url) {
+          if (ventanaTicket) {
+            ventanaTicket.location.replace(response.data.ticket_url);
+          } else {
+            window.open(response.data.ticket_url, "_blank", "noopener");
+          }
+        }
+
+        if (response.data.error_impresion) {
+          alert("Venta registrada. " + response.data.error_impresion);
         }
 
         if (response.data.reset) {
@@ -1217,18 +1380,32 @@ function guardarEstadoVenta(){
           inputEfectivo.value = "";
           inputTransferencia.value = "";
           inputTarjeta.value = "";
+          inputMetodoPago.value = "EFECTIVO";
 
           $("subtotal").innerText = "0.00";
           $("iva").innerText = "0.00";
           $("total").innerText = "0.00";
           $("total").dataset.raw = 0;
+          actualizarVistaMetodoPago(false);
           $("total_pagado").innerText = "0.00";
           $("info_pago").innerText = "";
+          $("cantidad_items").innerText = "0";
+          inputCliente.value = "";
+          inputObservaciones.value = "";
+          inputVendedor.value = "";
 
           btnCerrar.disabled = true;
           pagoEditadoManualmente = false;
 
           setTipoVentaUI("MAYORISTA");
+
+          if (response.data.nuevo_carrito) {
+            const nuevo = response.data.nuevo_carrito;
+            carritos = carritos.filter(c => c.uuid !== ventaActualUUID);
+            carritos.unshift({uuid: nuevo.uuid, cliente: "", estado: "BORRADOR", total: "0"});
+            actualizarTabla(nuevo);
+            renderTabs();
+          }
 
           inputBuscar.focus();
         }
@@ -1367,6 +1544,7 @@ function guardarEstadoVenta(){
 
   [
       inputCliente,
+      inputVendedor,
       inputObservaciones,
       inputEfectivo,
       inputTransferencia,

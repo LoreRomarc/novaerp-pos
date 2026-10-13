@@ -1,0 +1,13 @@
+{% load humanize %}
+<div class="row g-3">
+    <div class="col-sm-6"><div class="small text-muted">Tipo</div><div class="fw-semibold">{{ movimiento.get_tipo_display }}</div></div>
+    <div class="col-sm-6"><div class="small text-muted">Monto</div><div class="fw-bold {% if movimiento.tipo == 'EGRESO' or movimiento.tipo == 'RETIRO_BOVEDA' or movimiento.tipo == 'DEVOLUCION' %}text-danger{% else %}text-success{% endif %}">${{ movimiento.monto|floatformat:0|intcomma }}</div></div>
+    <div class="col-sm-6"><div class="small text-muted">Fecha</div><div>{{ movimiento.creado_en|date:"d/m/Y H:i" }}</div></div>
+    <div class="col-sm-6"><div class="small text-muted">Medio</div><div>{{ movimiento.get_medio_pago_display|default:"No aplica" }}</div></div>
+    <div class="col-sm-6"><div class="small text-muted">Sucursal / caja</div><div>{{ movimiento.sucursal.nombre }} · {{ movimiento.caja.codigo }}</div></div>
+    <div class="col-sm-6"><div class="small text-muted">Registrado por</div><div>{{ movimiento.usuario|default:"Sistema" }}</div></div>
+    <div class="col-sm-6"><div class="small text-muted">Turno</div><div>#{{ movimiento.turno_id }}</div></div>
+    <div class="col-sm-6"><div class="small text-muted">Referencia</div><div>{% if movimiento.referencia_venta_id %}Venta #{{ movimiento.referencia_venta_id }}{% elif movimiento.referencia_devolucion_id %}Cambio o devolución #{{ movimiento.referencia_devolucion_id }}{% else %}Sin documento relacionado{% endif %}</div></div>
+    <div class="col-12"><div class="small text-muted">Observación</div><div class="border rounded-3 p-2 bg-light">{{ movimiento.observacion|default:"Sin observación" }}</div></div>
+    <div class="col-12"><div class="small text-muted">Trazabilidad</div><div class="font-monospace small text-break">Secuencia {{ movimiento.numero_secuencia }} · Integridad {{ movimiento.hash_integridad }}</div></div>
+</div>

@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Créditos y abonos{% endblock %}
+
+{% block content %}
+<style>
+  .credit-hero { background:linear-gradient(135deg,#10233e,#1d4a55); color:#fff; border-radius:.85rem; padding:1.1rem 1.25rem; }
+  .credit-hero .muted { color:rgba(255,255,255,.74); }
+  .credit-summary { color:#64748b; font-size:.74rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
+  .credit-amount { font-variant-numeric:tabular-nums; }
+  .credit-table td,.credit-table th { vertical-align:middle; }
+  .credit-actions { white-space:nowrap; }
+  .payment-type { display:inline-flex; align-items:center; gap:.35rem; color:#415466; font-size:.78rem; font-weight:700; white-space:nowrap; }
+  .payment-type::before { content:""; width:.5rem; height:.5rem; border-radius:50%; background:#2c7a63; }
+  .payment-type.is-initial::before { background:#64748b; }
+  .credit-kpi { border-left:4px solid #2c7a63; }
+  .credit-kpi.is-pending { border-left-color:#b58a38; }
+</style>
+
+<div class="container-fluid py-2">
+  <div class="credit-hero d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">
+    <div>
+      <div class="small text-uppercase fw-semibold" style="letter-spacing:.08em">Cuentas por cobrar</div>
+      <h2 class="h4 mb-1">Créditos y abonos</h2>
+      <p class="muted mb-0">El inventario se descuenta una sola vez; cada pago conserva su trazabilidad financiera.</p>
+    </div>
+    <a href="{% url 'sales:pos' %}" class="btn btn-light"><i class="bi bi-cart3 me-1"></i>Punto de venta</a>
+  </div>
+
+  <div class="card mb-3"><div class="card-body py-2">
+    <form method="get" data-auto-filter class="row g-2 align-items-end">
+      <div class="col-12 col-md-6"><label class="form-label small mb-1" for="q">Buscar crédito</label><input id="q" type="search" class="form-control" name="q" value="{{ q }}" placeholder="Factura, cliente, vendedor u observación"></div>
+      <div class="col-12 col-md-3"><label class="form-label small mb-1" for="medio_pago">Pagado por</label><select id="medio_pago" class="form-select" name="medio_pago"><option value="">Todos los créditos</option><option value="EFECTIVO" {% if medio_pago == "EFECTIVO" %}selected{% endif %}>Efectivo</option><option value="TRANSFERENCIA" {% if medio_pago == "TRANSFERENCIA" %}selected{% endif %}>Transferencia</option><option value="COMBINADO" {% if medio_pago == "COMBINADO" %}selected{% endif %}>Combinado</option></select></div>
+      <div class="col-auto d-flex gap-2"><button class="btn btn-primary"><i class="bi bi-search"></i><span class="visually-hidden">Buscar</span></button><a class="btn btn-outline-secondary" href="{% url 'sales:creditos' %}">Limpiar</a></div>
+    </form>
+  </div></div>
+
+  {% if exito_abono %}<div class="alert alert-success py-2">{{ exito_abono }}</div>{% endif %}
+
+  {% if venta_seleccionada %}
+    <section class="card border-primary mb-3">
+      <div class="card-header bg-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div><strong>Crédito #{{ venta_seleccionada.id }}</strong><span class="text-muted small ms-2">{{ venta_seleccionada.cliente|default:"Consumidor final" }}</span></div>
+        <div class="d-flex gap-2"><a class="btn btn-sm btn-outline-primary" target="_blank" href="{% url 'sales:ticket_venta' venta_seleccionada.id %}"><i class="bi bi-printer me-1"></i>Soporte de crédito</a><a class="btn btn-sm btn-outline-secondary" href="{% url 'sales:creditos' %}?q={{ q|urlencode }}{% if medio_pago %}&medio_pago={{ medio_pago }}{% endif %}">Cerrar detalle</a></div>
+      </div>
+      <div class="card-body">
+        <div class="row g-2 mb-3">
+          <div class="col-12 col-md-4"><div class="card credit-kpi h-100"><div class="card-body py-2"><div class="credit-summary">Total facturado</div><strong class="fs-5 credit-amount">${{ venta_seleccionada.total|floatformat:0|intcomma }}</strong></div></div></div>
+          <div class="col-12 col-md-4"><div class="card credit-kpi h-100"><div class="card-body py-2"><div class="credit-summary">Total abonado</div><strong class="fs-5 text-success credit-amount">${{ venta_seleccionada.total_pagado|floatformat:0|intcomma }}</strong></div></div></div>
+          <div class="col-12 col-md-4"><div class="card credit-kpi is-pending h-100"><div class="card-body py-2"><div class="credit-summary">Saldo pendiente</div><strong class="fs-5 text-warning credit-amount">${{ venta_seleccionada.saldo_pendiente|floatformat:0|intcomma }}</strong></div></div></div>
+        </div>
+
+        <div class="d-flex justify-content-between align-items-center mb-2"><h6 class="mb-0">Historial de pagos</h6><span class="text-muted small">Incluye abono inicial y cuotas posteriores</span></div>
+        <div class="table-responsive mb-3"><table class="table table-hover table-sm mb-0"><thead class="table-light"><tr><th>Fecha</th><th>Concepto</th><th>Caja</th><th>Medio</th><th>Registró</th><th>Observación</th><th class="text-end">Monto</th></tr></thead><tbody>
+          {% for pago in historial_pagos %}<tr><td class="small text-nowrap">{{ pago.creado_en|date:"d/m/Y H:i" }}</td><td>{% if pago.tipo == "VENTA" %}<span class="payment-type is-initial">Abono inicial</span>{% else %}<span class="payment-type">Cuota / abono</span>{% endif %}</td><td>{{ pago.caja.codigo }}</td><td>{{ pago.get_medio_pago_display }}</td><td>{{ pago.usuario.get_full_name|default:pago.usuario.username }}</td><td class="small text-muted">{{ pago.observacion|default:"—"|truncatechars:60 }}</td><td class="text-end fw-semibold credit-amount text-success">${{ pago.monto|floatformat:0|intcomma }}</td></tr>
+          {% empty %}<tr><td colspan="7" class="text-center text-muted py-4">No se recibió abono inicial. Registre la primera cuota abajo.</td></tr>{% endfor %}
+        </tbody></table></div>
+
+        <form method="post" class="row g-2 align-items-end border-top pt-3">
+          {% csrf_token %}<input type="hidden" name="venta_id" value="{{ venta_seleccionada.id }}">
+          <div class="col-12"><h6 class="mb-0">Registrar nueva cuota</h6></div>
+          <div class="col-12 col-md-4"><label class="form-label" for="efectivo">Efectivo (COP)</label><input id="efectivo" class="form-control" type="number" min="0" step="1" name="efectivo" value="{{ venta_seleccionada.saldo_pendiente }}"></div>
+          <div class="col-12 col-md-4"><label class="form-label" for="transferencia">Transferencia (COP)</label><input id="transferencia" class="form-control" type="number" min="0" step="1" name="transferencia" value="0"></div>
+          <div class="col-12 col-md-4"><label class="form-label" for="observacion">Observación</label><input id="observacion" class="form-control" name="observacion" maxlength="2000" placeholder="Opcional"></div>
+          <div class="col-12"><small class="text-muted">El valor no puede superar el saldo pendiente. {% if turno %}Se registrará en la caja {{ turno.caja.codigo }}.{% else %}<span class="text-danger">No hay una caja operable.</span>{% endif %}</small></div>
+          {% if error_abono %}<div class="col-12 text-danger small">{{ error_abono }}</div>{% endif %}
+          <div class="col-12"><button class="btn btn-primary" {% if not turno %}disabled{% endif %}><i class="bi bi-cash-coin me-1"></i>Registrar abono</button></div>
+        </form>
+      </div>
+    </section>
+  {% endif %}
+
+  <div class="card"><div class="card-header bg-white d-flex justify-content-between align-items-center"><h5 class="mb-0">Ventas con saldo</h5><span class="badge text-bg-light">{{ ventas_credito|length }} pendientes</span></div><div class="table-responsive"><table class="table table-hover credit-table mb-0"><thead class="table-light"><tr><th>Factura</th><th>Fecha</th><th>Cliente</th><th>Vendedor</th><th class="text-end">Total</th><th class="text-end">Abonado</th><th class="text-end">Pendiente</th><th></th></tr></thead><tbody>{% for venta in ventas_credito %}<tr><td class="fw-semibold">#{{ venta.id }}</td><td class="small text-nowrap">{{ venta.creada|date:"d/m/Y H:i" }}</td><td>{{ venta.cliente|default:"Consumidor final" }}</td><td>{{ venta.vendedor.nombre|default:"Sin asignar" }}</td><td class="text-end credit-amount">${{ venta.total|floatformat:0|intcomma }}</td><td class="text-end credit-amount text-success">${{ venta.total_pagado|floatformat:0|intcomma }}</td><td class="text-end fw-bold text-warning credit-amount">${{ venta.saldo_pendiente|floatformat:0|intcomma }}</td><td class="text-end credit-actions"><a class="btn btn-sm btn-outline-primary" href="{% url 'sales:creditos' %}?abonar={{ venta.id }}{% if q %}&q={{ q|urlencode }}{% endif %}{% if medio_pago %}&medio_pago={{ medio_pago }}{% endif %}"><i class="bi bi-eye me-1"></i>Ver detalle / abonar</a></td></tr>{% empty %}<tr><td colspan="8" class="text-center text-muted py-5">No hay créditos pendientes para estos filtros.</td></tr>{% endfor %}</tbody></table></div></div>
+</div>
+{% endblock %}

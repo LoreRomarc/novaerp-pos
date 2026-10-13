@@ -2,7 +2,7 @@
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.urls import reverse_lazy
 from django.views.generic import (
     ListView,
@@ -16,18 +16,12 @@ from apps.inventory.models import (
     ProductoVariante,
 )
 
-from apps.sales.models import (
-    ListaPrecio,
-    PrecioVariante,
-)
 
 # ======================================================
 # FORM
 # ======================================================
 
 class VarianteForm(forms.ModelForm):
-
-    precios_lista = {}
 
 
     class Meta:
@@ -129,66 +123,11 @@ class VarianteForm(forms.ModelForm):
         self.fields["tipo_tela"].empty_label = "Seleccione tela"
         self.fields["color"].empty_label = "Seleccione color"
         self.fields["talla"].empty_label = "Seleccione talla"
+        self.fields["sku"].required = False
+        self.fields["sku"].widget.attrs["placeholder"] = "Se genera automáticamente"
+        self.fields["codigo_barras"].required = False
+        self.fields["codigo_barras"].widget.attrs["placeholder"] = "Se genera automáticamente"
 
-        # ============================================
-        # CAMPOS DINAMICOS DE LISTAS DE PRECIOS
-        # ============================================
-
-        self.precios_lista = {}
-
-        for lista in ListaPrecio.objects.filter(
-            activa=True
-        ):
-
-            campo = f"precio_lista_{lista.id}"
-
-            self.fields[campo] = forms.DecimalField(
-                required=False,
-                label=lista.nombre,
-                min_value=0,
-                widget=forms.NumberInput(
-                    attrs={
-                        "class": "form-control",
-                        "step": "0.01"
-                    }
-                )
-            )
-
-            self.precios_lista[campo] = lista
-
-        # cargar precios si estamos editando
-
-        if self.instance.pk:
-
-            for precio in self.instance.precios.all():
-
-                campo = (
-                    f"precio_lista_{precio.lista_id}"
-                )
-
-                if campo in self.fields:
-
-                    self.initial[campo] = precio.precio
-
-    def save(self, commit=True):
-
-        instancia = super().save(commit)
-
-        for campo, lista in self.precios_lista.items():
-
-            valor = self.cleaned_data.get(campo)
-
-            if valor:
-
-                PrecioVariante.objects.update_or_create(
-                    variante=instancia,
-                    lista=lista,
-                    defaults={
-                        "precio": valor
-                    }
-                )
-
-        return instancia
 
 # ======================================================
 # LISTADO
@@ -220,17 +159,19 @@ class VarianteListView(
             .prefetch_related("stocks")
         )
 
-        q = self.request.GET.get("q")
+        q = self.request.GET.get("q", "").strip()
 
         if q:
-
             qs = qs.filter(
-                sku__icontains=q
-            ) | qs.filter(
-                producto_base__nombre__icontains=q
+                Q(sku__icontains=q)
+                | Q(codigo_barras__icontains=q)
+                | Q(producto_base__nombre__icontains=q)
+                | Q(tipo_tela__nombre__icontains=q)
+                | Q(color__nombre__icontains=q)
+                | Q(talla__nombre__icontains=q)
             )
 
-        return qs
+        return qs.order_by("producto_base__nombre", "sku")
 
     def get_context_data(self, **kwargs):
 

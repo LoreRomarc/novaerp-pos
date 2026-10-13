@@ -1,379 +1,47 @@
-<!--apps/sales/templates/sales/venta_detalle_modal.html-->
 {% load humanize %}
 
 <style>
-.detalle-card{
-    border:0;
-    border-radius:12px;
-    box-shadow:0 2px 10px rgba(0,0,0,.08);
-}
-
-.detalle-card .card-body{
-    padding:12px 15px;
-}
-
-.detalle-label{
-    font-size:12px;
-    color:#64748b;
-    margin-bottom:4px;
-    font-weight:600;
-}
-
-.detalle-value{
-    font-size:16px;
-    font-weight:700;
-    color:#111827;
-    margin:0;
-}
-
-.detalle-total{
-    font-size:22px;
-}
-
-.tabla-detalle th{
-    font-size:12px;
-    background:#111827!important;
-    color:white;
-    padding:8px;
-}
-
-.tabla-detalle td{
-    font-size:13px;
-    padding:8px;
-    vertical-align:middle;
-}
-
-.resumen-box{
-    padding:12px;
-    border-radius:12px;
-    font-size:14px;
-}
+    .factura-encabezado { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; padding-bottom:.65rem; margin-bottom:.55rem; border-bottom:2px solid #182b49; }
+    .factura-titulo { margin:0; color:#182b49; font-size:1.15rem; font-weight:750; }
+    .factura-subtitulo { color:#64748b; font-size:.8rem; }
+    .factura-total { color:#21614f; text-align:right; white-space:nowrap; }
+    .factura-total small { display:block; color:#64748b; font-size:.68rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
+    .factura-total strong { font-size:1.2rem; }
+    .factura-meta { width:100%; margin:0 0 .55rem; font-size:.8rem; }
+    .factura-meta td { width:25%; padding:.28rem .45rem; border:0; border-right:1px solid #dce6eb; vertical-align:top; }
+    .factura-meta td:last-child { border-right:0; }
+    .factura-meta small { display:block; color:#64748b; font-size:.66rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
+    .factura-meta strong { display:block; color:#172033; font-weight:650; overflow-wrap:anywhere; }
+    .factura-observacion { margin-bottom:.7rem; padding:.5rem .65rem; background:#f8fbfc; border-left:3px solid #2c7a63; }
+    .factura-observacion label { color:#64748b; font-size:.68rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
+    .tabla-detalle th { background:#182b49!important; color:#fff; font-size:.74rem; white-space:nowrap; }
+    .tabla-detalle td { font-size:.82rem; }
+    @media (max-width:767.98px) { .factura-meta td { width:50%; } .factura-meta td:nth-child(2) { border-right:0; } .factura-meta tr + tr td { border-top:1px solid #dce6eb; } }
 </style>
 
-
-<div class="container-fluid px-2">
-
-
-<!-- INFORMACION PRINCIPAL -->
-
-<div class="row g-2 mb-3">
-
-<div class="col-md-4">
-<div class="card detalle-card">
-<div class="card-body">
-<div class="detalle-label">Venta</div>
-<div class="detalle-value">#{{ venta.id }}</div>
-</div>
-</div>
-</div>
-
-
-<div class="col-md-4">
-<div class="card detalle-card">
-<div class="card-body">
-<div class="detalle-label">Usuario</div>
-<div class="detalle-value">
-{{ venta.usuario.get_full_name|default:venta.usuario.username }}
-</div>
-</div>
-</div>
-</div>
-
-
-<div class="col-md-4">
-<div class="card detalle-card">
-<div class="card-body">
-<div class="detalle-label">Fecha</div>
-<div class="detalle-value">
-{{ venta.creada|date:"d/m/Y H:i" }}
-</div>
-</div>
-</div>
-</div>
-
-</div>
-
-<div class="row g-2 mb-2">
-
-
-<div class="col-md-4">
-
-<div class="card shadow-sm">
-
-<div class="card-body p-2">
-
-<small class="text-muted">
-Cliente
-</small>
-
-<div class="fw-bold">
-{{ venta.cliente|default:"Consumidor final" }}
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-
-
-<div class="col-md-4">
-
-<div class="card shadow-sm">
-
-<div class="card-body p-2">
-
-<small class="text-muted">
-Vendedor
-</small>
-
-<div class="fw-bold">
-
-{{ venta.usuario.get_full_name|default:venta.usuario.username }}
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-
-<div class="col-md-4">
-
-<div class="card shadow-sm">
-
-<div class="card-body p-2">
-
-<small class="text-muted">
-Observaciones
-</small>
-
-<div>
-
-{{ venta.observaciones|default:"Sin observaciones" }}
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-</div>
-
-<!-- RESUMEN PAGO -->
-
-<div class="row g-2 mb-3">
-
-<div class="col-md-3">
-<div class="card detalle-card bg-light">
-<div class="card-body">
-
-<div class="detalle-label">
-Estado
-</div>
-
-{% if venta.estado == "CERRADA" %}
-<span class="badge bg-success">
-Cerrada
-</span>
-
-{% elif venta.estado == "ABIERTA" %}
-<span class="badge bg-warning text-dark">
-Abierta
-</span>
-
-{% else %}
-<span class="badge bg-danger">
-Anulada
-</span>
-
-{% endif %}
-
-</div>
-</div>
-</div>
-
-
-
-<div class="col-md-3">
-<div class="card detalle-card bg-light">
-<div class="card-body">
-
-<div class="detalle-label">
-Total
-</div>
-
-<div class="detalle-value detalle-total">
-${{ venta.total|floatformat:0|intcomma }}
-</div>
-
-</div>
-</div>
-</div>
-
-
-
-<div class="col-md-3">
-<div class="card detalle-card bg-light">
-<div class="card-body">
-
-<div class="detalle-label">
-Efectivo
-</div>
-
-<div class="detalle-value">
-${{ venta.monto_efectivo|floatformat:0|intcomma }}
-</div>
-
-</div>
-</div>
-</div>
-
-
-
-<div class="col-md-3">
-<div class="card detalle-card bg-light">
-<div class="card-body">
-
-<div class="detalle-label">
-Transferencia
-</div>
-
-<div class="detalle-value">
-${{ venta.monto_transferencia|floatformat:0|intcomma }}
-</div>
-
-</div>
-</div>
-</div>
-
-
-</div>
-
-
-
-
-<h6 class="fw-bold mb-2">
-🛒 Productos vendidos
-</h6>
-
-
-<div class="table-responsive">
-
-<table class="table table-hover table-bordered tabla-detalle mb-3">
-
-<thead>
-
-<tr>
-<th>Producto</th>
-<th>SKU</th>
-<th>Color</th>
-<th>Talla</th>
-<th>Cant.</th>
-<th>Precio</th>
-<th>Total</th>
-</tr>
-
-</thead>
-
-
-<tbody>
-
-
-{% for item in venta.items.all %}
-
-<tr>
-
-<td>
-<strong>{{ item.nombre_producto }}</strong>
-</td>
-
-<td>
-{{ item.sku }}
-</td>
-
-<td>
-{{ item.color }}
-</td>
-
-<td>
-{{ item.talla }}
-</td>
-
-<td>
-{{ item.cantidad }}
-</td>
-
-<td>
-${{ item.precio_unitario|floatformat:0|intcomma }}
-</td>
-
-<td>
-<strong>
-${{ item.total_linea|floatformat:0|intcomma }}
-</strong>
-</td>
-
-</tr>
-
-
-{% empty %}
-
-<tr>
-<td colspan="7" class="text-center">
-No hay productos
-</td>
-</tr>
-
-{% endfor %}
-
-
-</tbody>
-
-</table>
-
-</div>
-
-
-
-
-<!-- TOTALES -->
-
-<div class="row g-2">
-
-
-<div class="col-md-4">
-<div class="alert alert-secondary resumen-box mb-0">
-<strong>Subtotal</strong><br>
-${{ venta.subtotal|floatformat:0|intcomma }}
-</div>
-</div>
-
-
-<div class="col-md-4">
-<div class="alert alert-secondary resumen-box mb-0">
-<strong>IVA</strong><br>
-${{ venta.total_iva|floatformat:0|intcomma }}
-</div>
-</div>
-
-
-<div class="col-md-4">
-<div class="alert alert-success resumen-box mb-0">
-<strong>Total venta</strong><br>
-<h5 class="mb-0">
-${{ venta.total|floatformat:0|intcomma }}
-</h5>
-</div>
-</div>
-
-
-</div>
-
-
+<div class="container-fluid px-0">
+    <header class="factura-encabezado">
+        <div><h4 class="factura-titulo">Venta #{{ venta.id }}</h4><div class="factura-subtitulo">{{ venta.creada|date:"d/m/Y H:i" }} · {% if venta.estado == "CERRADA" %}<span class="text-success fw-semibold">CERRADA</span>{% elif venta.estado == "CREDITO" %}<span class="text-warning fw-semibold">CRÉDITO · SALDO ${{ venta.saldo_pendiente|floatformat:0|intcomma }}</span>{% elif venta.estado == "ABIERTA" %}<span class="text-warning fw-semibold">ABIERTA</span>{% else %}<span class="text-danger fw-semibold">ANULADA</span>{% endif %}</div></div>
+        <div class="factura-total"><small>Total venta</small><strong>${{ venta.total|floatformat:0|intcomma }}</strong></div>
+    </header>
+
+    <table class="factura-meta"><tbody>
+        <tr><td><small>Sucursal / caja</small><strong>{{ venta.sucursal.nombre }}{% if venta.turno %} · {{ venta.turno.caja.codigo }}{% endif %}</strong></td><td><small>Registrada por</small><strong>{{ venta.usuario.get_full_name|default:venta.usuario.username }}</strong></td><td><small>Vendedor</small><strong>{{ venta.vendedor.nombre|default:"Sin asignar" }}</strong></td><td><small>Cliente</small><strong>{{ venta.cliente|default:"Consumidor final" }}</strong></td></tr>
+        <tr><td><small>Método de pago</small><strong>{% if venta.estado == "CREDITO" %}Crédito{% elif venta.monto_efectivo > 0 and venta.monto_transferencia > 0 %}Combinado{% elif venta.monto_transferencia > 0 %}Transferencia{% elif venta.monto_efectivo > 0 %}Efectivo{% else %}Sin pago registrado{% endif %}</strong></td><td><small>Efectivo</small><strong>${{ venta.monto_efectivo|floatformat:0|intcomma }}</strong></td><td><small>Transferencia</small><strong>${{ venta.monto_transferencia|floatformat:0|intcomma }}</strong></td><td><small>{% if venta.estado == "CREDITO" %}Saldo pendiente{% else %}Subtotal / IVA{% endif %}</small><strong>{% if venta.estado == "CREDITO" %}${{ venta.saldo_pendiente|floatformat:0|intcomma }}{% else %}${{ venta.subtotal|floatformat:0|intcomma }} / ${{ venta.total_iva|floatformat:0|intcomma }}{% endif %}</strong></td></tr>
+    </tbody></table>
+
+    <section class="factura-observacion">
+        <label for="observacion-venta-{{ venta.id }}">Observación</label>
+        {% if venta.estado != "ANULADA" %}<form class="js-form-observacion-venta d-flex align-items-end gap-2 mt-1" data-venta-id="{{ venta.id }}"><div class="flex-grow-1"><textarea id="observacion-venta-{{ venta.id }}" name="observacion" class="form-control form-control-sm" rows="1" maxlength="2000" placeholder="Sin observaciones">{{ venta.observaciones }}</textarea><small class="js-error-observacion d-block mt-1" aria-live="polite"></small></div><button class="btn btn-sm btn-outline-primary flex-shrink-0" type="submit">Guardar</button></form>{% else %}<div class="small mt-1">{{ venta.observaciones|default:"Sin observaciones" }}</div>{% endif %}
+    </section>
+
+    {% if venta.abonos.all %}
+    <section class="mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-1"><h6 class="mb-0 fw-bold">Abonos registrados</h6><span class="small text-muted">{{ venta.abonos.all|length }} cuota{{ venta.abonos.all|length|pluralize:"s" }}</span></div>
+        <div class="table-responsive"><table class="table table-sm mb-0"><thead><tr><th>Fecha</th><th>Medio</th><th>Registró</th><th>Observación</th><th class="text-end">Valor</th></tr></thead><tbody>{% for abono in venta.abonos.all %}<tr><td class="text-nowrap">{{ abono.creado|date:"d/m/Y H:i" }}</td><td>{{ abono.get_medio_pago_display }}</td><td>{{ abono.usuario.get_full_name|default:abono.usuario.username }}</td><td class="text-muted">{{ abono.observacion|default:"—" }}</td><td class="text-end fw-semibold">${{ abono.monto|floatformat:0|intcomma }}</td></tr>{% endfor %}</tbody></table></div>
+    </section>
+    {% endif %}
+
+    <div class="d-flex align-items-center justify-content-between mb-2"><h6 class="mb-0 fw-bold">Productos vendidos</h6><span class="text-muted small">{{ venta.items.all|length }} línea{{ venta.items.all|length|pluralize:"s" }}</span></div>
+    <div class="table-responsive"><table class="table table-hover tabla-detalle mb-0"><thead><tr><th>Producto</th><th>SKU</th><th>Color</th><th>Talla</th><th class="text-end">Cant.</th><th class="text-end">Precio</th><th class="text-end">Total</th></tr></thead><tbody>{% for item in venta.items.all %}<tr><td class="fw-semibold">{{ item.nombre_producto }}</td><td>{{ item.sku }}</td><td>{{ item.color }}</td><td>{{ item.talla }}</td><td class="text-end">{{ item.cantidad }}</td><td class="text-end">${{ item.precio_unitario|floatformat:0|intcomma }}</td><td class="text-end fw-bold">${{ item.total_linea|floatformat:0|intcomma }}</td></tr>{% empty %}<tr><td colspan="7" class="text-center text-muted py-4">No hay productos registrados.</td></tr>{% endfor %}</tbody></table></div>
 </div>

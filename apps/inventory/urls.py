@@ -30,10 +30,11 @@ from apps.inventory.views_productos import (
 
 from .views import (
     AjusteStockCreateView,
-    AjusteStockView,
     StockListView,
     TrasladoCreateView,
+    TrasladoDetalleView,
     TrasladoListView,
+    TrasladoRecibirView,
     ProduccionListView,
 )
 
@@ -80,7 +81,9 @@ urlpatterns = [
     # STOCK
     # ======================================================
     path("api/variantes/search/", VarianteSearchAPI.as_view(), name="variant_search_api" ),
-    path("ajuste-stock/", AjusteStockView.as_view(), name="ajuste_stock" ),
+    # URL anterior conservada para marcadores; usa el único formulario
+    # auditable de ajustes y evita que existan dos flujos distintos.
+    path("ajuste-stock/", AjusteStockCreateView.as_view(), name="ajuste_stock" ),
     path( "stock/", StockListView.as_view(),  name="stock_list" ),
     path("stock/ajuste/",AjusteStockCreateView.as_view(), name="ajuste_stock_form"),
 
@@ -89,6 +92,8 @@ urlpatterns = [
     # ======================================================
     path( "traslados/", TrasladoListView.as_view(),  name="traslado_list" ),
     path( "traslados/nuevo/", TrasladoCreateView.as_view(), name="traslado_create"),
+    path("traslados/<int:pk>/detalle/", TrasladoDetalleView.as_view(), name="traslado_detalle"),
+    path("traslados/<int:pk>/recibir/", TrasladoRecibirView.as_view(), name="traslado_recibir"),
 
     # ======================================================
     # MOVIMIENTOS

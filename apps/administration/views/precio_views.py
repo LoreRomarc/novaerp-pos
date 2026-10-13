@@ -292,6 +292,7 @@ class PrecioVarianteBusquedaView(SuperAdminRequiredMixin, View):
             )
             .filter(
                 Q(sku__icontains=query)
+                | Q(codigo_barras__icontains=query)
                 | Q(producto_base__nombre__icontains=query)
                 | Q(color__nombre__icontains=query)
                 | Q(tipo_tela__nombre__icontains=query)
@@ -312,6 +313,7 @@ class PrecioVarianteBusquedaView(SuperAdminRequiredMixin, View):
                             f"{variante.tipo_tela.nombre}"
                         ),
                         "sku": variante.sku,
+                        "codigo_barras": variante.codigo_barras or "",
                     }
                     for variante in variantes
                 ]

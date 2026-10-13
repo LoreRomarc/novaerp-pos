@@ -1,254 +1,92 @@
 {% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Dashboard de inventario{% endblock %}
 
 {% block content %}
+<style>
+    .inventory-dashboard { max-width: 1600px; }
+    .dashboard-heading { font-size: 1.35rem; font-weight: 700; margin: 0; }
+    .dashboard-kpi { min-height: 100%; }
+    .dashboard-kpi .card-body { padding: .8rem .95rem; }
+    .dashboard-kpi-label { color: #64748b; font-size: .72rem; font-weight: 700; letter-spacing: .055em; text-transform: uppercase; }
+    .dashboard-kpi-value { color: #182b49; font-size: 1.32rem; font-weight: 750; line-height: 1.2; margin-top: .24rem; font-variant-numeric: tabular-nums; }
+    .dashboard-panel-title { font-size: .93rem; font-weight: 700; color: #182b49; }
+    .dashboard-activity-dot { width: .5rem; height: .5rem; border-radius: 999px; display: inline-block; }
+    .dashboard-action { display: flex; align-items: center; gap: .72rem; padding: .72rem .85rem; border: 1px solid #e3e8ef; border-radius: .65rem; color: #182b49; text-decoration: none; transition: .15s ease; }
+    .dashboard-action:hover { border-color: #2c7a63; background: #f2faf7; color: #182b49; }
+    .dashboard-action i { color: #2c7a63; font-size: 1.05rem; }
+</style>
 
-<div class="container-fluid">
-
-    <h2 class="mb-4">📊 Dashboard de Inventario</h2>
-
-    <!-- ================= KPIs ================= -->
-    <div class="row g-3 mb-4">
-
-        <div class="col-md-3">
-            <div class="card shadow-sm p-3">
-                <small>Total Unidades</small>
-                <h3>{{ total_unidades }}</h3>
-            </div>
+<div class="container-fluid py-3 inventory-dashboard">
+    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-2 mb-3">
+        <div>
+            <div class="text-uppercase text-muted small fw-semibold">Inventario · {{ sucursal.nombre }}</div>
+            <h1 class="dashboard-heading">Resumen operativo</h1>
         </div>
-
-        <div class="col-md-3">
-            <div class="card shadow-sm p-3">
-                <small>Productos</small>
-                <h3>{{ productos_unicos }}</h3>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card shadow-sm p-3">
-                <small>Movimientos Hoy</small>
-                <h3>{{ movimientos_hoy }}</h3>
-            </div>
-        </div>
-
-        <div class="col-md-3">
-            <div class="card shadow-sm p-3">
-                <small>Producción (7 días)</small>
-                <h3>{{ produccion_semana }}</h3>
-            </div>
-        </div>
-
-    </div>
-
-    <!-- ================= ALERTAS ================= -->
-    <div class="card mb-4 shadow-sm">
-        <div class="card-header bg-danger text-white">
-            ⚠ Stock bajo
-        </div>
-
-        <div class="card-body">
-
-            <table class="table table-sm">
-                <thead>
-                    <tr>
-                        <th>Producto</th>
-                        <th>Cantidad</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for s in stock_bajo %}
-                    <tr>
-                        <td>{{ s.variante.producto_base.nombre }}</td>
-                        <td class="text-danger">{{ s.cantidad }}</td>
-                    </tr>
-                    {% empty %}
-                    <tr><td colspan="2">Sin alertas</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            {% if puede_filtrar_sucursales %}<form method="get"><select class="form-select form-select-sm" name="sucursal" onchange="this.form.submit()">{% for opcion in sucursales %}<option value="{{ opcion.id }}" {% if sucursal_id == opcion.id|stringformat:'s' %}selected{% endif %}>{{ opcion.nombre }}</option>{% endfor %}</select></form>{% endif %}
+            <a class="btn btn-outline-secondary btn-sm" href="{% url 'inventory:kardex' %}"><i class="bi bi-journal-text"></i> Kardex</a>
+            <a class="btn btn-outline-secondary btn-sm" href="{% url 'inventory:stock_list' %}"><i class="bi bi-boxes"></i> Ver stock</a>
+            <a class="btn btn-primary btn-sm" href="{% url 'inventory:ajuste_stock_form' %}"><i class="bi bi-sliders"></i> Ajustar stock</a>
         </div>
     </div>
 
-    <div class="row">
+    <div class="row g-2 mb-3">
+        <div class="col-6 col-md-4 col-xl-2"><div class="card dashboard-kpi"><div class="card-body"><div class="dashboard-kpi-label">Unidades</div><div class="dashboard-kpi-value">{{ total_unidades|floatformat:0|intcomma }}</div></div></div></div>
+        <div class="col-6 col-md-4 col-xl-2"><div class="card dashboard-kpi"><div class="card-body"><div class="dashboard-kpi-label">Referencias</div><div class="dashboard-kpi-value">{{ productos_unicos|intcomma }}</div></div></div></div>
+        <div class="col-6 col-md-4 col-xl-2"><div class="card dashboard-kpi"><div class="card-body"><div class="dashboard-kpi-label">Valor inventario</div><div class="dashboard-kpi-value">${{ valor_inventario|floatformat:0|intcomma }}</div></div></div></div>
+        <div class="col-6 col-md-4 col-xl-2"><div class="card dashboard-kpi"><div class="card-body"><div class="dashboard-kpi-label">Entradas hoy</div><div class="dashboard-kpi-value text-success">+{{ entradas_hoy|floatformat:0|intcomma }}</div></div></div></div>
+        <div class="col-6 col-md-4 col-xl-2"><div class="card dashboard-kpi"><div class="card-body"><div class="dashboard-kpi-label">Salidas hoy</div><div class="dashboard-kpi-value text-danger">{{ salidas_hoy|floatformat:0|intcomma }}</div></div></div></div>
+        <div class="col-6 col-md-4 col-xl-2"><div class="card dashboard-kpi"><div class="card-body"><div class="dashboard-kpi-label">Producción · 7 días</div><div class="dashboard-kpi-value">{{ produccion_semana|floatformat:0|intcomma }}</div></div></div></div>
+    </div>
 
-        <!-- ================= MOVIMIENTOS ================= -->
-        <div class="col-md-8">
-            <div class="card shadow-sm">
-                <div class="card-header">
-                    🔄 Actividad reciente
-                </div>
-
-                <div class="card-body">
-
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th>Producto</th>
-                                <th>Tipo</th>
-                                <th>Cantidad</th>
-                                <th>Usuario</th>
-                                <th>Fecha</th>
-                            </tr>
-                        </thead>
+    <div class="row g-3">
+        <div class="col-12 col-xl-8">
+            <div class="card h-100">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center py-2"><span class="dashboard-panel-title">Actividad reciente</span><small class="text-muted">{{ movimientos_hoy }} movimientos hoy</small></div>
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle mb-0">
+                        <thead class="table-light"><tr><th>Hora</th><th>Producto</th><th>Movimiento</th><th class="text-end">Cantidad</th><th>Usuario</th></tr></thead>
                         <tbody>
                             {% for m in movimientos %}
                             <tr>
-                                <td>{{ m.variante.producto_base.nombre }}</td>
-                                <td>{{ m.tipo }}</td>
-                                <td>{{ m.cantidad }}</td>
-                                <td>{{ m.usuario }}</td>
-                                <td>{{ m.creado|date:"d/m H:i" }}</td>
+                                <td class="text-nowrap text-muted">{{ m.creado|date:"d/m H:i" }}</td>
+                                <td class="fw-semibold">{{ m.variante.producto_base.nombre }}</td>
+                                <td><span class="dashboard-activity-dot {% if m.cantidad < 0 %}bg-danger{% else %}bg-success{% endif %}"></span> {{ m.tipo_legible|default:m.tipo }}</td>
+                                <td class="text-end fw-semibold {% if m.cantidad < 0 %}text-danger{% else %}text-success{% endif %}">{% if m.cantidad > 0 %}+{% endif %}{{ m.cantidad|floatformat:0|intcomma }}</td>
+                                <td class="text-muted">{{ m.usuario|default:"Sistema" }}</td>
                             </tr>
+                            {% empty %}
+                            <tr><td colspan="5" class="text-center text-muted py-4">Todavía no hay movimientos para mostrar.</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
-
                 </div>
             </div>
         </div>
 
-        <!-- ================= TOP PRODUCTOS ================= -->
-        <div class="col-md-4">
-            <div class="card shadow-sm">
-                <div class="card-header">
-                    🔥 Productos más movidos
+        <div class="col-12 col-xl-4">
+            <div class="card mb-3">
+                <div class="card-header bg-white py-2 d-flex justify-content-between"><span class="dashboard-panel-title">Alertas de stock</span><span class="badge {% if stock_bajo %}text-bg-warning{% else %}text-bg-success{% endif %}">{{ stock_bajo|length }} bajas · {{ agotados }} agotadas</span></div>
+                <div class="list-group list-group-flush">
+                    {% for s in stock_bajo %}
+                    <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-2" href="{% url 'inventory:stock_list' %}?q={{ s.variante.producto_base.nombre|urlencode }}"><span class="text-truncate me-2">{{ s.variante.producto_base.nombre }}</span><span class="fw-bold text-danger">{{ s.cantidad|floatformat:0|intcomma }}</span></a>
+                    {% empty %}
+                    <div class="list-group-item text-muted py-3">No hay referencias por debajo del nivel crítico.</div>
+                    {% endfor %}
                 </div>
-
-                <div class="card-body">
-
-                    <ul class="list-group">
-                        {% for p in top_productos %}
-                        <li class="list-group-item d-flex justify-content-between">
-                            {{ p.variante__producto_base__nombre }}
-                            <span class="badge bg-primary">{{ p.total }}</span>
-                        </li>
-                        {% endfor %}
-                    </ul>
-
+            </div>
+            <div class="card">
+                <div class="card-header bg-white py-2"><span class="dashboard-panel-title">Acciones rápidas</span></div>
+                <div class="card-body d-grid gap-2">
+                    <a class="dashboard-action" href="{% url 'inventory:producto_create' %}"><i class="bi bi-plus-square"></i><span><strong>Nuevo producto</strong><small class="d-block text-muted">Cree la referencia y sus variantes.</small></span></a>
+                    <a class="dashboard-action" href="{% url 'inventory:traslado_create' %}"><i class="bi bi-truck"></i><span><strong>Trasladar inventario</strong><small class="d-block text-muted">Envíe unidades entre sucursales.</small></span></a>
+                    <a class="dashboard-action" href="{% url 'inventory:corte_produccion' %}"><i class="bi bi-scissors"></i><span><strong>Registrar corte</strong><small class="d-block text-muted">Continúe el flujo de producción.</small></span></a>
                 </div>
             </div>
         </div>
-
     </div>
-
-    <!-- ================= AJUSTE RÁPIDO PRO ================= -->
-    <div class="card mt-4 shadow-sm">
-        <div class="card-header bg-dark text-white">
-            ⚡ Ajuste inteligente de stock (Shopify Mode)
-        </div>
-
-        <div class="card-body">
-
-            <!-- SEARCH -->
-            <input id="search"
-                class="form-control mb-2"
-                placeholder="Buscar producto, SKU, color..."
-                autocomplete="off">
-
-            <!-- RESULTS -->
-            <div id="results" class="list-group mb-3"></div>
-
-            <form id="ajusteForm" method="POST">
-                {% csrf_token %}
-
-                <input type="hidden" name="variante_id" id="variante_id">
-
-                <div class="row g-2">
-
-                    <div class="col-md-4">
-                        <input name="cantidad"
-                            type="number"
-                            step="1"
-                            class="form-control"
-                            placeholder="+10 o -5">
-                    </div>
-
-                    <div class="col-md-4">
-                        <button class="btn btn-primary w-100">
-                            Aplicar ajuste
-                        </button>
-                    </div>
-
-                </div>
-
-            </form>
-
-            <small class="text-muted">
-                💡 Escribe nombre, SKU o escanea código de barras
-            </small>
-
-        </div>
-    </div>
-
+    <div class="text-end text-muted small mt-2">Actualizado {{ actualizado_en|date:"d/m/Y H:i" }}</div>
 </div>
-
-<script>
-function initShopifyVariantSearch({ inputId, resultsId, hiddenId, url }) {
-
-    const input = document.getElementById(inputId);
-    const results = document.getElementById(resultsId);
-    const hidden = document.getElementById(hiddenId);
-
-    let timeout = null;
-
-    input.addEventListener("input", function () {
-
-        clearTimeout(timeout);
-
-        const q = this.value.trim();
-
-        if (q.length < 2) {
-            results.innerHTML = "";
-            return;
-        }
-
-        timeout = setTimeout(() => {
-
-            fetch(url + "?q=" + encodeURIComponent(q))
-                .then(r => r.json())
-                .then(data => {
-
-                    results.innerHTML = "";
-
-                    data.forEach(item => {
-
-                        const div = document.createElement("div");
-                        div.className = "list-group-item list-group-item-action";
-
-                        div.innerHTML = `
-                            <strong>${item.text}</strong><br>
-                            <small class="text-muted">${item.sku}</small>
-                        `;
-
-                        div.onclick = () => {
-                            input.value = item.text;
-                            hidden.value = item.id;
-                            results.innerHTML = "";
-                        };
-
-                        results.appendChild(div);
-                    });
-
-                });
-
-        }, 200);
-    });
-
-    document.addEventListener("click", (e) => {
-        if (!results.contains(e.target) && e.target !== input) {
-            results.innerHTML = "";
-        }
-    });
-}
-
-
-// init
-initShopifyVariantSearch({
-    inputId: "search",
-    resultsId: "results",
-    hiddenId: "variante_id",
-    url: "{% url 'inventory:variant_search_api' %}"
-});
-</script>
-
 {% endblock %}

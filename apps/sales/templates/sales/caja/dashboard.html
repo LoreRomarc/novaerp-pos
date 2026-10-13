@@ -115,6 +115,20 @@
             </div>
 
             <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card border-0 shadow-sm h-100 border-start border-4 border-success">
+                    <div class="card-body">
+                        <div class="text-muted small">Abonos a crédito</div>
+                        <div class="fs-4 fw-bold text-success">
+                            ${{ resumen.abonos_total|floatformat:0|intcomma }}
+                        </div>
+                        <small class="text-muted">
+                            Efectivo: ${{ resumen.abonos_efectivo|floatformat:0|intcomma }}
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-sm-6 col-xl-3">
                 <div class="card border-0 shadow-sm h-100">
                     <div class="card-body">
                         <div class="text-muted small">

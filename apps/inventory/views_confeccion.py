@@ -15,6 +15,8 @@ from apps.inventory.models_produccion import (
     ProduccionDetalle,
     ProduccionLote,
 )
+from apps.core.models import Sucursal
+from apps.accounts.models import UserProfile
 from apps.inventory.services.confeccion_service import (
     ConfeccionService,
 )
@@ -127,6 +129,9 @@ class ConfeccionRegistroView(
             "lote": lote,
             "detalles": detalles_pendientes,
             "costureras": costureras,
+            "sucursales_destino": Sucursal.objects.filter(activa=True).order_by("nombre"),
+            "puede_elegir_destino": self.request.user.profile.role == UserProfile.Role.SUPER_ADMIN,
+            "sucursal_destino": lote.sucursal_destino or lote.sucursal,
         }
 
     def get(self, request, lote_id):
@@ -144,34 +149,34 @@ class ConfeccionRegistroView(
 
         try:
             for detalle in lote.detalles.all():
-                cantidad = request.POST.get(
-                    f"cantidad_{detalle.id}",
-                    "",
-                ).strip()
+                cantidades = request.POST.getlist(f"cantidad_{detalle.id}[]")
+                costureras = request.POST.getlist(f"costurera_{detalle.id}[]")
+                destinos = request.POST.getlist(f"destino_{detalle.id}[]")
 
-                # Una línea vacía significa que todavía
-                # no se ha confeccionado esa variante.
-                if not cantidad or cantidad == "0":
-                    continue
+                if not (len(cantidades) == len(costureras) == len(destinos)):
+                    raise ValidationError("Las asignaciones de confección están incompletas.")
 
-                costurera_id = request.POST.get(
-                    f"costurera_{detalle.id}",
-                    "",
-                ).strip()
+                for cantidad, costurera_id, destino_id in zip(cantidades, costureras, destinos):
+                    cantidad = cantidad.strip()
+                    if not cantidad or cantidad == "0":
+                        continue
+                    if not costurera_id:
+                        raise ValidationError(f"Seleccione la costurera para {detalle.variante}.")
 
-                if not costurera_id:
-                    raise ValidationError(
-                        f"Seleccione la costurera para "
-                        f"{detalle.variante}."
+                    destino = (
+                        Sucursal.objects.filter(pk=destino_id, activa=True).first()
+                        if self.request.user.profile.role == UserProfile.Role.SUPER_ADMIN
+                        else lote.sucursal
                     )
+                    if not destino:
+                        raise ValidationError("Seleccione una sucursal destino activa.")
 
-                items.append(
-                    {
+                    items.append({
                         "detalle_id": detalle.id,
                         "operario_id": int(costurera_id),
                         "cantidad": int(cantidad),
-                    }
-                )
+                        "sucursal_destino_id": destino.id,
+                    })
 
             lote = ConfeccionService.registrar_confeccion(
                 lote_id=lote.id,

@@ -34,15 +34,16 @@ def _serializar_item(item, usar_snapshot=False):
     }
 
 
-def _obtener_items(documento):
-    return list(
-        documento.items.select_related(
+def _obtener_items(documento, *, newest_first=False):
+    items = documento.items.select_related(
             "variante",
             "variante__producto_base",
             "variante__color",
             "variante__talla",
         )
-    )
+    if newest_first:
+        items = items.order_by("-id")
+    return list(items)
 
 
 def _calcular_totales(items):
@@ -68,8 +69,9 @@ def _serializar_documento(
     identificador,
     usar_snapshot,
     usar_totales_guardados=False,
+    newest_first=False,
 ):
-    items = _obtener_items(documento)
+    items = _obtener_items(documento, newest_first=newest_first)
 
     if usar_totales_guardados:
         subtotal = documento.subtotal
@@ -84,6 +86,8 @@ def _serializar_documento(
         "estado": documento.estado,
         "tipo_venta": documento.tipo_venta,
         "cliente": documento.cliente or "",
+        "vendedor_id": documento.vendedor_id,
+        "vendedor": documento.vendedor.nombre if documento.vendedor_id else "",
         "observaciones": documento.observaciones or "",
         "efectivo": _decimal(documento.monto_efectivo),
         "transferencia": _decimal(documento.monto_transferencia),
@@ -117,4 +121,5 @@ def serializar_carrito(carrito):
         carrito,
         identificador=None,
         usar_snapshot=False,
+        newest_first=True,
     )

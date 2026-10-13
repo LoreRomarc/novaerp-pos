@@ -20,14 +20,6 @@
         </a>
     </div>
 
-    {% if messages %}
-        {% for message in messages %}
-            <div class="alert alert-{{ message.tags|default:'info' }}">
-                {{ message }}
-            </div>
-        {% endfor %}
-    {% endif %}
-
     {% if not costureras %}
         <div class="alert alert-warning">
             Debe crear al menos una costurera antes de registrar
@@ -75,6 +67,7 @@
                         </small>
                     </div>
                 </div>
+                <div class="form-text mt-3">Cada asignación de una prenda puede enviarse a una sucursal distinta. Agregue otra asignación para repartir la misma referencia entre sedes.</div>
 
             </div>
         </div>
@@ -89,8 +82,7 @@
                             <th class="text-end">Cortadas</th>
                             <th class="text-end">Confeccionadas</th>
                             <th class="text-end">Pendientes</th>
-                            <th style="min-width: 180px;">Costurera</th>
-                            <th style="min-width: 110px;">Cantidad</th>
+                            <th colspan="3" style="min-width: 390px;">Asignaciones de confección</th>
                         </tr>
                     </thead>
 
@@ -124,32 +116,21 @@
                                 {{ detalle.pendientes }}
                             </td>
 
-                            <td>
-                                <select
-                                    name="costurera_{{ detalle.id }}"
-                                    class="form-select form-select-sm costurera-select">
-                                    <option value="">
-                                        Seleccione
-                                    </option>
-
-                                    {% for costurera in costureras %}
-                                    <option value="{{ costurera.id }}">
-                                        {{ costurera.nombre }}
-                                    </option>
-                                    {% endfor %}
-                                </select>
-                            </td>
-
-                            <td>
-                                <input
-                                    type="number"
-                                    name="cantidad_{{ detalle.id }}"
-                                    min="0"
-                                    max="{{ detalle.pendientes }}"
-                                    step="1"
-                                    value="0"
-                                    class="form-control form-control-sm"
-                                    {% if not costureras %}disabled{% endif %}>
+                            <td colspan="3">
+                                <div class="asignaciones" data-detalle="{{ detalle.id }}" data-pendientes="{{ detalle.pendientes }}">
+                                    <div class="asignacion-row d-grid gap-2 mb-2" style="grid-template-columns: 1fr 1fr 90px 32px;">
+                                        {% if puede_elegir_destino %}
+                                        <select name="destino_{{ detalle.id }}[]" class="form-select form-select-sm destino-select">
+                                            {% for sucursal in sucursales_destino %}<option value="{{ sucursal.id }}" {% if sucursal.id == sucursal_destino.id %}selected{% endif %}>{{ sucursal.nombre }}</option>{% endfor %}
+                                        </select>
+                                        {% else %}
+                                        <input type="hidden" name="destino_{{ detalle.id }}[]" value="{{ sucursal_destino.id }}"><input class="form-control form-control-sm" value="{{ sucursal_destino.nombre }}" readonly>
+                                        {% endif %}
+                                        <select name="costurera_{{ detalle.id }}[]" class="form-select form-select-sm costurera-select"><option value="">Costurera</option>{% for costurera in costureras %}<option value="{{ costurera.id }}">{{ costurera.nombre }}</option>{% endfor %}</select>
+                                        <input type="number" name="cantidad_{{ detalle.id }}[]" min="0" max="{{ detalle.pendientes }}" step="1" value="0" class="form-control form-control-sm" {% if not costureras %}disabled{% endif %}>
+                                        <button type="button" class="btn btn-sm btn-outline-primary agregar-asignacion" title="Repartir en otra sucursal"><i class="bi bi-plus"></i></button>
+                                    </div>
+                                </div>
                             </td>
                         </tr>
                         {% empty %}
@@ -186,5 +167,23 @@ document
                 selector.value = this.value;
             }, this);
     });
+
+document.addEventListener("click", function (evento) {
+    const boton = evento.target.closest(".agregar-asignacion");
+    if (!boton) return;
+    const contenedor = boton.closest(".asignaciones");
+    const fila = boton.closest(".asignacion-row");
+    const copia = fila.cloneNode(true);
+    copia.querySelectorAll("select").forEach(select => select.selectedIndex = 0);
+    copia.querySelector('input[type="number"]').value = 0;
+    copia.querySelector(".agregar-asignacion").className = "btn btn-sm btn-outline-danger eliminar-asignacion";
+    copia.querySelector("button").innerHTML = '<i class="bi bi-dash"></i>';
+    contenedor.appendChild(copia);
+});
+
+document.addEventListener("click", function (evento) {
+    const boton = evento.target.closest(".eliminar-asignacion");
+    if (boton) boton.closest(".asignacion-row").remove();
+});
 </script>
 {% endblock %}

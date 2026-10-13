@@ -178,6 +178,17 @@ class ProduccionLote(models.Model):
     sucursal = models.ForeignKey(
         Sucursal,
         on_delete=models.PROTECT,
+        related_name="lotes_produccion_origen",
+    )
+
+    # El corte pertenece a la fábrica/origen. La confección puede ingresar el
+    # terminado inicialmente allí o, si se autoriza, en otra sucursal.
+    sucursal_destino = models.ForeignKey(
+        Sucursal,
+        on_delete=models.PROTECT,
+        related_name="lotes_produccion_destino",
+        null=True,
+        blank=True,
     )
 
     consumo_total = models.DecimalField(
@@ -363,6 +374,16 @@ class OperacionProduccion(models.Model):
     )
 
     cantidad = models.PositiveIntegerField()
+
+    # En confección identifica la sede que recibió el terminado. En corte no
+    # aplica y queda vacío. Permite repartir un mismo lote entre sucursales.
+    sucursal_destino = models.ForeignKey(
+        Sucursal,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="operaciones_produccion_recibidas",
+    )
 
     registrado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL,

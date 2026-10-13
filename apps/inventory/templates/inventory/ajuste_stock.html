@@ -4,12 +4,13 @@
 
 {% block content %}
 
-<div class="container">
+<div class="container py-2">
 
     <div class="card shadow-sm">
 
-        <div class="card-header">
-            <h4>📦 Ajuste de Inventario</h4>
+        <div class="card-header bg-white">
+            <h4 class="mb-1">Ajuste de inventario</h4>
+            <p class="text-muted small mb-0">Cada ajuste genera un movimiento auditable en Kardex.</p>
         </div>
 
         <div class="card-body">
@@ -19,19 +20,45 @@
                 {% csrf_token %}
 
                 <div class="mb-3">
-                    <label>Producto</label>
+                    <label class="form-label">Producto</label>
+                    <input id="lectorProductoAjuste" type="search" class="form-control mb-2" placeholder="Escanee el código de barras y presione Enter" autocomplete="off">
+                    <div id="estadoLectorAjuste" class="form-text">También puede seleccionar la prenda manualmente.</div>
                     {{ form.variante }}
+                    {% for error in form.variante.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
                 </div>
 
+                {% if form.sucursal.field.widget.input_type != "hidden" %}
+                    <div class="mb-3">
+                        <label class="form-label">Sucursal</label>
+                        {{ form.sucursal }}
+                        <div class="form-text">El ajuste se registrará únicamente en esta sucursal.</div>
+                    </div>
+                {% else %}
+                    {{ form.sucursal }}
+                {% endif %}
+
                 <div class="mb-3">
-                    <label>Cantidad</label>
+                    <label class="form-label">Cantidad</label>
                     {{ form.cantidad }}
                 </div>
 
                 <div class="mb-3">
-                    <label>Movimiento</label>
+                    <label class="form-label">Tipo de ajuste</label>
                     {{ form.tipo }}
                 </div>
+
+                <div class="mb-3">
+                    <label class="form-label">{{ form.motivo.label }}</label>
+                    {{ form.motivo }}
+                    {% for error in form.motivo.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">{{ form.observacion.label }}</label>
+                    {{ form.observacion }}
+                </div>
+
+                {% for error in form.non_field_errors %}<div class="alert alert-danger py-2">{{ error }}</div>{% endfor %}
 
                 <button class="btn btn-success">
                     Guardar
@@ -50,4 +77,24 @@
 
 </div>
 
+{% endblock %}
+
+{% block content-script %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const selectVariante = document.getElementById("{{ form.variante.id_for_label }}");
+    configurarLectorProducto({
+        input: document.getElementById("lectorProductoAjuste"),
+        endpoint: "{% url 'inventory:variant_search_api' %}",
+        estado: document.getElementById("estadoLectorAjuste"),
+        alEncontrar: (variante) => {
+            if (!selectVariante.querySelector(`option[value="${variante.id}"]`)) {
+                selectVariante.add(new Option(variante.text || variante.nombre, variante.id));
+            }
+            selectVariante.value = String(variante.id);
+            selectVariante.dispatchEvent(new Event("change", { bubbles: true }));
+        },
+    });
+});
+</script>
 {% endblock %}

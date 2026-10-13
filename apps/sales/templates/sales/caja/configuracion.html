@@ -75,6 +75,7 @@
                                 <th>Código</th>
                                 <th>Nombre</th>
                                 <th>Estado</th>
+                                <th class="text-end">Acciones</th>
                             </tr>
                         </thead>
 
@@ -90,10 +91,14 @@
                                             <span class="badge text-bg-secondary">Inactiva</span>
                                         {% endif %}
                                     </td>
+                                    <td class="text-end text-nowrap">
+                                        <button class="btn btn-sm btn-outline-primary js-editar-caja" type="button" data-id="{{ caja.id }}" data-codigo="{{ caja.codigo }}" data-nombre="{{ caja.nombre }}"><i class="bi bi-pencil"></i><span class="visually-hidden">Editar</span></button>
+                                        <form method="post" class="d-inline">{% csrf_token %}<input type="hidden" name="accion" value="cambiar_estado"><input type="hidden" name="caja_id" value="{{ caja.id }}"><button class="btn btn-sm btn-outline-secondary" type="submit" title="{% if caja.activa %}Desactivar{% else %}Activar{% endif %}"><i class="bi {% if caja.activa %}bi-pause-circle{% else %}bi-play-circle{% endif %}"></i></button></form>
+                                    </td>
                                 </tr>
                             {% empty %}
                                 <tr>
-                                    <td colspan="3" class="text-center text-muted py-4">
+                                    <td colspan="4" class="text-center text-muted py-4">
                                         Aún no hay cajas creadas para esta sucursal.
                                     </td>
                                 </tr>
@@ -105,4 +110,6 @@
         </div>
     </div>
 </div>
+<div class="modal fade" id="modalEditarCaja" tabindex="-1"><div class="modal-dialog"><form method="post" class="modal-content">{% csrf_token %}<input name="accion" type="hidden" value="actualizar"><input name="caja_id" id="editarCajaId" type="hidden"><div class="modal-header"><h5 class="modal-title">Editar caja</h5><button class="btn-close" type="button" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="mb-3"><label class="form-label" for="editarCajaCodigo">Código</label><input class="form-control" id="editarCajaCodigo" name="codigo" maxlength="20" required></div><div class="mb-3"><label class="form-label" for="editarCajaNombre">Nombre</label><input class="form-control" id="editarCajaNombre" name="nombre" maxlength="100" required></div></div><div class="modal-footer"><button class="btn btn-light border" type="button" data-bs-dismiss="modal">Cancelar</button><button class="btn btn-primary" type="submit">Guardar cambios</button></div></form></div></div>
 {% endblock %}
+{% block content-script %}<script>const modalEditarCaja=new bootstrap.Modal(document.getElementById("modalEditarCaja"));document.querySelectorAll(".js-editar-caja").forEach((boton)=>boton.addEventListener("click",()=>{document.getElementById("editarCajaId").value=boton.dataset.id;document.getElementById("editarCajaCodigo").value=boton.dataset.codigo;document.getElementById("editarCajaNombre").value=boton.dataset.nombre;modalEditarCaja.show();}));</script>{% endblock %}

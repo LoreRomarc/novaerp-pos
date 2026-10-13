@@ -1,0 +1,32 @@
+# Despliegue GRATUITO DE PRUEBA. No usar como producción: la base gratuita
+# de Render vence y la instancia web se pausa cuando está inactiva.
+databases:
+  - name: novaerp-pruebas-db
+    plan: free
+    databaseName: novaerp_pruebas
+    user: novaerp_pruebas
+
+services:
+  - type: web
+    name: novaerp-pruebas
+    runtime: python
+    plan: free
+    buildCommand: bash build.sh
+    startCommand: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: novaerp-pruebas-db
+          property: connectionString
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DJANGO_USE_WHITENOISE
+        value: "True"
+      - key: DJANGO_SECURE_SSL_REDIRECT
+        value: "True"
+      - key: DJANGO_HSTS_SECONDS
+        value: "0"
+      - key: POSTGRES_CONN_MAX_AGE
+        value: "60"

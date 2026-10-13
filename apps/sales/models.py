@@ -64,6 +64,53 @@ class Caja(models.Model):
 
 
 # =========================================================
+# IMPRESIÓN DE COMPROBANTES DE VENTA
+# =========================================================
+
+class ConfiguracionImpresionVenta(models.Model):
+    """Preferencias del ticket térmico, independientes en cada sucursal."""
+
+    MODOS_IMPRESION = (
+        ("ZPL_WINDOWS", "Etiquetas ZPL por Windows (SAT TT448 / Zebra)"),
+    )
+
+    sucursal = models.OneToOneField(
+        "core.Sucursal",
+        on_delete=models.CASCADE,
+        related_name="configuracion_impresion_venta",
+    )
+    impresion_automatica = models.BooleanField(default=True)
+    modo_impresion = models.CharField(
+        max_length=20,
+        choices=MODOS_IMPRESION,
+        default="ZPL_WINDOWS",
+    )
+    nombre_impresora = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Vacío: usa la impresora predeterminada de Windows.",
+    )
+    cortar_papel = models.BooleanField(default=True)
+    ancho_papel_mm = models.PositiveSmallIntegerField(
+        default=33,
+    )
+    mensaje_pie = models.CharField(
+        max_length=180,
+        blank=True,
+        default="Gracias por su compra.",
+    )
+    actualizado = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Configuración de impresión de venta"
+        verbose_name_plural = "Configuraciones de impresión de venta"
+
+    def __str__(self):
+        return f"Ticket {self.sucursal} ({self.ancho_papel_mm} mm)"
+
+
+# =========================================================
 # CAJEROS EN TURNO
 # =========================================================
 
@@ -98,6 +145,32 @@ class TurnoCajaUsuario(models.Model):
 # CARRITO (BORRADOR DE VENTA)
 # =========================================================
 
+class Vendedor(models.Model):
+    """Persona comercial seleccionable en POS; no requiere usuario del sistema."""
+
+    sucursal = models.ForeignKey(
+        "core.Sucursal", on_delete=models.PROTECT, related_name="vendedores"
+    )
+    nombre = models.CharField(max_length=150)
+    documento = models.CharField(max_length=40, blank=True, default="")
+    telefono = models.CharField(max_length=40, blank=True, default="")
+    activo = models.BooleanField(default=True)
+    creado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["nombre", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["sucursal", "nombre"],
+                name="venta_vendedor_nombre_unico_por_sucursal",
+            )
+        ]
+        indexes = [models.Index(fields=["sucursal", "activo"])]
+
+    def __str__(self):
+        return self.nombre
+
+
 class Carrito(models.Model):
 
     ESTADOS = (
@@ -114,6 +187,10 @@ class Carrito(models.Model):
     uuid = models.UUIDField( default=uuid.uuid4,editable=False, unique=True, db_index=True, )
     sucursal = models.ForeignKey( "core.Sucursal", on_delete=models.CASCADE, related_name="carritos",)
     usuario = models.ForeignKey( settings.AUTH_USER_MODEL, on_delete=models.CASCADE,related_name="carritos",)
+    vendedor = models.ForeignKey(
+        Vendedor, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="carritos",
+    )
     tipo_venta = models.CharField( max_length=20, choices=TIPO_VENTA, default="MAYORISTA",)
     estado = models.CharField( max_length=20, choices=ESTADOS, default="BORRADOR", db_index=True,)
     cliente = models.CharField( max_length=150, blank=True, default="",)
@@ -281,6 +358,7 @@ class Venta(models.Model):
 
     ESTADOS = (
         ("ABIERTA", "Abierta"),
+        ("CREDITO", "Crédito pendiente"),
         ("CERRADA", "Cerrada"),
         ("ANULADA", "Anulada"),
     )
@@ -313,6 +391,11 @@ class Venta(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
         related_name="ventas"
+    )
+
+    vendedor = models.ForeignKey(
+        Vendedor, on_delete=models.PROTECT, null=True, blank=True,
+        related_name="ventas",
     )
 
     cliente = models.CharField(
@@ -497,19 +580,19 @@ class Venta(models.Model):
 
         return excedente
 
-    def puede_cerrar(self):
+    def puede_cerrar(self, permitir_credito=False):
 
         return (
             self.estado == "ABIERTA"
             and self.items.exists()
-            and self.total_pagado >= self.total
+            and (permitir_credito or self.total_pagado >= self.total)
         )
 
     # =====================================================
     # CIERRE DE VENTA
     # =====================================================
     @transaction.atomic
-    def cerrar_venta(self):
+    def cerrar_venta(self, permitir_credito=False):
         if self.estado != "ABIERTA":
             raise ValidationError(
                 "La venta no está abierta."
@@ -522,7 +605,7 @@ class Venta(models.Model):
 
         self.recalcular_totales()
 
-        if not self.puede_cerrar():
+        if not self.puede_cerrar(permitir_credito=permitir_credito):
             raise ValidationError(
                 "El pago no cubre el total de la venta."
             )
@@ -568,7 +651,9 @@ class Venta(models.Model):
         # CERRAR VENTA
         # -----------------------------------------------------
 
-        self.estado = "CERRADA"
+        # Un crédito es una venta terminada: ya descuenta stock y deja su
+        # factura. Lo pendiente es exclusivamente su recaudo posterior.
+        self.estado = "CREDITO" if self.total_pagado < self.total else "CERRADA"
         self.cerrada = timezone.now()
 
         self.save(
@@ -591,9 +676,48 @@ class Venta(models.Model):
                 "TARJETA": self.monto_tarjeta,
                 "TRANSFERENCIA": self.monto_transferencia,
             },
+            permitir_credito=permitir_credito,
         )
 
         return self
+
+
+class AbonoVenta(models.Model):
+    """Pago posterior de una venta a crédito, conservado para auditoría."""
+
+    venta = models.ForeignKey(Venta, on_delete=models.PROTECT, related_name="abonos")
+    turno = models.ForeignKey(
+        "sales.TurnoCaja", on_delete=models.PROTECT, related_name="abonos_venta"
+    )
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name="abonos_venta"
+    )
+    medio_pago = models.CharField(
+        max_length=20,
+        choices=(
+            ("EFECTIVO", "Efectivo"),
+            ("TRANSFERENCIA", "Transferencia"),
+            # TARJETA: preparado para activar cuando el negocio la habilite.
+            ("TARJETA", "Tarjeta"),
+        ),
+    )
+    monto = models.DecimalField(max_digits=14, decimal_places=2)
+    observacion = models.TextField(blank=True, default="")
+    creado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-creado", "-id"]
+        indexes = [
+            models.Index(fields=["venta", "creado"]),
+            models.Index(fields=["turno", "creado"]),
+        ]
+
+    def clean(self):
+        if self.monto <= 0:
+            raise ValidationError({"monto": "El abono debe ser mayor a cero."})
+
+    def __str__(self):
+        return f"Abono venta #{self.venta_id}: ${self.monto:,.0f}"
 
 
 # =========================================================
@@ -905,6 +1029,20 @@ class Devolucion(models.Model):
     # Dinero adicional cobrado al cliente si lleva
     # una prenda de mayor valor.
     monto_cobrado = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=0,
+    )
+
+    # La caja guarda el neto en ``monto_cobrado``. Estos dos valores dejan
+    # trazabilidad del efectivo físico y del vuelto en el comprobante.
+    monto_recibido_efectivo = models.DecimalField(
+        max_digits=14,
+        decimal_places=2,
+        default=0,
+    )
+
+    vuelto_efectivo = models.DecimalField(
         max_digits=14,
         decimal_places=2,
         default=0,

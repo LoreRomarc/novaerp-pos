@@ -71,7 +71,7 @@ class ProductoListView(
         qs = (
             ProductoBase.objects
             .prefetch_related("variantes")
-            .order_by("-id")
+            .order_by("nombre", "id")
         )
 
         q = self.request.GET.get("q")

@@ -31,15 +31,25 @@
                         </div>
                     {% endif %}
 
-                    {% if messages %}
-                        {% for message in messages %}
-                            <div class="alert alert-{{ message.tags|default:'info' }}" role="alert">
-                                {{ message }}
-                            </div>
-                        {% endfor %}
-                    {% endif %}
+                    {% if turno_existente %}
 
-                    {% if cajas %}
+                        <div class="alert alert-warning border-0 mb-0">
+                            <div class="d-flex gap-3 align-items-start">
+                                <i class="bi bi-shield-lock fs-4"></i>
+                                <div>
+                                    <h5 class="alert-heading mb-1">Ya hay un turno abierto</h5>
+                                    <p class="mb-1">La caja <strong>{{ turno_existente.caja.nombre }}</strong> (turno #{{ turno_existente.id }}) fue abierta por <strong>{{ turno_existente.usuario_apertura }}</strong>.</p>
+                                    {% if puede_gestionar_turno %}
+                                        <p class="mb-3 small">Su rol le permite administrar el turno actual; no se abrirá otra caja.</p>
+                                        <a class="btn btn-sm btn-outline-dark" href="{% url 'sales:caja_dashboard' %}"><i class="bi bi-cash-stack me-1"></i>Ir a operación de caja</a>
+                                    {% else %}
+                                        <p class="mb-0 small">Por seguridad, un cajero nuevo no puede abrir una segunda caja ni operar este turno sin asignación. Un administrador de esta sucursal debe agregarlo desde <strong>Operación de caja</strong>.</p>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                    {% elif cajas %}
 
                         <form
                             action="{% url 'sales:abrir_caja' %}"
@@ -350,6 +360,11 @@ document.addEventListener("DOMContentLoaded", function () {
     monto.addEventListener("input", function () {
         monto.classList.remove("is-invalid");
     });
+
+    // Evita que la rueda modifique la base mientras el cajero desplaza la página.
+    monto.addEventListener("wheel", function () {
+        monto.blur();
+    }, { passive: true });
 });
 </script>
 

@@ -19,7 +19,7 @@
 
     .rollo-header {
         display: grid;
-        grid-template-columns: minmax(260px, 2fr) 150px 150px auto auto;
+            grid-template-columns: minmax(240px, 2fr) 140px 170px 135px auto auto;
         gap: 8px;
         align-items: center;
         padding: 10px;
@@ -162,6 +162,20 @@ function opcionesRollos() {
     `;
 }
 
+function leerNumeroDecimal(valor) {
+    const texto = String(valor ?? "").trim();
+    if (!texto) return NaN;
+
+    // Acepta tanto 12.50 como 12,50 y 1.234,50 sin depender de la
+    // configuración regional con que Django presente el Decimal.
+    if (texto.includes(",") && texto.includes(".")) {
+        return texto.lastIndexOf(",") > texto.lastIndexOf(".")
+            ? Number(texto.replace(/\./g, "").replace(",", "."))
+            : Number(texto.replace(/,/g, ""));
+    }
+    return Number(texto.replace(",", "."));
+}
+
 function opcionesProductos() {
     return `
         {% for producto in productos %}
@@ -215,6 +229,11 @@ function addRollo() {
                 placeholder="Metros"
                 required>
 
+            <label class="small text-nowrap d-flex align-items-center gap-2 mb-0">
+                <input type="checkbox" class="form-check-input usar-completo">
+                Usar rollo completo
+            </label>
+
             <small class="text-muted restante">
                 Disponible: —
             </small>
@@ -262,6 +281,31 @@ function addRollo() {
             calcularTotales();
         });
 
+    bloque.querySelector(".usar-completo")
+        .addEventListener("change", function () {
+            const select = bloque.querySelector(".rollo-select");
+            const metrosInput = bloque.querySelector(".metros-input");
+            if (!select.value) {
+                this.checked = false;
+                alert("Seleccione primero el rollo.");
+                return;
+            }
+
+            if (this.checked) {
+                const disponible = leerNumeroDecimal(
+                    select.selectedOptions[0].dataset.disponible
+                );
+                metrosInput.value = Number.isFinite(disponible)
+                    ? disponible.toFixed(2)
+                    : "";
+                metrosInput.readOnly = true;
+            } else {
+                metrosInput.readOnly = false;
+            }
+            actualizarRestante(bloque);
+            calcularTotales();
+        });
+
     bloque.querySelector(".agregar-item")
         .addEventListener("click", function () {
             addItem(bloque);
@@ -300,6 +344,16 @@ function configurarRollo(bloque) {
     const opcion = select.selectedOptions[0];
     const rolloId = select.value;
 
+    const usarCompleto = bloque.querySelector(".usar-completo");
+    const metrosInput = bloque.querySelector(".metros-input");
+    if (usarCompleto.checked) {
+        const disponible = leerNumeroDecimal(opcion.dataset.disponible);
+        metrosInput.value = Number.isFinite(disponible)
+            ? disponible.toFixed(2)
+            : "";
+        metrosInput.readOnly = true;
+    }
+
     bloque.querySelector(".metros-input").name =
         `metros_${rolloId}`;
 
@@ -325,7 +379,7 @@ function actualizarRestante(bloque) {
         return;
     }
 
-    const disponible = Number(
+    const disponible = leerNumeroDecimal(
         select.selectedOptions[0].dataset.disponible
     );
 
@@ -333,8 +387,15 @@ function actualizarRestante(bloque) {
         bloque.querySelector(".metros-input").value || 0
     );
 
-    const restante = disponible - metros;
     const etiqueta = bloque.querySelector(".restante");
+
+    if (!Number.isFinite(disponible)) {
+        etiqueta.textContent = "No fue posible leer los metros disponibles.";
+        etiqueta.className = "text-danger restante";
+        return;
+    }
+
+    const restante = disponible - metros;
 
     etiqueta.textContent =
         `Disponible: ${disponible.toFixed(2)} m · Restan: `
@@ -359,9 +420,13 @@ function addItem(bloque) {
     fila.className = "item-row";
 
     fila.innerHTML = `
-        <select class="form-select producto-select">
-            ${opcionesProductos()}
-        </select>
+        <div>
+            <input type="search" class="form-control lector-producto-corte mb-1" placeholder="Escanear código" autocomplete="off">
+            <select class="form-select producto-select">
+                ${opcionesProductos()}
+            </select>
+            <small class="form-text lector-producto-estado"></small>
+        </div>
 
         <input
             class="form-control tela-view"
@@ -410,6 +475,21 @@ function addItem(bloque) {
 
     fila.querySelector(".cantidad-input")
         .addEventListener("input", calcularTotales);
+
+    configurarLectorProducto({
+        input: fila.querySelector(".lector-producto-corte"),
+        endpoint: "{% url 'inventory:variant_search_api' %}",
+        estado: fila.querySelector(".lector-producto-estado"),
+        alEncontrar: (variante) => {
+            const productoSelect = fila.querySelector(".producto-select");
+            const productoId = String(variante.producto_base_id || "");
+            if (!productoId || !productoSelect.querySelector(`option[value="${productoId}"]`)) {
+                throw new Error("El código leído no corresponde a un producto disponible para este corte.");
+            }
+            productoSelect.value = productoId;
+            productoSelect.dispatchEvent(new Event("change", { bubbles: true }));
+        },
+    });
 
     fila.querySelector(".eliminar-item")
         .addEventListener("click", function () {

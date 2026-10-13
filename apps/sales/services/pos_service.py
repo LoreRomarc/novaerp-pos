@@ -395,6 +395,7 @@ class POSService:
         efectivo=0,
         transferencia=0,
         tarjeta=0,
+        vendedor_id=None,
     ):
         carrito = POSService._obtener_carrito_bloqueado(
             usuario=usuario,
@@ -422,15 +423,24 @@ class POSService:
                 "Los montos de pago no pueden ser negativos."
             )
 
-        carrito.cliente = (cliente or "").strip()
+        carrito.cliente = (cliente or "").strip().upper()
         carrito.observaciones = (
             observaciones or ""
-        ).strip()
+        ).strip().upper()
         carrito.monto_efectivo = pagos["EFECTIVO"]
         carrito.monto_transferencia = pagos[
             "TRANSFERENCIA"
         ]
         carrito.monto_tarjeta = pagos["TARJETA"]
+        if vendedor_id:
+            from apps.sales.models import Vendedor
+            carrito.vendedor = Vendedor.objects.filter(
+                pk=vendedor_id, sucursal=sucursal, activo=True
+            ).first()
+            if not carrito.vendedor:
+                raise ValidationError("El vendedor seleccionado no está disponible en esta sucursal.")
+        else:
+            carrito.vendedor = None
 
         carrito.save(
             update_fields=[
@@ -439,6 +449,7 @@ class POSService:
                 "monto_efectivo",
                 "monto_transferencia",
                 "monto_tarjeta",
+                "vendedor",
                 "actualizado",
             ]
         )
@@ -454,7 +465,9 @@ class POSService:
         pagos,
         cliente="",
         observaciones="",
+        vendedor_id=None,
         venta_uuid=None,
+        permitir_credito=False,
     ):
         if not turno_id:
             raise ValidationError(
@@ -497,6 +510,11 @@ class POSService:
             venta_uuid=venta_uuid,
         )
 
+        if permitir_credito and not (cliente or "").strip():
+            raise ValidationError(
+                "Para vender a crédito debe registrar el nombre del cliente."
+            )
+
         if not carrito.items.exists():
             raise ValidationError(
                 "No hay productos en la venta."
@@ -507,15 +525,20 @@ class POSService:
             sucursal=sucursal,
         )
 
-        CajaService.validar_operador_turno(
-            turno=turno,
-            usuario=usuario,
-        )
+        # El superadministrador puede operar el turno de la sucursal activa
+        # aunque lo haya abierto otro cajero.
+        if getattr(getattr(usuario, "profile", None), "role", None) in {"SUPER_ADMIN", "ADMIN_SUCURSAL"}:
+            CajaService.validar_gestor_turno(turno, usuario)
+        else:
+            CajaService.validar_operador_turno(
+                turno=turno,
+                usuario=usuario,
+            )
 
-        carrito.cliente = (cliente or "").strip()
+        carrito.cliente = (cliente or "").strip().upper()
         carrito.observaciones = (
             observaciones or ""
-        ).strip()
+        ).strip().upper()
         carrito.monto_efectivo = pagos_normalizados[
             "EFECTIVO"
         ]
@@ -525,6 +548,15 @@ class POSService:
         carrito.monto_transferencia = pagos_normalizados[
             "TRANSFERENCIA"
         ]
+        if vendedor_id:
+            from apps.sales.models import Vendedor
+            carrito.vendedor = Vendedor.objects.filter(
+                pk=vendedor_id, sucursal=sucursal, activo=True
+            ).first()
+            if not carrito.vendedor:
+                raise ValidationError("El vendedor seleccionado no está disponible en esta sucursal.")
+        else:
+            carrito.vendedor = None
 
         carrito.save(
             update_fields=[
@@ -533,6 +565,7 @@ class POSService:
                 "monto_efectivo",
                 "monto_tarjeta",
                 "monto_transferencia",
+                "vendedor",
                 "actualizado",
             ]
         )
@@ -543,6 +576,7 @@ class POSService:
                 Decimal("0.00"),
             )
             < carrito.total
+            and not permitir_credito
         ):
             raise ValidationError(
                 "El pago no cubre el total de la venta."
@@ -553,6 +587,7 @@ class POSService:
             turno=turno,
             usuario=usuario,
             pagos=pagos_normalizados,
+            permitir_credito=permitir_credito,
         )
 
     @staticmethod
@@ -635,10 +670,13 @@ class POSService:
             turno_id=turno_id,
             sucursal=sucursal,
         )
-        CajaService.validar_operador_turno(
-            turno=turno,
-            usuario=usuario,
-        )
+        if getattr(getattr(usuario, "profile", None), "role", None) in {"SUPER_ADMIN", "ADMIN_SUCURSAL"}:
+            CajaService.validar_gestor_turno(turno, usuario)
+        else:
+            CajaService.validar_operador_turno(
+                turno=turno,
+                usuario=usuario,
+            )
 
         # Si falla caja o inventario, la transacción revierte todo el proceso.
         CajaService.registrar_devolucion_venta(

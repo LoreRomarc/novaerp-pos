@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% load humanize %}
+
+{% block title %}Turno pendiente{% endblock %}
+
+{% block content %}
+<div class="container" style="max-width: 650px; padding-top: 3rem;">
+    <div class="card">
+        <div class="card-body p-4">
+            <div class="d-flex gap-3 align-items-start mb-3">
+                <span class="rounded-circle d-inline-flex align-items-center justify-content-center text-bg-warning" style="width:2.7rem;height:2.7rem;"><i class="bi bi-calendar-x"></i></span>
+                <div>
+                    <div class="text-uppercase text-muted small fw-semibold">Validación de turno</div>
+                    <h1 class="h4 mb-1">Hay una caja abierta de un día anterior</h1>
+                    <p class="text-muted mb-0">Antes de operar, confirme qué desea hacer con este turno.</p>
+                </div>
+            </div>
+
+            <dl class="row small border-top border-bottom py-3 mb-4">
+                <dt class="col-5 text-muted">Sucursal</dt><dd class="col-7 fw-semibold">{{ sucursal.nombre }}</dd>
+                <dt class="col-5 text-muted">Caja</dt><dd class="col-7 fw-semibold">{{ turno.caja.nombre }} · {{ turno.caja.codigo }}</dd>
+                <dt class="col-5 text-muted">Abierto desde</dt><dd class="col-7">{{ turno.abierto_en|date:"d/m/Y H:i" }}</dd>
+                <dt class="col-5 text-muted">Base inicial</dt><dd class="col-7">${{ turno.monto_inicial|floatformat:0|intcomma }}</dd>
+            </dl>
+
+            <form method="post" class="d-flex flex-column flex-sm-row justify-content-end gap-2">
+                {% csrf_token %}
+                <button class="btn btn-outline-secondary" name="accion" value="CONTINUAR" type="submit">
+                    <i class="bi bi-arrow-right-circle"></i> Continuar este turno
+                </button>
+                <button class="btn btn-primary" name="accion" value="CERRAR" type="submit">
+                    <i class="bi bi-lock"></i> Ir a arqueo y cierre
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

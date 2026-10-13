@@ -181,6 +181,19 @@ class CajaService:
         )
 
     @staticmethod
+    def turno_requiere_confirmacion_diaria(turno):
+        """Indica si un turno abierto pertenece a un día anterior.
+
+        Un turno no se cierra automáticamente: el operador decide si lo
+        continúa de manera excepcional o si va al cierre y arqueo.
+        """
+        return bool(
+            turno
+            and timezone.localdate(turno.abierto_en)
+            < timezone.localdate()
+        )
+
+    @staticmethod
     def obtener_turno_bloqueado(
         turno_id,
         sucursal=None,
@@ -232,6 +245,19 @@ class CajaService:
         turno,
         usuario,
     ):
+        # Los administradores gestionan el turno de su propia sucursal aunque
+        # no sean el cajero que lo abrió. Sin esta excepción una vista podía
+        # dejarles entrar al POS y el servicio rechazar la venta después.
+        perfil = getattr(usuario, "profile", None)
+        if perfil and (
+            perfil.role == "SUPER_ADMIN"
+            or (
+                perfil.role == "ADMIN_SUCURSAL"
+                and perfil.sucursal_id == turno.sucursal_id
+            )
+        ):
+            return True
+
         if turno.usuario_apertura_id == usuario.id:
             return True
 
@@ -330,10 +356,11 @@ class CajaService:
 
         if TurnoCaja.objects.filter(
             usuario_apertura=usuario,
+            sucursal=sucursal,
             estado=TurnoCaja.Estado.ABIERTO,
         ).exists():
             raise ValidationError(
-                "El usuario ya tiene un turno de caja abierto."
+                "El usuario ya tiene un turno de caja abierto en esta sucursal."
             )
 
         # Garantiza existencia de bóveda.
@@ -590,6 +617,11 @@ class CajaService:
             "ventas_tarjeta": Decimal("0.00"),
             "ventas_transferencia": Decimal("0.00"),
 
+            # Recaudo posterior de facturas a crédito.
+            "abonos_efectivo": Decimal("0.00"),
+            "abonos_tarjeta": Decimal("0.00"),
+            "abonos_transferencia": Decimal("0.00"),
+
             # Excedentes cobrados por cambios.
             "cambios_efectivo": Decimal("0.00"),
             "cambios_tarjeta": Decimal("0.00"),
@@ -619,6 +651,16 @@ class CajaService:
 
                 elif medio == CajaMovimiento.MedioPago.TRANSFERENCIA:
                     resumen["ventas_transferencia"] += monto
+
+            elif movimiento.tipo == CajaMovimiento.Tipo.ABONO_CREDITO:
+                if medio == CajaMovimiento.MedioPago.EFECTIVO:
+                    resumen["abonos_efectivo"] += monto
+
+                elif medio == CajaMovimiento.MedioPago.TARJETA:
+                    resumen["abonos_tarjeta"] += monto
+
+                elif medio == CajaMovimiento.MedioPago.TRANSFERENCIA:
+                    resumen["abonos_transferencia"] += monto
 
             elif movimiento.tipo == CajaMovimiento.Tipo.CAMBIO:
                 if medio == CajaMovimiento.MedioPago.EFECTIVO:
@@ -661,6 +703,12 @@ class CajaService:
             + resumen["ventas_transferencia"]
         )
 
+        resumen["abonos_total"] = (
+            resumen["abonos_efectivo"]
+            + resumen["abonos_tarjeta"]
+            + resumen["abonos_transferencia"]
+        )
+
         resumen["cambios_total"] = (
             resumen["cambios_efectivo"]
             + resumen["cambios_tarjeta"]
@@ -677,6 +725,7 @@ class CajaService:
         # sin incluir la base inicial.
         resumen["efectivo_operacion_neto"] = (
             resumen["ventas_efectivo"]
+            + resumen["abonos_efectivo"]
             + resumen["cambios_efectivo"]
             + resumen["ingresos"]
             + resumen["ajustes"]
@@ -880,6 +929,7 @@ class CajaService:
         venta,
         usuario,
         pagos,
+        permitir_credito=False,
     ):
         if not isinstance(pagos, dict):
             raise ValidationError(
@@ -905,6 +955,7 @@ class CajaService:
 
         if venta.estado not in {
             "ABIERTA",
+            "CREDITO",
             "CERRADA",
         }:
             raise ValidationError(
@@ -942,10 +993,30 @@ class CajaService:
             Decimal("0.00"),
         )
 
-        if total_pagado < venta.total:
+        if total_pagado < venta.total and not permitir_credito:
             raise ValidationError(
                 "El pago no cubre el total de la venta."
             )
+
+        # Crédito con abono inicial: se registra únicamente lo que realmente
+        # ingresó. No se fuerza efectivo por el saldo pendiente ni se genera
+        # vuelto. Los siguientes recaudos usarán ABONO_CREDITO vinculados a
+        # esta misma factura.
+        if permitir_credito and total_pagado < venta.total:
+            for medio, monto in normalizados.items():
+                if monto <= 0:
+                    continue
+                CajaMovimiento.objects.create(
+                    turno=turno,
+                    usuario=usuario,
+                    tipo=CajaMovimiento.Tipo.VENTA,
+                    medio_pago=medio,
+                    monto=monto,
+                    referencia_venta=venta,
+                    observacion=f"Abono inicial crédito venta #{venta.id}",
+                )
+            CajaService.verificar_retiro_automatico(turno)
+            return
 
         tarjeta = normalizados[
             CajaMovimiento.MedioPago.TARJETA
@@ -1025,6 +1096,58 @@ class CajaService:
         CajaService.verificar_retiro_automatico(
             turno
         )
+
+    @staticmethod
+    @transaction.atomic
+    def registrar_abonos_credito(venta, turno_id, usuario, pagos):
+        """Registra abonos posteriores sin alterar los movimientos anteriores.
+
+        El importe se recibe por medio de pago y se registra como movimiento
+        de caja independiente, enlazado a la factura de crédito.
+        """
+        if not isinstance(pagos, dict):
+            raise ValidationError("Los pagos del abono son inválidos.")
+
+        turno = CajaService.obtener_turno_bloqueado(
+            turno_id, sucursal=venta.sucursal
+        )
+        CajaService.validar_operador_turno(turno, usuario)
+
+        normalizados = {}
+        for medio in CajaService.MEDIOS_VENTA_PERMITIDOS:
+            monto = CajaService.decimal(
+                pagos.get(medio, 0) or 0,
+                f"El abono {medio} es inválido.",
+            )
+            if monto < 0:
+                raise ValidationError("Los montos del abono no pueden ser negativos.")
+            normalizados[medio] = monto
+
+        if set(pagos) - CajaService.MEDIOS_VENTA_PERMITIDOS:
+            raise ValidationError("El abono contiene medios de pago no permitidos.")
+
+        total_abono = sum(normalizados.values(), Decimal("0.00"))
+        if total_abono <= 0:
+            raise ValidationError("Ingrese al menos un valor para el abono.")
+
+        if total_abono > venta.saldo_pendiente:
+            raise ValidationError("El abono supera el saldo pendiente de la venta.")
+
+        for medio, monto in normalizados.items():
+            if monto <= 0:
+                continue
+            CajaMovimiento.objects.create(
+                turno=turno,
+                usuario=usuario,
+                tipo=CajaMovimiento.Tipo.ABONO_CREDITO,
+                medio_pago=medio,
+                monto=monto,
+                referencia_venta=venta,
+                observacion=f"Abono a crédito venta #{venta.id}",
+            )
+
+        CajaService.verificar_retiro_automatico(turno)
+        return turno, normalizados
 
     # ==========================================================
     # RETIRO AUTOMÁTICO
@@ -1678,3 +1801,35 @@ class CajaService:
                 "-id",
             )[:limite]
         )
+
+    @staticmethod
+    def obtener_turno_activo_sucursal(sucursal):
+        """Turno abierto de la sucursal para supervisión administrativa."""
+        return (
+            TurnoCaja.objects.select_related("caja", "sucursal", "usuario_apertura")
+            .filter(sucursal=sucursal, estado=TurnoCaja.Estado.ABIERTO)
+            .order_by("-abierto_en").first()
+        )
+
+    @staticmethod
+    def obtener_turno_operable(sucursal, usuario):
+        """Resuelve el turno que un usuario puede usar en una sucursal.
+
+        Un cajero solo puede operar el turno que abrió o al que fue asignado.
+        El administrador de la misma sede y el superadministrador pueden
+        gestionar el turno abierto de la sede. Esta única regla evita que una
+        vista envíe a abrir caja mientras otra detecta que ya existe un turno.
+        """
+        turno = CajaService.obtener_turno_activo_usuario(sucursal, usuario)
+        if turno:
+            return turno
+
+        perfil = getattr(usuario, "profile", None)
+        if not perfil:
+            return None
+        if perfil.role == "SUPER_ADMIN" or (
+            perfil.role == "ADMIN_SUCURSAL"
+            and perfil.sucursal_id == sucursal.id
+        ):
+            return CajaService.obtener_turno_activo_sucursal(sucursal)
+        return None

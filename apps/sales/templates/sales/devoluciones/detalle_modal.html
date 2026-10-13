@@ -8,7 +8,8 @@
 <div class="row g-2 mb-4">
     <div class="col-6 col-md-3"><div class="border rounded p-2"><small class="text-muted d-block">Recibido</small><strong>${{ devolucion.total_devuelto|floatformat:0|intcomma }}</strong></div></div>
     <div class="col-6 col-md-3"><div class="border rounded p-2"><small class="text-muted d-block">Entregado</small><strong>${{ devolucion.total_entregado|floatformat:0|intcomma }}</strong></div></div>
-    <div class="col-6 col-md-3"><div class="border rounded p-2"><small class="text-muted d-block">Cobrado</small><strong class="text-success">${{ devolucion.monto_cobrado|floatformat:0|intcomma }}</strong></div></div>
+    <div class="col-6 col-md-3"><div class="border rounded p-2"><small class="text-muted d-block">Cobro neto</small><strong class="text-success">${{ devolucion.monto_cobrado|floatformat:0|intcomma }}</strong></div></div>
+    <div class="col-6 col-md-3"><div class="border rounded p-2"><small class="text-muted d-block">Efectivo / vuelto</small><strong>${{ devolucion.monto_recibido_efectivo|floatformat:0|intcomma }} / ${{ devolucion.vuelto_efectivo|floatformat:0|intcomma }}</strong></div></div>
     <div class="col-6 col-md-3"><div class="border rounded p-2"><small class="text-muted d-block">Reembolsado</small><strong class="text-danger">${{ devolucion.monto_reembolsado|floatformat:0|intcomma }}</strong></div></div>
 </div>
 <h6 class="mb-2">Prendas recibidas</h6>

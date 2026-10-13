@@ -1,4 +1,5 @@
 # apps/inventory/views.py
+import logging
 from decimal import Decimal
 
 from django import forms
@@ -8,12 +9,14 @@ from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import ListView, FormView
 from django.shortcuts import redirect
+from django.http import JsonResponse
 from django.db import transaction
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.contrib import messages
 from apps.sales.mixins import SucursalIsolationMixin
 from django.db.models import ExpressionWrapper, Sum, Q, F, DecimalField
 
+from apps.accounts.models import UserProfile
 from apps.core.models import Sucursal
 from apps.inventory.mixins import InventoryAccessMixin, SucursalScopedMixin
 from apps.inventory.models import (
@@ -25,6 +28,9 @@ from apps.inventory.models import (
 from apps.inventory.models_produccion import ProduccionLote, RolloTela
 from apps.inventory.services.stock_service import InventoryService
 from apps.inventory.services.traslado_service import TrasladoService
+
+
+logger = logging.getLogger(__name__)
 
 
 # ======================================================
@@ -169,6 +175,7 @@ class StockListView(LoginRequiredMixin, InventoryAccessMixin, SucursalScopedMixi
     model = Stock
     template_name = "inventory/stock_list.html"
     context_object_name = "stocks"
+    paginate_by = 50
 
     def get_queryset(self):
         qs = Stock.objects.select_related(
@@ -179,17 +186,32 @@ class StockListView(LoginRequiredMixin, InventoryAccessMixin, SucursalScopedMixi
             "sucursal"
         )
 
-        if self.request.user.profile.role != "SUPER_ADMIN":
+        perfil = self.request.user.profile
+        sucursal_id = self.request.GET.get("sucursal", "")
+
+        if perfil.role != UserProfile.Role.SUPER_ADMIN:
             qs = self.filter_by_sucursal(qs)
+        elif sucursal_id:
+            qs = qs.filter(sucursal_id=sucursal_id)
 
         q = self.request.GET.get("q")
         if q:
             qs = qs.filter(
                 Q(variante__producto_base__nombre__icontains=q) |
-                Q(variante__talla__icontains=q)
+                Q(variante__sku__icontains=q) |
+                Q(variante__color__nombre__icontains=q) |
+                Q(variante__tipo_tela__nombre__icontains=q) |
+                Q(variante__talla__nombre__icontains=q) |
+                Q(sucursal__nombre__icontains=q)
             )
 
-        return qs
+        return qs.order_by(
+            "variante__producto_base__nombre",
+            "variante__tipo_tela__nombre",
+            "variante__color__nombre",
+            "variante__talla__orden",
+            "sucursal__nombre",
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -213,9 +235,39 @@ class StockListView(LoginRequiredMixin, InventoryAccessMixin, SucursalScopedMixi
             )
         )["total"] or 0
 
+        context["puede_filtrar_sucursales"] = (
+            self.request.user.profile.role == UserProfile.Role.SUPER_ADMIN
+        )
+        context["sucursales"] = Sucursal.objects.filter(activa=True).order_by("nombre")
+        context["sucursal_id"] = self.request.GET.get("sucursal", "")
         return context
 
-class AjusteStockView(LoginRequiredMixin, InventoryAccessMixin, View):
+
+class TrasladoRecibirView(
+    LoginRequiredMixin, InventoryAccessMixin, SucursalScopedMixin, View
+):
+    """Confirma la recepción física desde la sucursal destino."""
+
+    def post(self, request, pk):
+        traslado = Traslado.objects.select_related("destino").filter(pk=pk).first()
+        if not traslado:
+            messages.error(request, "El traslado no existe.")
+            return redirect("inventory:traslado_list")
+
+        if traslado.destino_id != self.get_sucursal().id:
+            raise PermissionDenied("Solo la sucursal destino puede confirmar la recepción.")
+
+        try:
+            TrasladoService.recibir_traslado(
+                pk, request.user, sucursal=self.get_sucursal()
+            )
+        except ValidationError as error:
+            messages.error(request, error.messages[0])
+        else:
+            messages.success(request, f"Recepción de {traslado.numero} confirmada y stock actualizado.")
+        return redirect("inventory:traslado_list")
+
+class AjusteStockView(LoginRequiredMixin, InventoryAccessMixin, SucursalScopedMixin, View):
 
     def post(self, request):
         try:
@@ -229,6 +281,7 @@ class AjusteStockView(LoginRequiredMixin, InventoryAccessMixin, View):
                 raise ValidationError("La cantidad no puede ser cero.")
 
             variante = ProductoVariante.objects.get(id=variante_id)
+            sucursal = self._obtener_sucursal_ajuste(request)
 
             # La cantidad positiva es entrada; la negativa es salida.
             tipo = (
@@ -242,6 +295,7 @@ class AjusteStockView(LoginRequiredMixin, InventoryAccessMixin, View):
                 cantidad=abs(cantidad),
                 tipo=tipo,
                 user=request.user,
+                sucursal_id=sucursal.id,
                 referencia="AJUSTE MANUAL",
             )
 
@@ -258,8 +312,27 @@ class AjusteStockView(LoginRequiredMixin, InventoryAccessMixin, View):
 
         return redirect("inventory:dashboard")
 
+    def _obtener_sucursal_ajuste(self, request):
+        perfil = request.user.profile
+        if perfil.role != UserProfile.Role.SUPER_ADMIN:
+            return self.get_sucursal()
+
+        sucursal = Sucursal.objects.filter(
+            pk=request.POST.get("sucursal"),
+            activa=True,
+        ).first()
+        if not sucursal:
+            raise ValidationError("Seleccione una sucursal activa para el ajuste.")
+        return sucursal
+
 
 class AjusteStockForm(forms.Form):
+    sucursal = forms.ModelChoiceField(
+        label="Sucursal",
+        queryset=Sucursal.objects.none(),
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select"}),
+    )
     variante = forms.ModelChoiceField(
         label="Producto",
         queryset=ProductoVariante.objects.filter(activo=True),
@@ -282,19 +355,69 @@ class AjusteStockForm(forms.Form):
         label="Movimiento",
         choices=[
             ("AJUSTE_ENTRADA", "Entrada de inventario"),
-            ("AJUSTE_SALIDA", "Salida de inventario"),
+            ("AJUSTE_SALIDA", "Salida por conteo / corrección"),
+            ("DANADO", "Baja por producto dañado"),
+            ("MERMA", "Baja por merma o pérdida"),
+            ("CONSUMO_INTERNO", "Salida por consumo interno"),
         ],
         widget=forms.Select(attrs={"class": "form-select"})
     )
 
+    motivo = forms.CharField(
+        label="Motivo",
+        max_length=100,
+        required=False,
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": "Ej.: conteo físico, avería, vencimiento",
+        }),
+    )
+
+    observacion = forms.CharField(
+        label="Observación",
+        required=False,
+        widget=forms.Textarea(attrs={
+            "class": "form-control", "rows": 3,
+            "placeholder": "Detalle que quedará registrado en el Kardex",
+        }),
+    )
+
+    def __init__(self, *args, usuario=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        perfil = getattr(usuario, "profile", None)
+        if perfil and perfil.role == UserProfile.Role.SUPER_ADMIN:
+            self.fields["sucursal"].queryset = Sucursal.objects.filter(
+                activa=True
+            ).order_by("nombre")
+            self.fields["sucursal"].required = True
+            return
+
+        sucursal = getattr(perfil, "sucursal", None)
+        self.fields["sucursal"].queryset = Sucursal.objects.filter(pk=getattr(sucursal, "pk", None))
+        self.fields["sucursal"].initial = sucursal
+        self.fields["sucursal"].widget = forms.HiddenInput()
+
+    def clean(self):
+        cleaned = super().clean()
+        tipo = cleaned.get("tipo")
+        if tipo in {"DANADO", "MERMA", "CONSUMO_INTERNO"} and not cleaned.get("motivo"):
+            self.add_error("motivo", "Indique el motivo de esta salida.")
+        return cleaned
+
 class AjusteStockCreateView(
     LoginRequiredMixin,
     InventoryAccessMixin,
+    SucursalScopedMixin,
     FormView
 ):
     template_name = "inventory/ajuste_stock.html"
     form_class = AjusteStockForm
     success_url = reverse_lazy("inventory:stock_list")
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["usuario"] = self.request.user
+        return kwargs
 
     def form_valid(self, form):
         try:
@@ -303,7 +426,9 @@ class AjusteStockCreateView(
                 cantidad=form.cleaned_data["cantidad"],
                 tipo=form.cleaned_data["tipo"],
                 user=self.request.user,
-                referencia="AJUSTE MANUAL",
+                sucursal_id=form.cleaned_data["sucursal"].id,
+                referencia=(form.cleaned_data.get("motivo") or "AJUSTE MANUAL"),
+                observacion=form.cleaned_data.get("observacion"),
             )
         except ValidationError as error:
             form.add_error(None, error.messages[0])
@@ -322,37 +447,61 @@ class AjusteStockCreateView(
 class TrasladoForm(forms.Form):
 
     tipo = forms.ChoiceField(
-        choices=Traslado.TIPOS
+        choices=[("COMPLETO", "Traslado entre sucursales")],
+        initial="COMPLETO",
+        widget=forms.HiddenInput(),
     )
 
     origen = forms.ModelChoiceField(
         queryset=Sucursal.objects.all(),
-        required=False
+        label="Sucursal de origen",
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
 
     destino = forms.ModelChoiceField(
         queryset=Sucursal.objects.all(),
-        required=False
+        label="Sucursal de destino",
+        required=False,
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
 
     variante = forms.ModelChoiceField(
         queryset=ProductoVariante.objects.select_related(
             "producto_base",
             "color"
-        )
+        ),
+        label="Prenda",
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
 
     cantidad = forms.DecimalField(
-        min_value=1
+        label="Cantidad",
+        min_value=1,
+        decimal_places=2,
+        max_digits=12,
+        widget=forms.NumberInput(attrs={
+            "class": "form-control", "min": "1", "step": "1",
+        }),
     )
 
     motivo = forms.CharField(
-        required=False
+        label="Motivo",
+        max_length=120,
+        required=True,
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "placeholder": "Ej.: reposición para vitrina",
+        }),
     )
 
     observaciones = forms.CharField(
-        widget=forms.Textarea,
-        required=False
+        label="Observación",
+        required=False,
+        widget=forms.Textarea(attrs={
+            "class": "form-control", "rows": 2,
+            "placeholder": "Opcional: empaque, responsable o novedad física",
+        }),
     )
 
     # ==================================================
@@ -390,61 +539,10 @@ class TrasladoForm(forms.Form):
                     "Origen y destino no pueden ser iguales."
                 )
 
-        # ==============================================
-        # SOLO SALIDA
-        # ==============================================
-
-        elif tipo in [
-            "SALIDA",
-        ]:
-
-            if not origen:
-                raise ValidationError(
-                    "Sucursal origen requerida."
-                )
-
-            if not destino:
-                raise ValidationError(
-                    "Sucursal destino requerida."
-                )
-
-        # ==============================================
-        # SOLO ENTRADA
-        # ==============================================
-
-        elif tipo in [
-            "ENTRADA",
-            "AJUSTE_ENTRADA",
-            "DEVOLUCION_CLIENTE",
-            "INICIAL",
-        ]:
-
-            if not destino:
-                raise ValidationError(
-                    "Sucursal destino requerida."
-                )
-
-        # ==============================================
-        # SALIDAS INVENTARIO
-        # ==============================================
-
-        elif tipo in [
-            "AJUSTE_SALIDA",
-            "DANADO",
-            "MERMA",
-            "CONSUMO_INTERNO",
-            "DEVOLUCION_PROVEEDOR",
-        ]:
-
-            if not origen:
-                raise ValidationError(
-                    "Sucursal origen requerida."
-                )
-
         return cleaned
 
 
-class TrasladoCreateView( LoginRequiredMixin,InventoryAccessMixin,FormView):
+class TrasladoCreateView(LoginRequiredMixin, InventoryAccessMixin, SucursalScopedMixin, FormView):
 
     template_name = "inventory/traslado.html"
 
@@ -480,7 +578,7 @@ class TrasladoCreateView( LoginRequiredMixin,InventoryAccessMixin,FormView):
 
         context = super().get_context_data(**kwargs)
 
-        context["tipos"] = Traslado.TIPOS
+        context["tipos"] = [("COMPLETO", "Traslado entre sucursales")]
 
         return context
 
@@ -490,13 +588,26 @@ class TrasladoCreateView( LoginRequiredMixin,InventoryAccessMixin,FormView):
 
             with transaction.atomic():
 
+                sucursal_activa = self.get_sucursal()
+                origen = form.cleaned_data.get("origen")
+                destino = form.cleaned_data.get("destino")
+
+                if (
+                    self.request.user.profile.role != UserProfile.Role.SUPER_ADMIN
+                    and origen
+                    and origen.id != sucursal_activa.id
+                ):
+                    raise ValidationError(
+                        "Solo puede enviar inventario desde su sucursal asignada."
+                    )
+
                 traslado = Traslado.objects.create(
 
-                    tipo=form.cleaned_data["tipo"],
+                    tipo="COMPLETO",
 
-                    origen=form.cleaned_data.get("origen"),
+                    origen=origen,
 
-                    destino=form.cleaned_data.get("destino"),
+                    destino=destino,
 
                     motivo=form.cleaned_data.get("motivo"),
 
@@ -524,23 +635,23 @@ class TrasladoCreateView( LoginRequiredMixin,InventoryAccessMixin,FormView):
                     "Movimiento procesado correctamente."
                 )
 
-        except Exception as e:
-
-            messages.error(
-                self.request,
-                str(e)
+        except ValidationError as error:
+            form.add_error(None, error.messages[0])
+            return self.form_invalid(form)
+        except Exception:
+            logger.exception("Error al crear un traslado de inventario.")
+            form.add_error(
+                None,
+                "No fue posible registrar el traslado. Intente nuevamente.",
             )
-
-            return redirect(
-                "inventory:traslado_create"
-            )
+            return self.form_invalid(form)
 
         return redirect(
             "inventory:traslado_list"
         )
 
 
-class TrasladoListView( LoginRequiredMixin, InventoryAccessMixin, ListView):
+class TrasladoListView(LoginRequiredMixin, InventoryAccessMixin, SucursalScopedMixin, ListView):
 
     model = Traslado
 
@@ -568,6 +679,15 @@ class TrasladoListView( LoginRequiredMixin, InventoryAccessMixin, ListView):
         estado = self.request.GET.get("estado")
 
         tipo = self.request.GET.get("tipo")
+        sucursal_id = self.request.GET.get("sucursal", "")
+        fecha_desde = self.request.GET.get("fecha_desde", "")
+        fecha_hasta = self.request.GET.get("fecha_hasta", "")
+
+        if self.request.user.profile.role != UserProfile.Role.SUPER_ADMIN:
+            sucursal = self.get_sucursal()
+            qs = qs.filter(Q(origen=sucursal) | Q(destino=sucursal))
+        elif sucursal_id:
+            qs = qs.filter(Q(origen_id=sucursal_id) | Q(destino_id=sucursal_id))
 
         if q:
 
@@ -583,6 +703,12 @@ class TrasladoListView( LoginRequiredMixin, InventoryAccessMixin, ListView):
         if tipo:
             qs = qs.filter(tipo=tipo)
 
+        if fecha_desde:
+            qs = qs.filter(creado__date__gte=fecha_desde)
+
+        if fecha_hasta:
+            qs = qs.filter(creado__date__lte=fecha_hasta)
+
         return qs
 
     def get_context_data(self, **kwargs):
@@ -592,6 +718,77 @@ class TrasladoListView( LoginRequiredMixin, InventoryAccessMixin, ListView):
         context["tipos"] = Traslado.TIPOS
 
         context["estados"] = Traslado.ESTADOS
+        context["puede_filtrar_sucursales"] = (
+            self.request.user.profile.role == UserProfile.Role.SUPER_ADMIN
+        )
+        context["sucursales"] = Sucursal.objects.filter(activa=True).order_by("nombre")
+        context["sucursal_id"] = self.request.GET.get("sucursal", "")
+        sucursal_activa = self.get_sucursal()
+        context["sucursal_activa_traslado"] = sucursal_activa
+        context["pendientes_recepcion"] = Traslado.objects.filter(
+            destino=sucursal_activa,
+            estado="ENVIADO",
+            tipo__in=["COMPLETO", "SALIDA", "ENTRADA"],
+        ).select_related("origen", "enviado_por").exclude(enviado_por=self.request.user)
+        context["pendientes_confirmacion_destino"] = Traslado.objects.filter(
+            origen=sucursal_activa,
+            estado="ENVIADO",
+            tipo__in=["COMPLETO", "SALIDA"],
+        ).select_related("destino", "enviado_por")
 
         return context
+
+
+class TrasladoDetalleView(
+    LoginRequiredMixin,
+    InventoryAccessMixin,
+    SucursalScopedMixin,
+    View,
+):
+    """Detalle de traslado con el mismo alcance de sucursal de la lista."""
+
+    def get(self, request, pk):
+        traslados = Traslado.objects.select_related(
+            "origen", "destino", "enviado_por", "recibido_por"
+        ).prefetch_related(
+            "detalles__variante__producto_base",
+            "detalles__variante__tipo_tela",
+            "detalles__variante__color",
+            "detalles__variante__talla",
+        )
+
+        if request.user.profile.role != UserProfile.Role.SUPER_ADMIN:
+            sucursal = self.get_sucursal()
+            traslados = traslados.filter(Q(origen=sucursal) | Q(destino=sucursal))
+
+        traslado = traslados.filter(pk=pk).first()
+        if not traslado:
+            return JsonResponse(
+                {"success": False, "error": "Movimiento no encontrado."},
+                status=404,
+            )
+
+        return JsonResponse({
+            "success": True,
+            "traslado": {
+                "numero": traslado.numero,
+                "tipo": traslado.get_tipo_display(),
+                "estado": traslado.get_estado_display(),
+                "origen": traslado.origen.nombre if traslado.origen else "—",
+                "destino": traslado.destino.nombre if traslado.destino else "—",
+                "motivo": traslado.motivo or "Sin motivo registrado",
+                "observaciones": traslado.observaciones or "Sin observaciones",
+                "creado": traslado.creado.strftime("%d/%m/%Y %H:%M"),
+                "enviado_por": str(traslado.enviado_por or "—"),
+                "recibido_por": str(traslado.recibido_por or "—"),
+                "items": [
+                    {
+                        "producto": str(detalle.variante),
+                        "cantidad": str(detalle.cantidad),
+                        "observacion": detalle.observacion or "",
+                    }
+                    for detalle in traslado.detalles.all()
+                ],
+            },
+        })
 

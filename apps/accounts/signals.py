@@ -1,11 +1,7 @@
 # apps/accounts/signals.py
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-from django.contrib.auth.models import User
-from .models import UserProfile
+"""Señales de cuentas.
 
-
-@receiver(post_save, sender=User)
-def create_user_profile(sender, instance, created, **kwargs):
-    if created:
-        UserProfile.objects.create(user=instance, role='CAJERO')
+La creación del ``UserProfile`` vive en ``apps.accounts.models``. Mantener una
+segunda señal aquí intentaba crear el mismo perfil dos veces y ocasionaba el
+``IntegrityError`` al registrar usuarios desde Administración.
+"""

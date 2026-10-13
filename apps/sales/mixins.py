@@ -3,12 +3,6 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied
 
 from apps.accounts.models import UserProfile
-
-
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.core.exceptions import PermissionDenied
-
-from apps.accounts.models import UserProfile
 from apps.core.models import Sucursal
 
 
@@ -137,7 +131,7 @@ class CajaActivaRequiredMixin:
 
         sucursal = self.get_sucursal()
 
-        turno = CajaService.obtener_turno_activo_usuario(
+        turno = CajaService.obtener_turno_operable(
             sucursal=sucursal,
             usuario=request.user,
         )
@@ -150,6 +144,30 @@ class CajaActivaRequiredMixin:
             return redirect(
                 "sales:abrir_caja"
             )
+
+        if CajaService.turno_requiere_confirmacion_diaria(turno):
+            modo_diario = request.session.get("turno_diario_modo")
+            confirmado = str(
+                request.session.get("turno_diario_confirmado_id", "")
+            ) == str(turno.id)
+
+            if not confirmado:
+                request.session["turno_diario_pendiente_id"] = turno.id
+                request.session["turno_diario_siguiente"] = request.get_full_path()
+                request.session.modified = True
+                return redirect("sales:turno_diario")
+
+            # Si el operador eligió cerrar, solo puede hacer el arqueo y el
+            # cierre. Impide registrar movimientos manuales por HTTP directo.
+            if (
+                modo_diario == "CERRAR"
+                and "/caja/arqueo/" not in request.path
+                and "/caja/cerrar/" not in request.path
+                and "/caja/" != request.path
+            ):
+                raise PermissionDenied(
+                    "El turno anterior está marcado para cierre; primero realice el arqueo."
+                )
 
         request.session["turno_id"] = turno.id
         request.session["caja_id"] = turno.caja_id

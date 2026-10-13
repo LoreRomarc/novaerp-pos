@@ -1,15 +1,19 @@
 # apps/inventory/views_kardex.py
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.views import View
 from django.views.generic import ListView
 
+from apps.accounts.models import UserProfile
+from apps.core.models import Sucursal
+from apps.inventory.mixins import InventoryAccessMixin
 from apps.inventory.models import MovimientoStock, Traslado
 from apps.sales.mixins import SucursalIsolationMixin
 
 
-class KardexListView(LoginRequiredMixin, SucursalIsolationMixin, ListView):
+class KardexListView(LoginRequiredMixin, InventoryAccessMixin, SucursalIsolationMixin, ListView):
 
     model = MovimientoStock
     template_name = "inventory/kardex.html"
@@ -29,24 +33,63 @@ class KardexListView(LoginRequiredMixin, SucursalIsolationMixin, ListView):
             .order_by("-creado")
         )
 
-        qs = qs.filter(sucursal=self.get_sucursal())
+        perfil = self.request.user.profile
+        sucursal_id = self.request.GET.get("sucursal", "")
+        if perfil.role != UserProfile.Role.SUPER_ADMIN:
+            qs = qs.filter(sucursal=self.get_sucursal())
+        elif sucursal_id:
+            qs = qs.filter(sucursal_id=sucursal_id)
 
         variante_id = self.request.GET.get("variante")
         if variante_id:
             qs = qs.filter(variante_id=variante_id)
 
+        tipo = self.request.GET.get("tipo", "")
+        if tipo:
+            qs = qs.filter(tipo=tipo)
+
+        if self.request.GET.get("excluir_ventas") == "1":
+            qs = qs.exclude(tipo="VENTA")
+
+        q = self.request.GET.get("q", "").strip()
+        if q:
+            qs = qs.filter(
+                Q(variante__producto_base__nombre__icontains=q)
+                | Q(variante__sku__icontains=q)
+                | Q(referencia__icontains=q)
+                | Q(tipo__icontains=q)
+            )
+
+        fecha_desde = self.request.GET.get("fecha_desde", "")
+        fecha_hasta = self.request.GET.get("fecha_hasta", "")
+        if fecha_desde:
+            qs = qs.filter(creado__date__gte=fecha_desde)
+        if fecha_hasta:
+            qs = qs.filter(creado__date__lte=fecha_hasta)
+
         return qs
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["puede_filtrar_sucursales"] = (
+            self.request.user.profile.role == UserProfile.Role.SUPER_ADMIN
+        )
+        context["sucursales"] = Sucursal.objects.filter(activa=True).order_by("nombre")
+        context["sucursal_id"] = self.request.GET.get("sucursal", "")
+        context["tipos_movimiento"] = MovimientoStock.TIPOS
+        return context
 
-class KardexDetalleView(LoginRequiredMixin, SucursalIsolationMixin, View):
+
+class KardexDetalleView(LoginRequiredMixin, InventoryAccessMixin, SucursalIsolationMixin, View):
     """Detalle auditable de un movimiento, incluido el traslado relacionado."""
 
     def get(self, request, pk):
-        movimiento = get_object_or_404(
-            MovimientoStock.objects.select_related(
-                "variante", "variante__producto_base", "sucursal", "usuario"
-            ), pk=pk, sucursal=self.get_sucursal(),
+        movimientos = MovimientoStock.objects.select_related(
+            "variante", "variante__producto_base", "sucursal", "usuario"
         )
+        if self.request.user.profile.role != UserProfile.Role.SUPER_ADMIN:
+            movimientos = movimientos.filter(sucursal=self.get_sucursal())
+        movimiento = get_object_or_404(movimientos, pk=pk)
         traslado = None
         if movimiento.tipo in {"COMPLETO", "SALIDA", "ENTRADA"}:
             traslado = (
@@ -60,6 +103,7 @@ class KardexDetalleView(LoginRequiredMixin, SucursalIsolationMixin, View):
             "movimiento": {
                 "id": movimiento.id, "tipo": movimiento.tipo_legible,
                 "referencia": movimiento.referencia or "Sin referencia",
+                "observacion": movimiento.observacion or "Sin observaciones registradas",
                 "producto": str(movimiento.variante),
                 "sucursal": movimiento.sucursal.nombre,
                 "cantidad": str(movimiento.cantidad),

@@ -52,19 +52,13 @@ class VariantService:
         if variante:
             return variante
 
-        sku = VariantService.generar_sku(
-            producto_base,
-            tipo_tela,
-            color,
-            talla,
-        )
-
         return ProductoVariante.objects.create(
             producto_base=producto_base,
             tipo_tela=tipo_tela,
             color=color,
             talla=talla,
-            sku=sku,
+            # El modelo genera SKU y código de barras legibles y únicos.
+            sku="",
             activo=True,
             precio_venta=0,
             costo_unitario=0,

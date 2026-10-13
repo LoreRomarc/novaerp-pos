@@ -64,7 +64,7 @@ class TrasladoService:
                     "Sucursal origen requerida."
                 )
 
-        if traslado.tipo in ["COMPLETO", "ENTRADA"]:
+        if traslado.tipo in ["COMPLETO", "SALIDA", "ENTRADA"]:
 
             if not traslado.destino:
                 raise ValidationError(
@@ -100,7 +100,8 @@ class TrasladoService:
                     sucursal_id=traslado.origen_id,
                     referencia=traslado.numero,
                     tipo=traslado.tipo,
-                    user=usuario
+                    user=usuario,
+                    observacion=traslado.observaciones,
                 )
 
         # =================================================
@@ -117,35 +118,13 @@ class TrasladoService:
                     sucursal_id=traslado.destino_id,
                     referencia=traslado.numero,
                     tipo=traslado.tipo,
-                    user=usuario
+                    user=usuario,
+                    observacion=traslado.observaciones,
                 )
 
-        # =================================================
-        # TRASLADO COMPLETO
-        # =================================================
-
-        if traslado.tipo == "COMPLETO":
-
-            for detalle in traslado.detalles.all():
-
-                InventoryService.agregar_stock(
-                    variante=detalle.variante,
-                    cantidad=detalle.cantidad,
-                    sucursal_id=traslado.destino_id,
-                    referencia=traslado.numero,
-                    tipo=traslado.tipo,
-                    user=usuario
-                )
-
-            traslado.estado = "RECIBIDO"
-
-            traslado.fecha_recepcion = timezone.now()
-
-            traslado.recibido_por = usuario
-
-        else:
-
-            traslado.estado = "ENVIADO"
+        # Un traslado entre sucursales nunca suma automáticamente en destino.
+        # Permanece ENVIADO hasta que otro usuario confirme la recepción física.
+        traslado.estado = "ENVIADO"
 
         traslado.enviado_por = usuario
 
@@ -161,7 +140,7 @@ class TrasladoService:
 
     @staticmethod
     @transaction.atomic
-    def recibir_traslado(traslado_id, usuario):
+    def recibir_traslado(traslado_id, usuario, sucursal=None):
 
         traslado = (
             Traslado.objects
@@ -175,9 +154,21 @@ class TrasladoService:
                 "Solo movimientos enviados."
             )
 
-        if traslado.tipo not in ["SALIDA", "ENTRADA"]:
+        if traslado.tipo not in ["COMPLETO", "SALIDA", "ENTRADA"]:
             raise ValidationError(
                 "Este movimiento no requiere recepción."
+            )
+
+        if not traslado.destino_id:
+            raise ValidationError("El movimiento no tiene una sucursal destino.")
+
+        sucursal_id = getattr(sucursal, "id", sucursal)
+        if sucursal_id and traslado.destino_id != sucursal_id:
+            raise ValidationError("La recepción debe hacerse desde la sucursal destino.")
+
+        if traslado.enviado_por_id == usuario.id:
+            raise ValidationError(
+                "La recepción debe confirmarla una persona diferente a quien envió el traslado."
             )
 
         for detalle in traslado.detalles.all():
@@ -188,7 +179,8 @@ class TrasladoService:
                 sucursal_id=traslado.destino_id,
                 referencia=traslado.numero,
                 tipo=traslado.tipo,
-                user=usuario
+                user=usuario,
+                observacion=traslado.observaciones,
             )
 
         traslado.estado = "RECIBIDO"

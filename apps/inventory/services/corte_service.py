@@ -41,8 +41,6 @@ class CorteService:
         total_prendas = 0
         rollos_ids = set()
         producto_ids = set()
-        tela_ids = set()
-        color_ids = set()
         operarios_ids = set()
 
         # ==================================================
@@ -86,8 +84,6 @@ class CorteService:
 
                 total_prendas += cantidad
                 producto_ids.add(int(item["producto_base_id"]))
-                tela_ids.add(int(item["tipo_tela_id"]))
-                color_ids.add(int(item["color_id"]))
                 operarios_ids.add(operario_id)
 
         if total_prendas <= 0:
@@ -153,33 +149,10 @@ class CorteService:
             )
         }
 
-        telas = {
-            tela.id: tela
-            for tela in TipoTela.objects.filter(
-                id__in=tela_ids,
-                activo=True,
-            )
-        }
-
-        colores = {
-            color.id: color
-            for color in Color.objects.filter(
-                id__in=color_ids,
-            )
-        }
-
         if len(productos) != len(producto_ids):
             raise ValidationError(
                 "Uno de los productos no existe o está inactivo."
             )
-
-        if len(telas) != len(tela_ids):
-            raise ValidationError(
-                "Una de las telas no existe o está inactiva."
-            )
-
-        if len(colores) != len(color_ids):
-            raise ValidationError("Uno de los colores no existe.")
 
         cortadores = {
             operario.id: operario
@@ -217,6 +190,7 @@ class CorteService:
 
         lote = ProduccionLote.objects.create(
             sucursal=sucursal,
+            sucursal_destino=sucursal,
             consumo_total=consumo_total,
             consumo_unitario=consumo_unitario,
             total_prendas=total_prendas,
@@ -288,12 +262,10 @@ class CorteService:
                     producto_base=productos[
                         int(item["producto_base_id"])
                     ],
-                    tipo_tela=telas[
-                        int(item["tipo_tela_id"])
-                    ],
-                    color=colores[
-                        int(item["color_id"])
-                    ],
+                    # Tela y color siempre provienen del rollo seleccionado;
+                    # el operador solo elige producto, talla y cantidad.
+                    tipo_tela=rollo.tipo_tela,
+                    color=rollo.color,
                     talla_nombre=item["talla"],
                 )
 

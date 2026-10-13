@@ -122,6 +122,15 @@
         resultadosVariante.classList.add("d-none");
     }
 
+    function seleccionarVariante(variante) {
+        selectVariante.innerHTML = "";
+        const opcion = new Option(variante.text, variante.id, true, true);
+        selectVariante.add(opcion);
+        buscarVariante.value = variante.text;
+        mostrarSeleccionActual();
+        ocultarResultados();
+    }
+
     buscarVariante.addEventListener("input", function () {
         if (modoEdicion) return;
         clearTimeout(tiempoBusqueda);
@@ -158,14 +167,7 @@
                     boton.type = "button";
                     boton.className = "list-group-item list-group-item-action";
                     boton.textContent = `${variante.text} · SKU: ${variante.sku}`;
-                    boton.addEventListener("click", () => {
-                        selectVariante.innerHTML = "";
-                        const opcion = new Option(variante.text, variante.id, true, true);
-                        selectVariante.add(opcion);
-                        buscarVariante.value = variante.text;
-                        mostrarSeleccionActual();
-                        ocultarResultados();
-                    });
+                    boton.addEventListener("click", () => seleccionarVariante(variante));
                     resultadosVariante.appendChild(boton);
                 });
 
@@ -188,5 +190,19 @@
         buscarVariante.readOnly = true;
     }
     mostrarSeleccionActual();
+
+    document.addEventListener("DOMContentLoaded", () => {
+        if (modoEdicion) return;
+        configurarLectorProducto({
+            input: buscarVariante,
+            endpoint: "{% url 'administration:precio_variante_search' %}",
+            estado: varianteSeleccionada,
+            limpiarAlEncontrar: false,
+            alEncontrar: (variante) => {
+                clearTimeout(tiempoBusqueda);
+                seleccionarVariante(variante);
+            },
+        });
+    });
 </script>
 {% endblock %}

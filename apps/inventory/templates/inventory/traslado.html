@@ -2,93 +2,84 @@
 
 {% block content %}
 
-<div class="container">
+<div class="container py-2">
 
     <div class="card shadow-sm border-0">
 
         <div class="card-body">
 
-            <h3 class="mb-4">
-                Nuevo movimiento inventario
-            </h3>
+            <h3 class="mb-1">Enviar traslado</h3>
+            <p class="text-muted small mb-4">El stock sale de origen ahora y entra al destino solo cuando este confirme la recepción física.</p>
 
             <form method="post">
 
                 {% csrf_token %}
 
+                {% if form.non_field_errors %}
+                    <div class="alert alert-danger py-2 col-12">{{ form.non_field_errors }}</div>
+                {% endif %}
+
                 <div class="row g-3">
 
-                    <div class="col-md-4">
-
-                        <label class="form-label">
-                            Tipo movimiento
-                        </label>
-
-                        {{ form.tipo }}
-
-                    </div>
+                    {{ form.tipo }}
 
                     <div
-                        class="col-md-4"
+                        class="col-md-6"
                         id="origen-wrapper"
                     >
 
-                        <label class="form-label">
-                            Sucursal origen
-                        </label>
+                        <label class="form-label" for="{{ form.origen.id_for_label }}">Sucursal origen *</label>
 
                         {{ form.origen }}
+                        {% for error in form.origen.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
 
                     </div>
 
                     <div
-                        class="col-md-4"
+                        class="col-md-6"
                         id="destino-wrapper"
                     >
 
-                        <label class="form-label">
-                            Sucursal destino
-                        </label>
+                        <label class="form-label" for="{{ form.destino.id_for_label }}">Sucursal destino *</label>
 
                         {{ form.destino }}
+                        {% for error in form.destino.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
 
                     </div>
 
-                    <div class="col-md-6">
+                    <div class="col-md-7">
 
-                        <label class="form-label">
-                            Producto
-                        </label>
+                        <label class="form-label" for="{{ form.variante.id_for_label }}">Prenda *</label>
+
+                        <input id="lectorProductoTraslado" type="search" class="form-control mb-2" placeholder="Escanee el código de barras y presione Enter" autocomplete="off">
+                        <div id="estadoLectorTraslado" class="form-text mb-2">También puede seleccionar la prenda manualmente.</div>
 
                         {{ form.variante }}
+                        {% for error in form.variante.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
 
                     </div>
 
-                    <div class="col-md-3">
+                    <div class="col-md-2">
 
-                        <label class="form-label">
-                            Cantidad
-                        </label>
+                        <label class="form-label" for="{{ form.cantidad.id_for_label }}">Cantidad *</label>
 
                         {{ form.cantidad }}
+                        {% for error in form.cantidad.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
 
                     </div>
 
                     <div class="col-md-3">
 
-                        <label class="form-label">
-                            Motivo
-                        </label>
+                        <label class="form-label" for="{{ form.motivo.id_for_label }}">Motivo *</label>
 
                         {{ form.motivo }}
+                        {% for error in form.motivo.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
 
                     </div>
 
                     <div class="col-12">
 
-                        <label class="form-label">
-                            Observaciones
-                        </label>
+                        <label class="form-label" for="{{ form.observaciones.id_for_label }}">Observación</label>
 
                         {{ form.observaciones }}
 
@@ -98,7 +89,7 @@
 
                         <button class="btn btn-primary">
 
-                            Procesar movimiento
+                            Enviar traslado
 
                         </button>
 
@@ -114,64 +105,24 @@
 
 </div>
 
+{% endblock %}
+
+{% block content-script %}
 <script>
-
-const tipoField = document.getElementById("id_tipo");
-
-const origenWrapper = document.getElementById(
-    "origen-wrapper"
-);
-
-const destinoWrapper = document.getElementById(
-    "destino-wrapper"
-);
-
-function toggleFields() {
-
-    const tipo = tipoField.value;
-
-    origenWrapper.style.display = "none";
-    destinoWrapper.style.display = "none";
-
-    // COMPLETO
-    if (tipo === "COMPLETO") {
-
-        origenWrapper.style.display = "block";
-        destinoWrapper.style.display = "block";
-    }
-
-    // SALIDAS
-    else if ([
-        "SALIDA",
-        "AJUSTE_SALIDA",
-        "DANADO",
-        "MERMA",
-        "CONSUMO_INTERNO",
-        "DEVOLUCION_PROVEEDOR"
-    ].includes(tipo)) {
-
-        origenWrapper.style.display = "block";
-    }
-
-    // ENTRADAS
-    else if ([
-        "ENTRADA",
-        "AJUSTE_ENTRADA",
-        "DEVOLUCION_CLIENTE",
-        "INICIAL"
-    ].includes(tipo)) {
-
-        destinoWrapper.style.display = "block";
-    }
-}
-
-tipoField.addEventListener(
-    "change",
-    toggleFields
-);
-
-toggleFields();
-
+document.addEventListener("DOMContentLoaded", () => {
+    const selectVariante = document.getElementById("{{ form.variante.id_for_label }}");
+    configurarLectorProducto({
+        input: document.getElementById("lectorProductoTraslado"),
+        endpoint: "{% url 'inventory:variant_search_api' %}",
+        estado: document.getElementById("estadoLectorTraslado"),
+        alEncontrar: (variante) => {
+            if (!selectVariante.querySelector(`option[value="${variante.id}"]`)) {
+                selectVariante.add(new Option(variante.text || variante.nombre, variante.id));
+            }
+            selectVariante.value = String(variante.id);
+            selectVariante.dispatchEvent(new Event("change", { bubbles: true }));
+        },
+    });
+});
 </script>
-
 {% endblock %}

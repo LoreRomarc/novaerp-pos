@@ -35,7 +35,8 @@ class InventoryService:
         referencia,
         user,
         stock_final,
-        costo_unitario=None
+        costo_unitario=None,
+        observacion=None,
     ):
 
         MovimientoStock.objects.create(
@@ -44,6 +45,7 @@ class InventoryService:
             cantidad=cantidad,
             tipo=tipo,
             referencia=referencia,
+            observacion=(observacion or "").strip(),
             usuario=user,  # 👈 IMPORTANTE: dejar user directo
             saldo_post_movimiento=stock_final,
             costo_unitario=costo_unitario
@@ -61,7 +63,8 @@ class InventoryService:
         sucursal_id=None,
         referencia=None,
         tipo="PRODUCCION",
-        costo_unitario=None
+        costo_unitario=None,
+        observacion=None,
     ):
 
         cantidad = Decimal(cantidad)
@@ -95,7 +98,8 @@ class InventoryService:
             referencia=referencia,
             user=user,
             stock_final=stock.cantidad,
-            costo_unitario=costo_unitario
+            costo_unitario=costo_unitario,
+            observacion=observacion,
         )
 
     # ======================================================
@@ -110,7 +114,8 @@ class InventoryService:
         sucursal_id=None,
         referencia=None,
         tipo="VENTA",
-        costo_unitario=None
+        costo_unitario=None,
+        observacion=None,
     ):
 
         cantidad = Decimal(cantidad)
@@ -142,7 +147,8 @@ class InventoryService:
             referencia=referencia,
             user=user,
             stock_final=stock.cantidad,
-            costo_unitario=costo_unitario
+            costo_unitario=costo_unitario,
+            observacion=observacion,
         )
 
     # ======================================================
@@ -156,6 +162,7 @@ class InventoryService:
         user,
         sucursal_id=None,
         referencia=None,
+        observacion=None,
     ):
         if tipo == "AJUSTE_ENTRADA":
             return InventoryService.agregar_stock(
@@ -165,16 +172,18 @@ class InventoryService:
                 sucursal_id=sucursal_id,
                 tipo="AJUSTE_ENTRADA",
                 referencia=referencia or "AJUSTE MANUAL",
+                observacion=observacion,
             )
 
-        if tipo == "AJUSTE_SALIDA":
+        if tipo in {"AJUSTE_SALIDA", "DANADO", "MERMA", "CONSUMO_INTERNO", "DEVOLUCION_PROVEEDOR"}:
             return InventoryService.descontar_stock(
                 variante=variante,
                 cantidad=cantidad,
                 user=user,
                 sucursal_id=sucursal_id,
-                tipo="AJUSTE_SALIDA",
+                tipo=tipo,
                 referencia=referencia or "AJUSTE MANUAL",
+                observacion=observacion,
             )
 
         raise ValidationError("Tipo de ajuste inválido.")

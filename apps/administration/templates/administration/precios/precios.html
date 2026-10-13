@@ -45,12 +45,7 @@
                     <tr>
                         <td>
                             <div class="fw-semibold text-dark">{{ resumen.variante.producto_base.nombre }}</div>
-                            <div class="small text-muted">{{ resumen.variante }}</div>
-                        </td>
-                        <td class="text-end">
-                            <a href="{% url 'administration:precio_variante_update' resumen.variante.pk %}" class="btn btn-sm btn-outline-primary">
-                                <i class="bi bi-pencil"></i><span class="visually-hidden">Editar</span>
-                            </a>
+                            <div class="small text-muted">{{ resumen.variante.sku }} · {{ resumen.variante.tipo_tela|default:"—" }} · {{ resumen.variante.color|default:"—" }} · {{ resumen.variante.talla|default:"—" }}</div>
                         </td>
                         <td>
                             {% for item in resumen.MAYORISTA %}
@@ -71,6 +66,11 @@
                             {% empty %}
                                 <span class="text-muted">Sin precio</span>
                             {% endfor %}
+                        </td>
+                        <td class="text-end">
+                            <a href="{% url 'administration:precio_variante_update' resumen.variante.pk %}" class="btn btn-sm btn-outline-primary" title="Editar precios de esta variante">
+                                <i class="bi bi-pencil-square"></i><span class="visually-hidden">Editar precios</span>
+                            </a>
                         </td>
                     </tr>
                 {% empty %}

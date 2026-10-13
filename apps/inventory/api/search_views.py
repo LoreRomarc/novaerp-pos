@@ -1,11 +1,14 @@
 # apps/inventory/api/search_views.py
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import JsonResponse
 from django.views import View
 
+from apps.inventory.mixins import InventoryAccessMixin
 from apps.inventory.services.search_service import InventorySearchService
 
 
-class VarianteSearchAPI(View):
+class VarianteSearchAPI(LoginRequiredMixin, InventoryAccessMixin, View):
+    """Búsqueda autenticada de variantes para controles internos del inventario."""
 
     def get(self, request):
 

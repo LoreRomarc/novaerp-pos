@@ -1,16 +1,16 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Devoluciones y cambios{% endblock %}
+{% block title %}Historial posventa{% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4">
 
     <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-4">
         <div>
-            <h2 class="mb-1">Devoluciones y cambios</h2>
+            <h2 class="mb-1">Historial posventa</h2>
             <p class="text-muted mb-0">
-                Consulte las operaciones registradas.
+                Consulte cambios, devoluciones y reembolsos registrados.
             </p>
         </div>
 
@@ -22,7 +22,7 @@
         </a>
     </div>
 
-    <form method="get" class="card shadow-sm border-0 mb-4">
+    <form method="get" data-auto-filter class="card shadow-sm border-0 mb-4">
         <div class="card-body">
             <div class="row g-2 align-items-end">
                 <div class="col-md-5">
@@ -33,6 +33,17 @@
                         class="form-control"
                         value="{{ request.GET.q }}"
                         placeholder="Número, referencia, motivo o cliente">
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label" for="medio_pago">Método de pago</label>
+                    <select class="form-select" id="medio_pago" name="medio_pago">
+                        <option value="">Todos</option>
+                        <option value="EFECTIVO" {% if request.GET.medio_pago == "EFECTIVO" %}selected{% endif %}>Efectivo</option>
+                        <option value="TRANSFERENCIA" {% if request.GET.medio_pago == "TRANSFERENCIA" %}selected{% endif %}>Transferencia</option>
+                        <option value="COMBINADO" {% if request.GET.medio_pago == "COMBINADO" %}selected{% endif %}>Combinado</option>
+                        <option value="CREDITO" {% if request.GET.medio_pago == "CREDITO" %}selected{% endif %}>Crédito / abonos</option>
+                    </select>
                 </div>
 
                 <div class="col-md-auto">
@@ -73,7 +84,7 @@
                     <tr>
                         <td>{{ devolucion.creada|date:"d/m/Y H:i" }}</td>
 
-                        <td><strong>#{{ devolucion.id }}</strong></td>
+                        <td><strong>CD-{{ devolucion.id }}</strong></td>
 
                         <td>
                             {% if devolucion.venta_id %}
@@ -124,7 +135,7 @@
                                 —
                             {% endif %}
                         </td>
-                        <td class="text-end"><button type="button" class="btn btn-sm btn-outline-primary js-ver-devolucion" data-id="{{ devolucion.id }}"><i class="bi bi-eye"></i><span class="visually-hidden">Ver detalle</span></button></td>
+                        <td class="text-end table-actions"><div class="action-buttons"><button type="button" class="btn btn-sm btn-outline-primary js-ver-devolucion" data-id="{{ devolucion.id }}" title="Ver detalle"><i class="bi bi-eye"></i><span class="visually-hidden">Ver detalle</span></button><a class="btn btn-sm btn-outline-secondary" target="_blank" href="{% url 'sales:ticket_devolucion' devolucion.id %}" title="Reimprimir comprobante"><i class="bi bi-printer"></i><span class="visually-hidden">Reimprimir comprobante</span></a></div></td>
                     </tr>
                     {% empty %}
                     <tr>

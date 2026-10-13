@@ -144,11 +144,11 @@ class TurnoCaja(models.Model):
             ),
 
             models.UniqueConstraint(
-                fields=["usuario_apertura"],
+                fields=["usuario_apertura", "sucursal"],
                 condition=Q(
                     estado="ABIERTO"
                 ),
-                name="unique_turno_abierto_por_usuario",
+                name="unique_turno_abierto_usuario_sucursal",
             ),
 
             models.CheckConstraint(
@@ -331,6 +331,7 @@ class CajaMovimiento(models.Model):
     class Tipo(models.TextChoices):
         APERTURA = "APERTURA", "Apertura"
         VENTA = "VENTA", "Venta"
+        ABONO_CREDITO = "ABONO_CREDITO", "Abono a crédito"
         CAMBIO = "CAMBIO", "Cobro por cambio"
         RETIRO_BOVEDA = "RETIRO_BOVEDA", "Retiro a bóveda"
         INGRESO = "INGRESO", "Ingreso manual"
@@ -568,12 +569,12 @@ class CajaMovimiento(models.Model):
                     }
                 )
 
-        if self.tipo == self.Tipo.VENTA:
+        if self.tipo in {self.Tipo.VENTA, self.Tipo.ABONO_CREDITO}:
             if not self.referencia_venta_id:
                 raise ValidationError(
                     {
                         "referencia_venta": (
-                            "Una venta debe tener "
+                            "Una venta o abono debe tener "
                             "referencia."
                         )
                     }
@@ -583,7 +584,7 @@ class CajaMovimiento(models.Model):
                 raise ValidationError(
                     {
                         "medio_pago": (
-                            "Una venta debe indicar "
+                            "Una venta o abono debe indicar "
                             "medio de pago."
                         )
                     }
@@ -645,6 +646,9 @@ class CajaMovimiento(models.Model):
                 self.tipo
                 not in {
                     self.Tipo.DEVOLUCION,
+                    # Un abono se cobra en el turno vigente, que puede ser
+                    # distinto al turno donde nació la venta a crédito.
+                    self.Tipo.ABONO_CREDITO,
                 }
                 and venta.turno_id
                 != self.turno_id

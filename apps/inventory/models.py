@@ -5,6 +5,7 @@ from django.db import models, transaction
 from django.db.models import Q, Sum
 from django.core.exceptions import ValidationError
 from django.db.models.functions import Lower
+from django.utils.text import slugify
 
 from apps.core.models import Sucursal
 
@@ -183,7 +184,8 @@ class ProductoVariante(models.Model):
 
     sku = models.CharField(
         max_length=100,
-        unique=True
+        unique=True,
+        blank=True,
     )
 
     codigo_barras = models.CharField(
@@ -236,17 +238,59 @@ class ProductoVariante(models.Model):
         )
 
     def clean(self):
+        self.sku = (self.sku or "").strip().upper()
+        # En formularios Django la validación ocurre antes de `save()`. El
+        # SKU vacío es válido temporalmente y se genera justo antes de guardar.
 
-        self.sku = self.sku.strip().upper()
+    @staticmethod
+    def _codigo_legible(valor, limite=12):
+        codigo = slugify(str(valor or "")).replace("-", "").upper()
+        return (codigo[:limite] or "ITEM")
 
-        if not self.sku:
-            raise ValidationError("SKU obligatorio")
+    def _generar_sku_automatico(self):
+        base = "-".join([
+            self._codigo_legible(self.producto_base.nombre, 8),
+            self._codigo_legible(self.tipo_tela.nombre, 5),
+            self._codigo_legible(self.color.nombre, 5),
+            self._codigo_legible(self.talla.nombre, 4),
+        ])
+        candidato = base
+        consecutivo = 2
+        while ProductoVariante.objects.exclude(pk=self.pk).filter(
+            sku__iexact=candidato
+        ).exists():
+            sufijo = f"-{consecutivo}"
+            candidato = f"{base[:100 - len(sufijo)]}{sufijo}"
+            consecutivo += 1
+        return candidato
+
+    @staticmethod
+    def _codigo_barras_interno_ean13(pk):
+        """EAN-13 interno con prefijo 770 y dígito verificador.
+
+        No se debe presentar como un código GS1 asignado por GS1 Colombia;
+        sirve para identificar de forma única productos dentro del ERP y para
+        lectores configurados como teclado.
+        """
+        base = f"770{int(pk):09d}"  # 12 dígitos sin verificador.
+        suma = sum(
+            int(digito) * (3 if indice % 2 else 1)
+            for indice, digito in enumerate(reversed(base))
+        )
+        return f"{base}{(10 - suma % 10) % 10}"
 
     def save(self, *args, **kwargs):
-
+        if not (self.sku or "").strip():
+            self.sku = self._generar_sku_automatico()
         self.full_clean()
-
         super().save(*args, **kwargs)
+
+        # Código EAN-13 interno, estable y escaneable. Solo se crea si el
+        # usuario no registró uno propio; no modifica códigos existentes.
+        if not self.codigo_barras:
+            codigo = self._codigo_barras_interno_ean13(self.pk)
+            type(self).objects.filter(pk=self.pk).update(codigo_barras=codigo)
+            self.codigo_barras = codigo
 
     def __str__(self):
 
@@ -411,6 +455,12 @@ class MovimientoStock(models.Model):
     cantidad = models.DecimalField(max_digits=12, decimal_places=2)
 
     referencia = models.CharField(max_length=100, null=True, blank=True)
+
+    observacion = models.TextField(
+        blank=True,
+        default="",
+        help_text="Detalle o justificación del movimiento de inventario.",
+    )
 
     usuario = models.ForeignKey(
         "auth.User",

@@ -1,6 +1,15 @@
 from django.contrib import admin
 from django.db.models import Q
-from .models import Caja, TurnoCajaUsuario, Venta,  ListaPrecio, PrecioVariante, VentaItem
+from .models import (
+    Caja,
+    ConfiguracionImpresionVenta,
+    TurnoCajaUsuario,
+    Venta,
+    ListaPrecio,
+    PrecioVariante,
+    VentaItem,
+    Vendedor,
+)
 from .models_caja_enterprise import TurnoCaja, CajaMovimiento, ArqueoTurno, ArqueoDenominacion, Boveda
 
 # =========================================================
@@ -11,6 +20,20 @@ class CajaAdmin(admin.ModelAdmin):
     list_display = ["codigo", "nombre", "sucursal", "activa"]
     list_filter = ["sucursal", "activa"]
     search_fields = ["codigo", "nombre"]
+
+
+@admin.register(ConfiguracionImpresionVenta)
+class ConfiguracionImpresionVentaAdmin(admin.ModelAdmin):
+    list_display = ["sucursal", "impresion_automatica", "ancho_papel_mm", "actualizado"]
+    list_filter = ["impresion_automatica", "ancho_papel_mm"]
+    search_fields = ["sucursal__nombre"]
+
+
+@admin.register(Vendedor)
+class VendedorAdmin(admin.ModelAdmin):
+    list_display = ["nombre", "sucursal", "documento", "telefono", "activo"]
+    list_filter = ["sucursal", "activo"]
+    search_fields = ["nombre", "documento", "telefono"]
 
 # =========================================================
 # TURNO CAJA

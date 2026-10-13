@@ -340,9 +340,24 @@ class PrecioMasivoForm(forms.Form):
                 "producto_base", "tipo_tela", "color", "talla"
             ).order_by("producto_base__nombre", "sku")
         )
-        self.fields["sucursales"].queryset = Sucursal.objects.filter(
-            activa=True
-        ).order_by("nombre")
+        sucursales = Sucursal.objects.filter(activa=True).order_by("nombre")
+        self.fields["sucursales"].queryset = sucursales
+        listas_por_sucursal = {}
+        for lista in ListaPrecio.objects.filter(
+            sucursal__in=sucursales, activa=True
+        ).only("sucursal_id", "tipo_venta", "nombre"):
+            listas_por_sucursal.setdefault(lista.sucursal_id, []).append(
+                f"{lista.get_tipo_venta_display()}: {lista.nombre}"
+            )
+
+        self.fields["sucursales"].label_from_instance = lambda sucursal: (
+            f"{sucursal.nombre}"
+            + (
+                " — " + " · ".join(listas_por_sucursal.get(sucursal.id, []))
+                if listas_por_sucursal.get(sucursal.id)
+                else " — sin listas activas"
+            )
+        )
 
     def clean(self):
         cleaned_data = super().clean()

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Prueba de impresora</title>
+    <style>
+        :root { --ticket-width: {{ configuracion.ancho_papel_mm }}mm; }
+        @page { size: {{ configuracion.ancho_papel_mm }}mm auto; margin: 0; }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; background: #eef3f5; font-family: Arial, sans-serif; color: #10263d; }
+        .ticket { width: var(--ticket-width); min-width: var(--ticket-width); margin: 8px auto; padding: 3mm 2mm; background: #fff; text-align: center; font-size: 8pt; line-height: 1.35; }
+        .line { border: 0; border-top: 1px dashed #52677a; margin: 3mm 0; }
+        .sample { display: flex; justify-content: space-between; text-align: left; font-size: 7pt; }
+        .actions { width: var(--ticket-width); margin: 12px auto; text-align: center; }
+        button { border: 0; border-radius: 6px; padding: 8px 10px; background: #182b49; color: #fff; cursor: pointer; }
+        @media print { html, body { width: var(--ticket-width); background: #fff; } .ticket { margin: 0; } .actions { display: none; } }
+    </style>
+</head>
+<body>
+    <main class="ticket"><strong>PRUEBA DE IMPRESIÓN</strong><br><small>{{ sucursal.nombre }}</small><hr class="line"><div>Ancho configurado: {{ configuracion.ancho_papel_mm }} mm</div><div>Texto centrado</div><div class="sample"><span>Producto de prueba</span><strong>$12.500</strong></div><hr class="line"><small>Si el contenido queda cortado, cambie el ancho aquí y en el controlador de Windows.</small></main>
+    <div class="actions"><button type="button" onclick="window.print()">Imprimir prueba</button></div>
+    {% if auto_imprimir %}<script>window.addEventListener("load", () => window.setTimeout(() => window.print(), 250));</script>{% endif %}
+</body>
+</html>

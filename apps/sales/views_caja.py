@@ -1,5 +1,6 @@
 # apps/sales/views_caja.py
 import json
+import logging
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -17,10 +18,13 @@ from django.db import IntegrityError, transaction
 from apps.accounts.models import UserProfile
 from apps.core.models import Sucursal
 from apps.sales.mixins import CajaActivaRequiredMixin, SucursalIsolationMixin
-from apps.sales.models import Caja
+from apps.sales.models import Caja, TurnoCajaUsuario
 from apps.sales.models_caja_enterprise import ArqueoTurno, Boveda, CajaMovimiento, TurnoCaja
 from apps.sales.permissions import RolePermissionMixin
 from apps.sales.services.caja_service import CajaService
+
+
+logger = logging.getLogger(__name__)
 
 
 def _obtener_datos_request(request):
@@ -145,13 +149,82 @@ class SeleccionarSucursalView(
         sucursal_anterior_id = request.session.get("sucursal_id")
 
         if str(sucursal_anterior_id) != str(sucursal.id):
-            request.session.pop("turno_id", None)
-            request.session.pop("caja_id", None)
+            turno = CajaService.obtener_turno_activo_sucursal(sucursal)
+            if turno:
+                request.session["turno_id"] = turno.id
+                request.session["caja_id"] = turno.caja_id
+            else:
+                request.session.pop("turno_id", None)
+                request.session.pop("caja_id", None)
 
         request.session["sucursal_id"] = sucursal.id
         request.session.modified = True
 
         return redirect("sales:caja_dashboard")
+
+
+class ConfirmarTurnoDiarioView(
+    LoginRequiredMixin,
+    RolePermissionMixin,
+    SucursalIsolationMixin,
+    View,
+):
+    """Obliga a decidir qué hacer con una caja abierta de un día anterior."""
+
+    allowed_roles = [
+        "SUPER_ADMIN",
+        "ADMIN_SUCURSAL",
+        "CAJERO",
+    ]
+
+    def _obtener_turno(self, request):
+        sucursal = self.get_sucursal()
+        turno = CajaService.obtener_turno_operable(
+            sucursal=sucursal,
+            usuario=request.user,
+        )
+        return sucursal, turno
+
+    @staticmethod
+    def _siguiente(request):
+        siguiente = request.session.get("turno_diario_siguiente", "")
+        # Solo se aceptan rutas internas previamente generadas por el sistema.
+        return siguiente if siguiente.startswith("/") and not siguiente.startswith("//") else ""
+
+    def get(self, request):
+        sucursal, turno = self._obtener_turno(request)
+        if not turno or not CajaService.turno_requiere_confirmacion_diaria(turno):
+            return redirect(self._siguiente(request) or "sales:caja_dashboard")
+
+        return render(
+            request,
+            "sales/caja/confirmar_turno_diario.html",
+            {
+                "turno": turno,
+                "sucursal": sucursal,
+                "siguiente": self._siguiente(request),
+            },
+        )
+
+    def post(self, request):
+        _, turno = self._obtener_turno(request)
+        if not turno or not CajaService.turno_requiere_confirmacion_diaria(turno):
+            return redirect("sales:caja_dashboard")
+
+        accion = request.POST.get("accion")
+        if accion not in {"CONTINUAR", "CERRAR"}:
+            return self.get(request)
+
+        request.session["turno_diario_confirmado_id"] = turno.id
+        request.session["turno_diario_modo"] = accion
+        request.session["turno_id"] = turno.id
+        request.session["caja_id"] = turno.caja_id
+        request.session.modified = True
+
+        if accion == "CERRAR":
+            return redirect("sales:caja_dashboard")
+
+        return redirect(self._siguiente(request) or "sales:caja_dashboard")
 
 class CajaConfiguracionView(
     LoginRequiredMixin,
@@ -187,6 +260,37 @@ class CajaConfiguracionView(
 
     def post(self, request):
         sucursal = self.get_sucursal()
+
+        accion = request.POST.get("accion", "crear")
+        caja_id = request.POST.get("caja_id")
+
+        if accion in {"actualizar", "cambiar_estado"}:
+            caja = Caja.objects.filter(pk=caja_id, sucursal=sucursal).first()
+            if not caja:
+                return render(request, self.template_name, self._contexto(
+                    sucursal, "La caja indicada no existe en esta sucursal."
+                ), status=404)
+            if accion == "cambiar_estado":
+                caja.activa = not caja.activa
+                caja.save(update_fields=["activa"])
+                return redirect("sales:caja_configuracion")
+
+            codigo = (request.POST.get("codigo") or "").strip().upper()
+            nombre = (request.POST.get("nombre") or "").strip()
+            if not codigo or not nombre:
+                return render(request, self.template_name, self._contexto(
+                    sucursal, "Código y nombre son obligatorios."
+                ), status=400)
+            caja.codigo = codigo
+            caja.nombre = nombre
+            try:
+                caja.full_clean()
+                caja.save(update_fields=["codigo", "nombre"])
+            except (ValidationError, IntegrityError):
+                return render(request, self.template_name, self._contexto(
+                    sucursal, "No fue posible actualizar: el código ya existe o los datos no son válidos."
+                ), status=400)
+            return redirect("sales:caja_configuracion")
 
         codigo = (request.POST.get("codigo") or "").strip().upper()
         nombre = (request.POST.get("nombre") or "").strip()
@@ -261,6 +365,9 @@ class CajaDashboardView(
         context["cierre_en_proceso"] = False
         context["puede_asignar_supervisor"] = False
         context["supervisores"] = []
+        context["puede_gestionar_cajeros"] = False
+        context["cajeros_turno"] = []
+        context["cajeros_disponibles"] = []
 
         if not turno:
             return context
@@ -279,6 +386,12 @@ class CajaDashboardView(
         context["movimientos"] = CajaService.ultimos_movimientos(turno)
         context["arqueo_actual"] = arqueo_actual
         context["cierre_en_proceso"] = arqueo_actual is not None
+        context["turno_en_cierre_obligatorio"] = (
+            CajaService.turno_requiere_confirmacion_diaria(turno)
+            and self.request.session.get("turno_diario_modo") == "CERRAR"
+            and str(self.request.session.get("turno_diario_confirmado_id", ""))
+            == str(turno.id)
+        )
 
         if self.get_user_role() not in {
             "SUPER_ADMIN",
@@ -287,6 +400,7 @@ class CajaDashboardView(
             return context
 
         context["puede_asignar_supervisor"] = True
+        context["puede_gestionar_cajeros"] = True
         context["supervisores"] = (
             UserProfile.objects.select_related("user")
             .filter(
@@ -307,6 +421,30 @@ class CajaDashboardView(
                 "user__last_name",
                 "user__username",
             )
+        )
+
+        # Un turno de caja tiene un responsable, pero puede autorizarse a más
+        # cajeros de la misma sucursal. Así un cajero nuevo no crea un segundo
+        # turno ni hereda acceso sin trazabilidad.
+        cajeros_turno = (
+            TurnoCajaUsuario.objects.select_related("usuario")
+            .filter(turno=turno, activo=True)
+            .order_by("usuario__first_name", "usuario__last_name", "usuario__username")
+        )
+        context["cajeros_turno"] = cajeros_turno
+        context["cajeros_disponibles"] = (
+            UserProfile.objects.select_related("user")
+            .filter(
+                user__is_active=True,
+                role=UserProfile.Role.CAJERO,
+                sucursal=turno.sucursal,
+            )
+            .exclude(user_id__in=cajeros_turno.values("usuario_id"))
+            .exclude(
+                user__turnocajausuario__activo=True,
+                user__turnocajausuario__turno__estado=TurnoCaja.Estado.ABIERTO,
+            )
+            .order_by("user__first_name", "user__last_name", "user__username")
         )
 
         return context
@@ -344,17 +482,10 @@ class CajaIngresoView(
         except ValidationError as error:
             return _respuesta_error(error)
 
-        except Exception as error:
-            import traceback
-
-            traceback.print_exc()
-
-            return JsonResponse(
-                {
-                    "success": False,
-                    "error": str(error),
-                    "trace": traceback.format_exc(),
-                },
+        except Exception:
+            logger.exception("Error inesperado al registrar un ingreso de caja.")
+            return _respuesta_error(
+                "No fue posible registrar el ingreso. Intente nuevamente.",
                 status=500,
             )
 
@@ -777,6 +908,7 @@ class AbrirCajaView(
         caja_seleccionada=None,
         supervisor_seleccionado=None,
         monto_inicial="0",
+        turno_existente=None,
     ):
         perfil = getattr(usuario, "profile", None)
 
@@ -810,6 +942,18 @@ class AbrirCajaView(
                 supervisor_seleccionado or ""
             ),
             "monto_inicial": monto_inicial or "0",
+            "turno_existente": turno_existente,
+            "puede_gestionar_turno": bool(
+                turno_existente
+                and perfil
+                and (
+                    perfil.role == UserProfile.Role.SUPER_ADMIN
+                    or (
+                        perfil.role == UserProfile.Role.ADMIN_SUCURSAL
+                        and perfil.sucursal_id == sucursal.id
+                    )
+                )
+            ),
         }
 
     def get(self, request):
@@ -828,7 +972,7 @@ class AbrirCajaView(
 
         sucursal = self.get_sucursal()
 
-        turno = CajaService.obtener_turno_activo_usuario(
+        turno = CajaService.obtener_turno_operable(
             sucursal=sucursal,
             usuario=request.user,
         )
@@ -844,12 +988,14 @@ class AbrirCajaView(
         request.session.pop("caja_id", None)
         request.session.modified = True
 
+        turno_existente = CajaService.obtener_turno_activo_sucursal(sucursal)
         return render(
             request,
             "sales/abrir_caja.html",
             self._contexto_apertura(
                 sucursal=sucursal,
                 usuario=request.user,
+                turno_existente=turno_existente,
             ),
         )
 
@@ -868,6 +1014,31 @@ class AbrirCajaView(
             return redirect("sales:seleccionar_sucursal")
 
         sucursal = self.get_sucursal()
+
+        # Una segunda consulta evita una carrera entre la página de apertura y
+        # el envío del formulario: nunca se intenta abrir una caja que ya
+        # empezó turno mientras el usuario llenaba la pantalla.
+        turno_existente = CajaService.obtener_turno_activo_sucursal(sucursal)
+        if turno_existente:
+            turno_operable = CajaService.obtener_turno_operable(
+                sucursal=sucursal,
+                usuario=request.user,
+            )
+            if turno_operable:
+                request.session["turno_id"] = turno_operable.id
+                request.session["caja_id"] = turno_operable.caja_id
+                request.session.modified = True
+                return redirect("sales:caja_dashboard")
+            return render(
+                request,
+                "sales/abrir_caja.html",
+                self._contexto_apertura(
+                    sucursal=sucursal,
+                    usuario=request.user,
+                    turno_existente=turno_existente,
+                ),
+                status=409,
+            )
 
         caja_id = request.POST.get("caja_id")
         supervisor_id = request.POST.get("supervisor_id")

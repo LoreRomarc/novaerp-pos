@@ -157,36 +157,12 @@
 
                 </div>
 
-                <!-- LISTAS DE PRECIOS -->
-
                 <div class="col-12">
-
-                    <hr>
-
-                    <h5>
-                        💰 Listas de precios
-                    </h5>
-
-                </div>
-
-
-                {% for campo in form %}
-
-                    {% if "precio_lista_" in campo.name %}
-
-                    <div class="col-md-3 mb-3">
-
-                        <label class="form-label">
-                            {{ campo.label }}
-                        </label>
-
-                        {{ campo }}
-
+                    <div class="alert alert-light border small mb-3">
+                        Los precios se asignan después de guardar desde
+                        <strong>Precios de productos</strong>, donde puede elegir varias sucursales en un solo paso.
                     </div>
-
-                    {% endif %}
-
-                {% endfor %}
+                </div>
 
                 <!-- COSTO -->
                 <div class="col-md-3 mb-3">

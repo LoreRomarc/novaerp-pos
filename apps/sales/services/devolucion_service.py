@@ -37,6 +37,7 @@ class DevolucionService:
         "SUPER_ADMIN",
         "ADMIN_SUCURSAL",
         "SUPERVISOR",
+        "CAJERO",
     }
 
     @staticmethod
@@ -281,7 +282,7 @@ class DevolucionService:
         precio_lista,
     ):
         precio_manual = dato.get("precio_unitario")
-        motivo_precio = (dato.get("motivo_precio") or "").strip()
+        motivo_precio = (dato.get("motivo_precio") or "").strip().upper()
 
         if precio_manual in (None, ""):
             if precio_lista is None:
@@ -420,10 +421,14 @@ class DevolucionService:
         permite_reembolso=False,
         medio_reembolso="",
         pagos_adicionales=None,
+        efectivo_recibido=0,
+        vuelto_efectivo=0,
         motivo="",
         venta_id=None,
         referencia_externa="",
         tipo_venta="MAYORISTA",
+        tipo_venta_recibido=None,
+        tipo_venta_entregado=None,
     ):
         """
         Procesa una devolución o cambio directo.
@@ -432,11 +437,11 @@ class DevolucionService:
         si cualquier validación falla.
         """
 
-        motivo = (motivo or "").strip()
+        motivo = (motivo or "").strip().upper()
         referencia_externa = (
             referencia_externa
             or ""
-        ).strip()
+        ).strip().upper()
 
         if not motivo:
             raise ValidationError(
@@ -463,16 +468,28 @@ class DevolucionService:
             usuario,
         )
 
-        lista = DevolucionService._obtener_lista_precios(
-            sucursal,
-            tipo_venta,
+        tipo_venta_recibido = tipo_venta_recibido or tipo_venta
+        tipo_venta_entregado = tipo_venta_entregado or tipo_venta
+        lista_recibido = (
+            DevolucionService._obtener_lista_precios(
+                sucursal, tipo_venta_recibido
+            )
+            if productos_recibidos
+            else None
+        )
+        lista_entregado = (
+            DevolucionService._obtener_lista_precios(
+                sucursal, tipo_venta_entregado
+            )
+            if productos_entregados
+            else None
         )
 
         recibidos = (
             DevolucionService
             ._preparar_productos_recibidos(
                 usuario=usuario,
-                lista=lista,
+                lista=lista_recibido,
                 productos=productos_recibidos,
             )
         )
@@ -481,7 +498,7 @@ class DevolucionService:
             DevolucionService
             ._preparar_productos_entregados(
                 usuario=usuario,
-                lista=lista,
+                lista=lista_entregado,
                 productos=productos_entregados or [],
             )
         )
@@ -528,6 +545,15 @@ class DevolucionService:
             )
         )
 
+        efectivo_recibido = DevolucionService._decimal(
+            efectivo_recibido, "El efectivo recibido es inválido."
+        )
+        vuelto_efectivo = DevolucionService._decimal(
+            vuelto_efectivo, "El vuelto es inválido."
+        )
+        if efectivo_recibido < 0 or vuelto_efectivo < 0:
+            raise ValidationError("Los valores recibidos no pueden ser negativos.")
+
         # Una devolución o un cambio por igual valor no recibe dinero del
         # cliente. La interfaz puede conservar valores escritos antes de que
         # se cambien los productos, por lo que esos valores no deben bloquear
@@ -549,6 +575,17 @@ class DevolucionService:
                 "la diferencia del cambio."
             )
 
+        # La caja solo recibe el neto. El documento conserva el efectivo que
+        # el cliente entregó y el vuelto real que se le devolvió.
+        efectivo_neto = pagos_adicionales[CajaMovimiento.MedioPago.EFECTIVO]
+        if monto_cobrado == Decimal("0.00"):
+            efectivo_recibido = Decimal("0.00")
+            vuelto_efectivo = Decimal("0.00")
+        elif efectivo_recibido - vuelto_efectivo != efectivo_neto:
+            raise ValidationError(
+                "El efectivo recibido menos el vuelto debe coincidir con el cobro en efectivo."
+            )
+
         if monto_reembolsado > 0:
             if medio_reembolso not in DevolucionService.MEDIOS_PAGO:
                 raise ValidationError(
@@ -567,7 +604,7 @@ class DevolucionService:
                 if entregados
                 else Devolucion.Tipo.DEVOLUCION
             ),
-            tipo_venta=tipo_venta,
+            tipo_venta=tipo_venta_entregado,
             referencia_externa=referencia_externa,
             motivo=motivo,
             permite_reembolso=permite_reembolso,
@@ -576,6 +613,8 @@ class DevolucionService:
             total_entregado=total_entregado,
             diferencia=diferencia,
             monto_cobrado=monto_cobrado,
+            monto_recibido_efectivo=efectivo_recibido,
+            vuelto_efectivo=vuelto_efectivo,
             monto_reembolsado=monto_reembolsado,
             monto_no_reembolsado=monto_no_reembolsado,
         )

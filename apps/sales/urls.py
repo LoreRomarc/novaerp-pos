@@ -2,9 +2,21 @@
 from django.urls import path
 
 from apps.sales.pos_views import POSNuevaVentaView
+from apps.sales.views_facturacion import (
+    ConfiguracionImpresionVentaView,
+    ImpresionPruebaDirectaView,
+    TicketPruebaView,
+    TicketDevolucionView,
+    TicketVentaView,
+)
 from apps.sales.report_views import (
     ReporteCajaView,
+    ReporteCajaPDFView,
+    CajaMovimientoDetalleView,
     ReporteVentasView,
+    ReporteVentasPDFView,
+    VentaAnularReporteView,
+    VentaActualizarObservacionView,
     VentaDetalleView,
 )
 from apps.sales.views_devoluciones import (
@@ -14,6 +26,8 @@ from apps.sales.views_devoluciones import (
     DevolucionDetalleView,
     DevolucionListView,
 )
+from apps.sales.views_vendedores import VendedorListView
+from apps.sales.views_creditos import CreditoListView
 from apps.sales.views_caja import (
     AbrirCajaView,
     CajaAprobarArqueoView,
@@ -29,6 +43,7 @@ from apps.sales.views_caja import (
     CajaRetiroView,
     CajaVerificarIntegridadView,
     CerrarCajaView,
+    ConfirmarTurnoDiarioView,
     SeleccionarSucursalView,
 )
 
@@ -62,11 +77,17 @@ urlpatterns = [
     path("pos/cargar/", POSCargarVentaView.as_view(), name="pos_cargar"),
     path("pos/nueva/", POSNuevaVentaView.as_view(), name="pos_nueva_venta"),
     path("pos/guardar/", POSGuardarEstadoView.as_view(), name="pos_guardar"),
+    path("ventas/<int:pk>/comprobante/", TicketVentaView.as_view(), name="ticket_venta"),
+    path("devoluciones/<int:pk>/comprobante/", TicketDevolucionView.as_view(), name="ticket_devolucion"),
+    path("ventas/impresion/", ConfiguracionImpresionVentaView.as_view(), name="configuracion_impresion"),
+    path("ventas/impresion/prueba/", TicketPruebaView.as_view(), name="ticket_prueba"),
+    path("ventas/impresion/prueba-directa/", ImpresionPruebaDirectaView.as_view(), name="impresion_prueba_directa"),
 
     path("caja/", CajaDashboardView.as_view(), name="caja_dashboard"),
     path("caja/configuracion/",CajaConfiguracionView.as_view(),name="caja_configuracion",),
     path("caja/abrir/", AbrirCajaView.as_view(), name="abrir_caja"),
     path("caja/cerrar/", CerrarCajaView.as_view(), name="cerrar_caja"),
+    path("caja/turno-diario/", ConfirmarTurnoDiarioView.as_view(), name="turno_diario"),
     path("caja/ingreso/", CajaIngresoView.as_view(), name="caja_ingreso"),
     path("caja/egreso/", CajaEgresoView.as_view(), name="caja_egreso"),
     path("caja/retiro/", CajaRetiroView.as_view(), name="caja_retiro"),
@@ -78,12 +99,19 @@ urlpatterns = [
     path("caja/turnos/<int:turno_id>/integridad/",CajaVerificarIntegridadView.as_view(),name="caja_verificar_integridad",),
     path("caja/resumen/",CajaDashboardView.as_view(),name="caja_resumen",),
     path("caja/reportes/", ReporteCajaView.as_view(), name="caja_reportes"),
+    path("caja/reportes/pdf/", ReporteCajaPDFView.as_view(), name="caja_reportes_pdf"),
+    path("caja/movimientos/<int:pk>/", CajaMovimientoDetalleView.as_view(), name="caja_movimiento_detalle"),
     path("caja/cierres/",CajaHistorialCierresView.as_view(), name="caja_historial_cierres",),
 
     path( "sucursal/seleccionar/",SeleccionarSucursalView.as_view(), name="seleccionar_sucursal",),
 
     path("reportes/", ReporteVentasView.as_view(), name="reportes"),
+    path("reportes/pdf/", ReporteVentasPDFView.as_view(), name="reportes_pdf"),
     path("venta/<int:pk>/", VentaDetalleView.as_view(), name="venta_detalle"),
+    path("venta/<int:pk>/observacion/", VentaActualizarObservacionView.as_view(), name="venta_actualizar_observacion"),
+    path("reportes/ventas/<int:pk>/anular/", VentaAnularReporteView.as_view(), name="reporte_venta_anular"),
+    path("vendedores/", VendedorListView.as_view(), name="vendedor_list"),
+    path("creditos/", CreditoListView.as_view(), name="creditos"),
 
     # ======================================================
     # DEVOLUCIONES Y CAMBIOS

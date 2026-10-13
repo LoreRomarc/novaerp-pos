@@ -1,0 +1,76 @@
+{% load humanize %}
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Comprobante {{ venta.id }}</title>
+    <style>
+        :root { --ticket-width: {{ configuracion.ancho_papel_mm }}mm; }
+        @page { size: {{ configuracion.ancho_papel_mm }}mm auto; margin: 0; }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; background: #eef3f5; color: #10263d; font-family: Arial, sans-serif; }
+        .ticket { width: min(var(--ticket-width), calc(100vw - 16px)); min-width: 0; margin: 8px auto; padding: 1.5mm .75mm; background: #fff; font-size: 8pt; line-height: 1.28; }
+        .center { text-align: center; }
+        .brand { font-size: 10pt; font-weight: 800; text-transform: uppercase; letter-spacing: .2px; }
+        .muted { color: #52677a; font-size: 7pt; }
+        .line { border: 0; border-top: 1px dashed #52677a; margin: 2.5mm 0; }
+        .meta { display: grid; gap: 1px; font-size: 7pt; }
+        table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+        th { text-align: left; font-size: 6.5pt; color: #52677a; font-weight: 700; padding-bottom: 1mm; }
+        td { padding: 1mm 0; vertical-align: top; overflow-wrap: anywhere; }
+        .qty { width: 15%; text-align: center; }
+        .money { width: 29%; text-align: right; white-space: nowrap; }
+        .product { width: 56%; padding-right: 1mm; }
+        .sku { display: block; color: #52677a; font-size: 6.5pt; }
+        .totals { margin-left: auto; width: 100%; font-size: 8pt; }
+        .totals td { padding: .6mm 0; }
+        .total td { border-top: 1px solid #10263d; padding-top: 1.5mm; font-size: 10pt; font-weight: 800; }
+        .footer { margin-top: 3mm; font-size: 7pt; text-align: center; }
+        .screen-actions { width: min(var(--ticket-width), calc(100vw - 16px)); margin: 12px auto; text-align: center; }
+        button { border: 0; border-radius: 6px; padding: 8px 10px; background: #182b49; color: #fff; cursor: pointer; }
+        @media print { html, body { width: var(--ticket-width); background: #fff; } .ticket { width: var(--ticket-width); margin: 0; box-shadow: none; } .screen-actions { display: none; } }
+    </style>
+</head>
+<body>
+    <main class="ticket">
+        <header class="center">
+            <div class="brand">{{ venta.sucursal.empresa.nombre|default:venta.sucursal.nombre }}</div>
+            {% if venta.sucursal.empresa.razon_social %}<div class="muted">{{ venta.sucursal.empresa.razon_social }}</div>{% endif %}
+            {% if venta.sucursal.empresa.nit %}<div class="muted">NIT: {{ venta.sucursal.empresa.nit }}</div>{% endif %}
+            <div class="muted">{{ venta.sucursal.nombre }}</div>
+            {% if venta.sucursal.direccion %}<div class="muted">{{ venta.sucursal.direccion }}</div>{% endif %}
+            {% if venta.sucursal.empresa.telefono %}<div class="muted">Tel. {{ venta.sucursal.empresa.telefono }}</div>{% endif %}
+            {% if venta.sucursal.empresa.email %}<div class="muted">{{ venta.sucursal.empresa.email }}</div>{% endif %}
+        </header>
+        <hr class="line">
+        <div class="center"><strong>{% if venta.estado == "CREDITO" %}FACTURA DE VENTA A CRÉDITO{% else %}COMPROBANTE DE VENTA{% endif %}</strong></div>
+        <div class="meta">
+            <span>Número: #{{ venta.id }}</span>
+            <span>Fecha: {{ venta.cerrada|date:"d/m/Y H:i" }}</span>
+            <span>Caja: {{ venta.turno.caja.codigo }}</span>
+            <span>Atendió: {{ venta.usuario.get_full_name|default:venta.usuario.username }}</span>
+            <span>Vendedor: {{ venta.vendedor.nombre|default:"Sin asignar" }}</span>
+            {% if venta.cliente %}<span>Cliente: {{ venta.cliente }}</span>{% endif %}
+        </div>
+        <hr class="line">
+        <table>
+            <thead><tr><th class="product">Producto</th><th class="qty">Cant.</th><th class="money">Total</th></tr></thead>
+            <tbody>{% for item in venta.items.all %}<tr><td class="product">{{ item.nombre_producto }}<span class="sku">{% if item.sku %}{{ item.sku }} · {% endif %}{{ item.tipo_tela }} {{ item.color }} {{ item.talla }}</span></td><td class="qty">{{ item.cantidad|floatformat:"-2" }}</td><td class="money">${{ item.total_linea|floatformat:0|intcomma }}</td></tr>{% endfor %}</tbody>
+        </table>
+        <hr class="line">
+        <table class="totals">
+            <tr><td>Subtotal</td><td class="money">${{ venta.subtotal|floatformat:0|intcomma }}</td></tr>
+            {% if venta.total_iva %}<tr><td>IVA</td><td class="money">${{ venta.total_iva|floatformat:0|intcomma }}</td></tr>{% endif %}
+            <tr class="total"><td>TOTAL</td><td class="money">${{ venta.total|floatformat:0|intcomma }}</td></tr>
+            <tr><td>Efectivo</td><td class="money">${{ venta.monto_efectivo|floatformat:0|intcomma }}</td></tr>
+            <tr><td>Transferencia</td><td class="money">${{ venta.monto_transferencia|floatformat:0|intcomma }}</td></tr>
+            {% if venta.estado == "CREDITO" %}<tr><td>TOTAL ABONADO</td><td class="money">${{ venta.total_pagado|floatformat:0|intcomma }}</td></tr><tr><td>SALDO PENDIENTE</td><td class="money"><strong>${{ venta.saldo_pendiente|floatformat:0|intcomma }}</strong></td></tr>{% endif %}
+            {% if venta.cambio %}<tr><td>Vuelto</td><td class="money">${{ venta.cambio|floatformat:0|intcomma }}</td></tr>{% endif %}
+        </table>
+        <div class="footer">{{ configuracion.mensaje_pie|default:"Gracias por su compra." }}</div>
+    </main>
+    <div class="screen-actions"><button type="button" onclick="window.print()">Imprimir comprobante</button></div>
+    {% if auto_imprimir %}<script>window.addEventListener("load", () => window.setTimeout(() => window.print(), 250)); window.addEventListener("afterprint", () => window.setTimeout(() => window.close(), 150));</script>{% endif %}
+</body>
+</html>

@@ -409,6 +409,7 @@ class CarritoService:
         turno,
         usuario,
         pagos=None,
+        permitir_credito=False,
     ):
         from apps.sales.models import Venta, VentaItem
 
@@ -435,6 +436,7 @@ class CarritoService:
             sucursal=carrito.sucursal,
             turno=turno,
             usuario=usuario,
+            vendedor=carrito.vendedor,
             cliente=carrito.cliente,
             observaciones=carrito.observaciones,
             tipo_venta=carrito.tipo_venta,
@@ -470,10 +472,10 @@ class CarritoService:
 
         venta.recalcular_totales()
 
-        if venta.total_pagado < venta.total:
+        if venta.total_pagado < venta.total and not permitir_credito:
             raise ValidationError("Pago insuficiente.")
 
-        venta.cerrar_venta()
+        venta.cerrar_venta(permitir_credito=permitir_credito)
 
         carrito.estado = "FINALIZADO"
         carrito.save(update_fields=["estado", "actualizado"])

@@ -5,21 +5,42 @@
 {% block title %}Reporte de ventas{% endblock %}
 
 {% block content %}
+<style>
+    .report-hero { background: linear-gradient(135deg, #10233e, #1d4a55); color: white; border-radius: 1rem; padding: 1.5rem; }
+    .report-hero .text-muted { color: rgba(237,248,247,.72)!important; }
+    .metric-card { border: 0; overflow: hidden; position: relative; }
+    .metric-card::before { content:""; position:absolute; inset:0 auto 0 0; width:4px; background:#2c7a63; }
+    .metric-card .card-body { padding:1.15rem 1.25rem; }
+    .report-filter { border: 0; }
+    /* Las tres acciones son un único grupo operativo: no deben separarse
+       ni subir junto a la etiqueta del buscador cuando el ancho cambia. */
+    .report-filter-actions { min-width: 0; }
+    .report-filter-actions .btn { white-space: nowrap; }
+    #modalVenta .modal-dialog { max-width: min(1240px, calc(100vw - 2rem)); }
+    #modalVenta .modal-content { height: min(92vh, 900px); }
+    #modalVenta .modal-body { overflow-y: auto; padding: 1rem 1.25rem 1.25rem; }
+    .sale-status { display:inline-flex; align-items:center; gap:.4rem; color:#415466; font-size:.78rem; font-weight:700; white-space:nowrap; }
+    .sale-status::before { content:""; width:.5rem; height:.5rem; border-radius:50%; background:#64748b; flex:0 0 auto; }
+    .sale-status.is-closed::before { background:#2c7a63; }
+    .sale-status.is-credit::before { background:#b58a38; }
+    .sale-status.is-cancelled::before { background:#b65352; }
+</style>
 <div class="container-fluid py-4">
-    <div class="d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
+    <form id="csrfReporteVentas" class="d-none">{% csrf_token %}</form>
+    <div class="report-hero d-flex flex-column flex-lg-row justify-content-between align-items-lg-center gap-3 mb-4">
         <div>
             <h2 class="mb-1">Reporte de ventas</h2>
             <p class="text-muted mb-0">
-                Consulte ventas, medios de pago y detalle por usuario.
+                Consulte ventas, medios de pago, detalle e impresión de comprobantes.
             </p>
         </div>
 
-        <a class="btn btn-outline-primary" href="{% url 'sales:caja_reportes' %}">
+        <a class="btn btn-light" href="{% url 'sales:caja_reportes' %}">
             <i class="bi bi-cash-stack"></i> Reportes de caja
         </a>
     </div>
 
-    <form class="card border-0 shadow-sm mb-4" method="get">
+    <form class="card report-filter mb-4" method="get" data-auto-filter>
         <div class="card-body">
             <div class="row g-3 align-items-end">
                 <div class="col-12 col-md-6 col-xl-2">
@@ -32,11 +53,23 @@
                     <input class="form-control" id="fin" name="fin" type="date" value="{{ fin }}">
                 </div>
 
+                {% if puede_filtrar_sucursales %}
+                <div class="col-12 col-md-6 col-xl-2">
+                    <label class="form-label" for="sucursal">Sucursal</label>
+                    <select class="form-select" id="sucursal" name="sucursal">
+                        {% for sucursal in sucursales %}
+                        <option value="{{ sucursal.id }}" {% if sucursal_id == sucursal.id|stringformat:'s' %}selected{% endif %}>{{ sucursal.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+
                 <div class="col-12 col-md-6 col-xl-2">
                     <label class="form-label" for="estado">Estado</label>
                     <select class="form-select" id="estado" name="estado">
                         <option value="">Todos</option>
                         <option value="ABIERTA" {% if estado == "ABIERTA" %}selected{% endif %}>Abierta</option>
+                        <option value="CREDITO" {% if estado == "CREDITO" %}selected{% endif %}>Crédito pendiente</option>
                         <option value="CERRADA" {% if estado == "CERRADA" %}selected{% endif %}>Cerrada</option>
                         <option value="ANULADA" {% if estado == "ANULADA" %}selected{% endif %}>Anulada</option>
                     </select>
@@ -48,8 +81,8 @@
                         <option value="">Todos</option>
                         <option value="EFECTIVO" {% if tipo_pago == "EFECTIVO" %}selected{% endif %}>Efectivo</option>
                         <option value="TRANSFERENCIA" {% if tipo_pago == "TRANSFERENCIA" %}selected{% endif %}>Transferencia</option>
-                        <option value="TARJETA" {% if tipo_pago == "TARJETA" %}selected{% endif %}>Tarjeta</option>
                         <option value="MIXTO" {% if tipo_pago == "MIXTO" %}selected{% endif %}>Mixto</option>
+                        <option value="CREDITO" {% if tipo_pago == "CREDITO" %}selected{% endif %}>Crédito / abonos</option>
                     </select>
                 </div>
 
@@ -71,7 +104,17 @@
                     </select>
                 </div>
 
-                <div class="col-12 col-xl-2">
+                <div class="col-12 col-md-6 col-xl-2">
+                    <label class="form-label" for="vendedor">Vendedor</label>
+                    <select class="form-select" id="vendedor" name="vendedor">
+                        <option value="">Todos</option>
+                        {% for vendedor in vendedores %}
+                        <option value="{{ vendedor.id }}" {% if vendedor_id == vendedor.id|stringformat:'s' %}selected{% endif %}>{{ vendedor.nombre }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-12 col-md-6 col-xl-3">
                     <label class="form-label" for="buscar">Buscar</label>
                     <input
                         class="form-control"
@@ -82,9 +125,13 @@
                         value="{{ buscar }}">
                 </div>
 
-                <div class="col-12 d-flex flex-wrap gap-2">
+                <div class="col-12 d-flex flex-nowrap gap-2 justify-content-end report-filter-actions">
                     <button class="btn btn-primary" type="submit">
                         <i class="bi bi-funnel"></i> Aplicar filtros
+                    </button>
+
+                    <button class="btn btn-outline-secondary" type="submit" formaction="{% url 'sales:reportes_pdf' %}" formtarget="_blank">
+                        <i class="bi bi-file-earmark-pdf"></i> Descargar PDF
                     </button>
 
                     <a class="btn btn-outline-secondary" href="{% url 'sales:reportes' %}">
@@ -97,7 +144,7 @@
 
     <div class="row g-3 mb-4">
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm h-100">
+            <div class="card metric-card h-100">
                 <div class="card-body">
                     <div class="text-muted small">Total vendido</div>
                     <div class="fs-4 fw-bold">
@@ -108,7 +155,7 @@
         </div>
 
         <div class="col-12 col-sm-6 col-xl-3">
-            <div class="card border-0 shadow-sm h-100">
+            <div class="card metric-card h-100">
                 <div class="card-body">
                     <div class="text-muted small">Ventas en efectivo</div>
                     <div class="fs-4 fw-bold text-success">
@@ -119,7 +166,7 @@
         </div>
 
         <div class="col-12 col-sm-6 col-xl-2">
-            <div class="card border-0 shadow-sm h-100">
+            <div class="card metric-card h-100">
                 <div class="card-body">
                     <div class="text-muted small">Transferencias</div>
                     <div class="fs-4 fw-bold">
@@ -129,8 +176,9 @@
             </div>
         </div>
 
-        <div class="col-12 col-sm-6 col-xl-2">
-            <div class="card border-0 shadow-sm h-100">
+        {# TARJETA: métrica disponible para activar al habilitar tarjeta. #}
+        <div class="col-12 col-sm-6 col-xl-2 d-none">
+            <div class="card metric-card h-100">
                 <div class="card-body">
                     <div class="text-muted small">Tarjetas</div>
                     <div class="fs-4 fw-bold">
@@ -141,7 +189,7 @@
         </div>
 
         <div class="col-12 col-sm-6 col-xl-1">
-            <div class="card border-0 shadow-sm h-100">
+            <div class="card metric-card h-100">
                 <div class="card-body">
                     <div class="text-muted small">Ventas</div>
                     <div class="fs-4 fw-bold">{{ resumen.cantidad_ventas }}</div>
@@ -150,7 +198,7 @@
         </div>
 
         <div class="col-12 col-sm-6 col-xl-2">
-            <div class="card border-0 shadow-sm h-100">
+            <div class="card metric-card h-100">
                 <div class="card-body">
                     <div class="text-muted small">Ticket promedio</div>
                     <div class="fs-4 fw-bold">
@@ -161,7 +209,7 @@
         </div>
     </div>
 
-    <div class="card border-0 shadow-sm">
+    <div class="card">
         <div class="card-header bg-white d-flex justify-content-between align-items-center">
             <h5 class="mb-0">Ventas encontradas</h5>
             <span class="badge text-bg-light">
@@ -176,7 +224,9 @@
                         <th>#</th>
                         <th>Fecha</th>
                         <th>Usuario</th>
+                        <th>Vendedor</th>
                         <th>Cliente</th>
+                        <th>Observación</th>
                         <th>Estado</th>
                         <th class="text-end">Efectivo</th>
                         <th class="text-end">Transferencia</th>
@@ -201,22 +251,20 @@
                                     {{ venta.usuario.username }}
                                 {% endif %}
                             </td>
+                            <td>{{ venta.vendedor.nombre|default:"Sin asignar" }}</td>
                             <td>
-                                <div>{{ venta.cliente|default:"Consumidor final" }}</div>
-
-                                {% if venta.observaciones %}
-                                    <small class="text-muted">
-                                        {{ venta.observaciones|truncatechars:50 }}
-                                    </small>
-                                {% endif %}
+                                {{ venta.cliente|default:"Consumidor final" }}
                             </td>
+                            <td class="text-muted small">{{ venta.observaciones|default:"—"|truncatechars:55 }}</td>
                             <td>
                                 {% if venta.estado == "ABIERTA" %}
-                                    <span class="badge text-bg-warning">Abierta</span>
+                                    <span class="sale-status">Abierta</span>
+                                {% elif venta.estado == "CREDITO" %}
+                                    <span class="sale-status is-credit">Crédito pendiente</span>
                                 {% elif venta.estado == "CERRADA" %}
-                                    <span class="badge text-bg-success">Cerrada</span>
+                                    <span class="sale-status is-closed">Cerrada</span>
                                 {% else %}
-                                    <span class="badge text-bg-danger">Anulada</span>
+                                    <span class="sale-status is-cancelled">Anulada</span>
                                 {% endif %}
                             </td>
                             <td class="text-end">
@@ -232,18 +280,36 @@
                             <td class="text-end fw-bold">
                                 ${{ venta.total|floatformat:0|intcomma }}
                             </td>
-                            <td class="text-end">
-                                <button
-                                    class="btn btn-sm btn-outline-primary js-ver-venta"
-                                    data-id="{{ venta.id }}"
-                                    type="button">
-                                    Ver detalle
-                                </button>
+                            <td class="text-end table-actions">
+                                <div class="action-buttons">
+                                    <button
+                                        class="btn btn-sm btn-outline-primary js-ver-venta"
+                                        data-id="{{ venta.id }}"
+                                        type="button">
+                                        Ver detalle
+                                    </button>
+                                    {% if venta.estado == "CERRADA" or venta.estado == "CREDITO" %}
+                                    <a
+                                        class="btn btn-sm btn-outline-secondary"
+                                        target="_blank"
+                                        href="{% url 'sales:ticket_venta' venta.id %}">
+                                        <i class="bi bi-printer"></i>
+                                        <span class="visually-hidden">Reimprimir comprobante</span>
+                                    </a>
+                                    {% if request.user.profile.role == "SUPER_ADMIN" %}
+                                    <form method="post" action="{% url 'sales:reporte_venta_anular' venta.id %}" class="d-inline" onsubmit="return confirm('¿Anular la venta #{{ venta.id }}? Se reversarán caja e inventario; el registro quedará visible como anulado.');">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="observacion" value="Anulación administrativa desde reporte de ventas.">
+                                        <button class="btn btn-sm btn-outline-danger" type="submit" title="Anular venta"><i class="bi bi-x-circle"></i><span class="visually-hidden">Anular</span></button>
+                                    </form>
+                                    {% endif %}
+                                    {% endif %}
+                                </div>
                             </td>
                         </tr>
                     {% empty %}
                         <tr>
-                            <td class="text-center text-muted py-5" colspan="10">
+                            <td class="text-center text-muted py-5" colspan="12">
                                 No existen ventas para los filtros seleccionados.
                             </td>
                         </tr>
@@ -257,10 +323,10 @@
 <div class="modal fade" id="modalVenta" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header bg-dark text-white">
+            <div class="modal-header">
                 <h5 class="modal-title">Detalle de venta</h5>
                 <button
-                    class="btn-close btn-close-white"
+                    class="btn-close"
                     data-bs-dismiss="modal"
                     type="button"></button>
             </div>
@@ -272,10 +338,40 @@
     </div>
 </div>
 
+{% endblock %}
+
+{% block content-script %}
 <script>
     const modalVentaElement = document.getElementById("modalVenta");
     const contenidoVenta = document.getElementById("contenidoVenta");
     const modalVenta = new bootstrap.Modal(modalVentaElement);
+    const csrfToken = () => document.querySelector("#csrfReporteVentas [name=csrfmiddlewaretoken]")?.value || document.cookie.split("; ").find((item) => item.startsWith("csrftoken="))?.split("=")[1] || "";
+
+    function activarEdicionObservacion(contenedor) {
+        const formulario = contenedor.querySelector(".js-form-observacion-venta");
+        if (!formulario) return;
+        formulario.addEventListener("submit", async (evento) => {
+            evento.preventDefault();
+            const boton = formulario.querySelector("button[type=submit]");
+            const error = formulario.querySelector(".js-error-observacion");
+            boton.disabled = true;
+            error.textContent = "";
+            try {
+                const ventaId = formulario.dataset.ventaId;
+                const url = "{% url 'sales:venta_actualizar_observacion' 0 %}".replace("/0/", `/${ventaId}/`);
+                const respuesta = await fetch(url, { method: "POST", headers: { "X-CSRFToken": csrfToken() }, body: new FormData(formulario) });
+                const datos = await respuesta.json();
+                if (!respuesta.ok || !datos.success) throw new Error(datos.error || "No fue posible guardar la observación.");
+                error.className = "js-error-observacion text-success";
+                error.textContent = "Observación guardada.";
+            } catch (errorRespuesta) {
+                error.className = "js-error-observacion text-danger";
+                error.textContent = errorRespuesta.message;
+            } finally {
+                boton.disabled = false;
+            }
+        });
+    }
 
     document.querySelectorAll(".js-ver-venta").forEach((boton) => {
         boton.addEventListener("click", async () => {
@@ -301,6 +397,7 @@
                 }
 
                 contenidoVenta.innerHTML = await respuesta.text();
+                activarEdicionObservacion(contenidoVenta);
             } catch (error) {
                 contenidoVenta.innerHTML = `
                     <div class="alert alert-danger mb-0">

@@ -8,12 +8,14 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views import View
 from django.views.generic import ListView
 
 from apps.sales.mixins import SucursalIsolationMixin
 from apps.inventory.models import ProductoVariante, Stock
 from apps.sales.models import (
+    ConfiguracionImpresionVenta,
     Devolucion,
     ListaPrecio,
     PrecioVariante,
@@ -21,6 +23,7 @@ from apps.sales.models import (
 from apps.sales.permissions import RolePermissionMixin
 from apps.sales.services.caja_service import CajaService
 from apps.sales.services.devolucion_service import DevolucionService
+from apps.sales.services.impresion_termica_service import ImpresionTermicaService
 
 
 logger = logging.getLogger(__name__)
@@ -61,7 +64,7 @@ class DevolucionBaseView(
     def obtener_turno_activo(self):
         sucursal = self.get_sucursal()
 
-        turno = CajaService.obtener_turno_activo_usuario(
+        turno = CajaService.obtener_turno_operable(
             sucursal=sucursal,
             usuario=self.request.user,
         )
@@ -109,6 +112,7 @@ class DevolucionListView(
         )
 
         q = self.request.GET.get("q", "").strip()
+        medio_pago = self.request.GET.get("medio_pago", "").strip()
 
         if q:
             filtros = (
@@ -124,6 +128,23 @@ class DevolucionListView(
                 )
 
             qs = qs.filter(filtros)
+
+        # El medio de la devolución corresponde al movimiento de caja. Para
+        # crédito también permitimos encontrar devoluciones ligadas a la venta
+        # original, aun cuando esta ya se haya saldado posteriormente.
+        if medio_pago in {"EFECTIVO", "TRANSFERENCIA"}:
+            qs = qs.filter(movimientos_caja__medio_pago=medio_pago).distinct()
+        elif medio_pago == "COMBINADO":
+            qs = (
+                qs.filter(movimientos_caja__medio_pago="EFECTIVO")
+                .filter(movimientos_caja__medio_pago="TRANSFERENCIA")
+                .distinct()
+            )
+        elif medio_pago == "CREDITO":
+            qs = qs.filter(
+                Q(venta__estado="CREDITO")
+                | Q(venta__abonos__isnull=False)
+            ).distinct()
 
         return qs
 
@@ -213,6 +234,8 @@ class CambioDirectoProcesarView(DevolucionBaseView):
                         0,
                     ),
                 },
+                efectivo_recibido=data.get("efectivo_recibido", 0),
+                vuelto_efectivo=data.get("vuelto_efectivo", 0),
                 motivo=data.get("motivo", ""),
                 venta_id=data.get("venta_id") or None,
                 referencia_externa=data.get(
@@ -223,7 +246,26 @@ class CambioDirectoProcesarView(DevolucionBaseView):
                     "tipo_venta",
                     "MAYORISTA",
                 ),
+                tipo_venta_recibido=data.get("tipo_venta_recibido"),
+                tipo_venta_entregado=data.get("tipo_venta_entregado"),
             )
+
+            configuracion, _ = ConfiguracionImpresionVenta.objects.get_or_create(
+                sucursal=devolucion.sucursal,
+            )
+            error_impresion = ""
+            impresion_directa = False
+            if configuracion.impresion_automatica:
+                try:
+                    ImpresionTermicaService.imprimir_devolucion(
+                        devolucion, configuracion
+                    )
+                    impresion_directa = True
+                except ValidationError as error_impresion_directa:
+                    error_impresion = error_impresion_directa.messages[0]
+                except Exception:
+                    logger.exception("Error al imprimir devolución %s.", devolucion.id)
+                    error_impresion = "La devolución se registró, pero no fue posible enviarla a la impresora."
 
             return JsonResponse(
                 {
@@ -249,6 +291,11 @@ class CambioDirectoProcesarView(DevolucionBaseView):
                         "monto_no_reembolsado": str(
                             devolucion.monto_no_reembolsado
                         ),
+                        "ticket_url": reverse(
+                            "sales:ticket_devolucion", kwargs={"pk": devolucion.id}
+                        ) + ("" if impresion_directa else "?autoprint=1"),
+                        "impresion_directa": impresion_directa,
+                        "error_impresion": error_impresion,
                     },
                 },
                 status=201,
@@ -392,6 +439,7 @@ class CambioProductoBusquedaView(DevolucionBaseView):
                     "id": variante.id,
                     "nombre": nombre,
                     "sku": variante.sku,
+                    "codigo_barras": variante.codigo_barras or "",
                     "precio": (
                         str(precio)
                         if precio is not None

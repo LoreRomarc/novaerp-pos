@@ -4,6 +4,8 @@ from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.db.models import Sum
 
+from apps.core.models import Sucursal
+
 from apps.inventory.models_produccion import (
     OperacionProduccion,
     OperarioProduccion,
@@ -79,15 +81,15 @@ class ConfeccionService:
                     "La costurera o cantidad es inválida."
                 ) from error
 
-            if detalle_id in detalle_ids:
-                raise ValidationError(
-                    "No puede repetir una prenda en el mismo registro."
-                )
-
             if cantidad <= 0:
                 raise ValidationError(
                     "La cantidad confeccionada debe ser mayor a cero."
                 )
+
+            try:
+                sucursal_destino_id = int(item.get("sucursal_destino_id"))
+            except (TypeError, ValueError) as error:
+                raise ValidationError("La sucursal destino es inválida.") from error
 
             detalle_ids.add(detalle_id)
             operario_ids.add(operario_id)
@@ -97,6 +99,7 @@ class ConfeccionService:
                     "detalle_id": detalle_id,
                     "operario_id": operario_id,
                     "cantidad": cantidad,
+                    "sucursal_destino_id": sucursal_destino_id,
                 }
             )
 
@@ -120,6 +123,15 @@ class ConfeccionService:
             raise ValidationError(
                 "Una de las prendas no pertenece a este lote."
             )
+
+        destinos = {
+            destino.id: destino
+            for destino in Sucursal.objects.filter(
+                id__in={item["sucursal_destino_id"] for item in items_limpios}, activa=True
+            )
+        }
+        if len(destinos) != len({item["sucursal_destino_id"] for item in items_limpios}):
+            raise ValidationError("Una sucursal destino no existe o está inactiva.")
 
         # ==============================================
         # VALIDAR COSTURERAS
@@ -148,36 +160,32 @@ class ConfeccionService:
         # ==============================================
         referencia = f"CONFECCION-{lote.referencia}"
 
+        cantidades_nuevas = {}
+        for item in items_limpios:
+            cantidades_nuevas[item["detalle_id"]] = (
+                cantidades_nuevas.get(item["detalle_id"], 0) + item["cantidad"]
+            )
+
+        for detalle_id, cantidad_nueva in cantidades_nuevas.items():
+            detalle = detalles[detalle_id]
+            ya_confeccionada = OperacionProduccion.objects.filter(
+                detalle=detalle, tipo=OperacionProduccion.Tipo.CONFECCION,
+            ).aggregate(total=Sum("cantidad"))["total"] or 0
+            if cantidad_nueva > detalle.cantidad - ya_confeccionada:
+                raise ValidationError(
+                    f"No puede confeccionar {cantidad_nueva} unidades de {detalle.variante}; "
+                    f"solo quedan {detalle.cantidad - ya_confeccionada} pendientes."
+                )
+
         for item in items_limpios:
             detalle = detalles[item["detalle_id"]]
-
-            cantidad_confeccionada = (
-                OperacionProduccion.objects
-                .filter(
-                    detalle=detalle,
-                    tipo=OperacionProduccion.Tipo.CONFECCION,
-                )
-                .aggregate(total=Sum("cantidad"))["total"]
-                or 0
-            )
-
-            cantidad_pendiente = (
-                detalle.cantidad - cantidad_confeccionada
-            )
-
-            if item["cantidad"] > cantidad_pendiente:
-                raise ValidationError(
-                    f"No puede confeccionar "
-                    f"{item['cantidad']} unidades de "
-                    f"{detalle.variante}. "
-                    f"Solo quedan {cantidad_pendiente} pendientes."
-                )
 
             OperacionProduccion.objects.create(
                 detalle=detalle,
                 operario=costureras[item["operario_id"]],
                 tipo=OperacionProduccion.Tipo.CONFECCION,
                 cantidad=item["cantidad"],
+                sucursal_destino=destinos[item["sucursal_destino_id"]],
                 registrado_por=usuario,
             )
 
@@ -185,7 +193,7 @@ class ConfeccionService:
             InventoryService.agregar_stock(
                 variante=detalle.variante,
                 cantidad=item["cantidad"],
-                sucursal_id=sucursal.id,
+                sucursal_id=item["sucursal_destino_id"],
                 user=usuario,
                 referencia=referencia,
                 tipo="PRODUCCION",

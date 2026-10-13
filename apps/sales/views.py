@@ -7,9 +7,11 @@ from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.urls import reverse
 from django.views import View
 
 from apps.inventory.models import ProductoVariante, Stock
+from apps.sales.models import ConfiguracionImpresionVenta, Venta, Vendedor
 from apps.sales.services.carrito_service import CarritoService
 from apps.sales.services.pos_service import POSService
 from apps.sales.services.serializers import serializar_carrito
@@ -55,6 +57,45 @@ class POSBaseView(
 ):
     allowed_roles = POS_ROLES
 
+    def dispatch(self, request, *args, **kwargs):
+        """No permite vender con un turno de un día anterior sin decisión."""
+        if request.user.is_authenticated:
+            perfil = getattr(request.user, "profile", None)
+            if perfil:
+                try:
+                    sucursal = self.get_sucursal()
+                except ValidationError:
+                    sucursal = None
+
+                if sucursal:
+                    turno = CajaService.obtener_turno_operable(
+                        sucursal=sucursal,
+                        usuario=request.user,
+                    )
+
+                    confirmado = str(
+                        request.session.get("turno_diario_confirmado_id", "")
+                    ) == str(getattr(turno, "id", ""))
+                    continuar = (
+                        request.session.get("turno_diario_modo")
+                        == "CONTINUAR"
+                    )
+
+                    if (
+                        CajaService.turno_requiere_confirmacion_diaria(turno)
+                        and not (confirmado and continuar)
+                    ):
+                        request.session["turno_diario_pendiente_id"] = turno.id
+                        request.session["turno_diario_siguiente"] = request.get_full_path()
+                        request.session.modified = True
+                        if request.method == "GET":
+                            return redirect("sales:turno_diario")
+                        return error(
+                            "Debe decidir si continúa o cierra el turno del día anterior."
+                        )
+
+        return super().dispatch(request, *args, **kwargs)
+
     @staticmethod
     def obtener_json(request):
         try:
@@ -76,7 +117,7 @@ class POSView(POSBaseView):
     def get(self, request):
         sucursal = self.get_sucursal()
 
-        turno = CajaService.obtener_turno_activo_usuario(
+        turno = CajaService.obtener_turno_operable(
             sucursal=sucursal,
             usuario=request.user,
         )
@@ -114,6 +155,9 @@ class POSView(POSBaseView):
             {
                 "turno": turno,
                 "sucursal": sucursal,
+                "vendedores": Vendedor.objects.filter(
+                    sucursal=sucursal, activo=True
+                ).order_by("nombre"),
                 "venta": json.dumps(
                     serializar_carrito(carrito_actual)
                 ),
@@ -128,6 +172,7 @@ class POSView(POSBaseView):
                         for carrito in carritos
                     ]
                 ),
+                "impresion_ticket_navegador": False,
             },
         )
 
@@ -211,6 +256,7 @@ class POSCerrarVentaView(POSBaseView):
     def post(self, request):
         try:
             data = self.obtener_json(request)
+            permitir_credito = bool(data.get("credito", False))
 
             venta = POSService.cerrar_venta(
                 usuario=request.user,
@@ -227,13 +273,58 @@ class POSCerrarVentaView(POSBaseView):
                 },
                 cliente=data.get("cliente", ""),
                 observaciones=data.get("observaciones", ""),
+                vendedor_id=data.get("vendedor_id"),
+                permitir_credito=permitir_credito,
             )
+
+            venta = (
+                Venta.objects.select_related(
+                    "sucursal",
+                    "sucursal__empresa",
+                    "turno",
+                    "turno__caja",
+                    "usuario",
+                    "vendedor",
+                )
+                .prefetch_related("items")
+                .get(pk=venta.pk)
+            )
+            nuevo_carrito = CarritoService.crear(
+                usuario=request.user,
+                sucursal=venta.sucursal,
+            )
+            configuracion, _ = ConfiguracionImpresionVenta.objects.get_or_create(
+                sucursal=venta.sucursal,
+            )
+            error_impresion = ""
+            impresion_directa = False
+            if configuracion.impresion_automatica:
+                try:
+                    from apps.sales.services.impresion_termica_service import ImpresionTermicaService
+
+                    ImpresionTermicaService.imprimir_venta(venta, configuracion)
+                    impresion_directa = True
+                except ValidationError as error_impresion_directa:
+                    error_impresion = error_impresion_directa.messages[0]
+                except Exception:
+                    logger.exception("Error al imprimir comprobante de venta %s.", venta.id)
+                    error_impresion = "La venta se registró, pero no fue posible enviarla a la impresora."
 
             return success(
                 {
                     "reset": True,
                     "venta_id": venta.id,
                     "total": str(venta.total),
+                    "estado": venta.estado,
+                    "saldo_pendiente": str(venta.saldo_pendiente),
+                    "ticket_url": (
+                        reverse("sales:ticket_venta", kwargs={"pk": venta.id})
+                        + "?autoprint=1"
+                    ),
+                    "imprimir_ticket": False,
+                    "impresion_directa": impresion_directa,
+                    "error_impresion": error_impresion,
+                    "nuevo_carrito": serializar_carrito(nuevo_carrito),
                 }
             )
 
@@ -355,7 +446,7 @@ class ProductoAutocompleteView(POSBaseView):
         try:
             sucursal = self.get_sucursal()
 
-            variantes = list(
+            base_variantes = (
                 ProductoVariante.objects
                 .select_related(
                     "producto_base",
@@ -363,7 +454,16 @@ class ProductoAutocompleteView(POSBaseView):
                     "tipo_tela",
                     "talla",
                 )
-                .filter(
+                .filter(activo=True)
+            )
+            # El lector HID escribe el código y termina con Enter. Dar
+            # prioridad al código exacto evita que una coincidencia por nombre
+            # agregue una variante diferente.
+            coincidencia_codigo = list(
+                base_variantes.filter(codigo_barras__iexact=q)[:1]
+            )
+            variantes = coincidencia_codigo or list(
+                base_variantes.filter(
                     Q(sku__icontains=q)
                     | Q(codigo_barras__icontains=q)
                     | Q(producto_base__nombre__icontains=q)
@@ -404,6 +504,8 @@ class ProductoAutocompleteView(POSBaseView):
                         "id": variante.id,
                         "nombre": self._nombre_producto(variante),
                         "sku": variante.sku,
+                        "codigo_barras": variante.codigo_barras or "",
+                        "coincidencia_codigo": bool(coincidencia_codigo),
                         "stock": float(cantidad_actual),
                         "sin_stock": cantidad_actual <= 0,
                         "otras_sucursales": stocks_otras.get(variante.id, []),
@@ -413,6 +515,7 @@ class ProductoAutocompleteView(POSBaseView):
             return JsonResponse(
                 {
                     "results": resultados,
+                    "coincidencia_codigo": bool(coincidencia_codigo),
                 }
             )
 
@@ -488,6 +591,7 @@ class POSGuardarEstadoView(POSBaseView):
                 efectivo=data.get("efectivo", 0),
                 transferencia=data.get("transferencia", 0),
                 tarjeta=data.get("tarjeta", 0),
+                vendedor_id=data.get("vendedor_id"),
             )
 
             return success(venta)

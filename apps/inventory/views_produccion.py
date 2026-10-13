@@ -1,5 +1,6 @@
 # apps/inventory/views_produccion.py
 from django.core.exceptions import ValidationError
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import redirect, render
 from django.views import View
 
@@ -14,10 +15,16 @@ from apps.inventory.models_produccion import (
     RolloTela,
 )
 from apps.inventory.services.corte_service import CorteService
+from apps.inventory.mixins import InventoryAccessMixin
 from apps.sales.mixins import SucursalIsolationMixin
 
 
-class CorteProduccionView(SucursalIsolationMixin, View):
+class CorteProduccionView(
+    LoginRequiredMixin,
+    InventoryAccessMixin,
+    SucursalIsolationMixin,
+    View,
+):
     template_name = "inventory/corte_produccion.html"
 
     def get_context_data(self):
@@ -79,12 +86,6 @@ class CorteProduccionView(SucursalIsolationMixin, View):
                 productos = request.POST.getlist(
                     f"producto_{rollo_id}[]"
                 )
-                telas = request.POST.getlist(
-                    f"tela_{rollo_id}[]"
-                )
-                colores = request.POST.getlist(
-                    f"color_{rollo_id}[]"
-                )
                 tallas = request.POST.getlist(
                     f"talla_{rollo_id}[]"
                 )
@@ -97,8 +98,6 @@ class CorteProduccionView(SucursalIsolationMixin, View):
 
                 longitudes = {
                     len(productos),
-                    len(telas),
-                    len(colores),
                     len(tallas),
                     len(cantidades),
                     len(cortadores),
@@ -113,15 +112,11 @@ class CorteProduccionView(SucursalIsolationMixin, View):
 
                 for (
                     producto_id,
-                    tela_id,
-                    color_id,
                     talla,
                     cantidad,
                     cortador_id,
                 ) in zip(
                     productos,
-                    telas,
-                    colores,
                     tallas,
                     cantidades,
                     cortadores,
@@ -138,8 +133,6 @@ class CorteProduccionView(SucursalIsolationMixin, View):
                     items.append(
                         {
                             "producto_base_id": int(producto_id),
-                            "tipo_tela_id": int(tela_id),
-                            "color_id": int(color_id),
                             "talla": talla,
                             "cantidad": int(cantidad),
                             "operario_id": int(cortador_id),

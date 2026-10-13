@@ -28,6 +28,12 @@
         min-height: 34px;
         font-size: .9rem;
     }
+    #mensaje { position: fixed; top: 1rem; right: 1rem; width: min(26rem, calc(100vw - 2rem)); z-index: 1080; }
+    .money-decision { background: #f5f9f8; border: 1px solid #d8e6e1; border-radius: .9rem; }
+    .money-decision .amount { font-size: clamp(1.45rem, 3vw, 2rem); font-weight: 700; }
+    .money-decision.is-receivable { border-color: #b9d8cb; background: #f1f8f5; }
+    .money-decision.is-refundable { border-color: #e7cece; background: #fcf6f6; }
+    #panel-decision-dinero[hidden], #panel-pago-adicional[hidden] { display: none!important; }
 </style>
 
 <div class="container-fluid py-4">
@@ -54,8 +60,9 @@
 
         <div class="col-lg-6">
             <div class="card shadow-sm border-0 h-100">
-                <div class="card-header bg-white">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center gap-2">
                     <h5 class="mb-0">1. Recibe</h5>
+                    <div class="d-flex align-items-center gap-2"><label class="small text-muted mb-0" for="tipo-venta-recibido">Precio</label><select id="tipo-venta-recibido" class="form-select form-select-sm"><option value="MAYORISTA" selected>Mayorista</option><option value="DETAL">Detal</option></select></div>
                 </div>
 
                 <div class="card-body">
@@ -65,7 +72,8 @@
                             type="search"
                             class="form-control"
                             autocomplete="off"
-                            placeholder="Buscar prenda que entrega el cliente">
+                            placeholder="Buscar o escanear prenda que entrega el cliente">
+                        <div id="estadoLectorRecibido" class="form-text">El lector selecciona la prenda automáticamente al terminar en Enter.</div>
 
                         <div
                             id="sugerencias-recibido"
@@ -99,8 +107,9 @@
 
         <div class="col-lg-6">
             <div class="card shadow-sm border-0 h-100">
-                <div class="card-header bg-white">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center gap-2">
                     <h5 class="mb-0">2. Entrega</h5>
+                    <div class="d-flex align-items-center gap-2"><label class="small text-muted mb-0" for="tipo-venta-entregado">Precio</label><select id="tipo-venta-entregado" class="form-select form-select-sm"><option value="MAYORISTA" selected>Mayorista</option><option value="DETAL">Detal</option></select></div>
                 </div>
 
                 <div class="card-body">
@@ -110,7 +119,8 @@
                             type="search"
                             class="form-control"
                             autocomplete="off"
-                            placeholder="Buscar prenda nueva">
+                            placeholder="Buscar o escanear prenda nueva">
+                        <div id="estadoLectorEntregado" class="form-text">El lector selecciona la prenda automáticamente al terminar en Enter.</div>
 
                         <div
                             id="sugerencias-entregado"
@@ -150,15 +160,7 @@
 
         <div class="card-body">
             <div class="row g-3 mb-4">
-                <div class="col-md-3">
-                    <label class="form-label">Tipo de precio</label>
-                    <select id="tipo-venta" class="form-select">
-                        <option value="DETAL">Detal</option>
-                        <option value="MAYORISTA" selected>Mayorista</option>
-                    </select>
-                </div>
-
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <label class="form-label">
                         Venta de referencia
                     </label>
@@ -170,7 +172,7 @@
                         placeholder="Opcional">
                 </div>
 
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <label class="form-label">
                         Factura / referencia externa
                     </label>
@@ -181,7 +183,7 @@
                         placeholder="Opcional">
                 </div>
 
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <label class="form-label">Motivo *</label>
                     <input
                         id="motivo"
@@ -191,118 +193,78 @@
                 </div>
             </div>
 
-            <div class="row g-3 align-items-end">
-                <div class="col-md-4">
-                    <div class="form-check mb-2">
-                        <input
-                            id="permite-reembolso"
-                            class="form-check-input"
-                            type="checkbox">
-
-                        <label
-                            class="form-check-label"
-                            for="permite-reembolso">
-                            Reembolsar diferencia al cliente
-                        </label>
-                    </div>
-
-                    <select
-                        id="medio-reembolso"
-                        class="form-select"
-                        disabled>
-                        <option value="">Medio de reembolso</option>
-                        <option value="EFECTIVO">Efectivo</option>
-                        <option value="TARJETA">Tarjeta</option>
-                        <option value="TRANSFERENCIA">
-                            Transferencia
-                        </option>
-                    </select>
+            <div id="panel-decision-dinero" class="money-decision p-3 mb-3">
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                    <div><div class="text-muted small" id="titulo-decision-dinero">Resultado del cambio</div><div class="amount" id="monto-decision-dinero">Seleccione prendas</div><div class="small text-muted" id="ayuda-decision-dinero">El sistema calculará el valor automáticamente.</div></div>
+                    <div class="col-12 col-md-5"><label class="form-label mb-1" for="accion-saldo">Si queda saldo a favor</label><select id="accion-saldo" class="form-select" disabled><option value="">Primero agregue las prendas</option><option value="CONSERVAR">Sin reembolso</option><option value="EFECTIVO">Reembolso en efectivo</option><option value="TRANSFERENCIA">Reembolso por transferencia</option></select><div class="form-text">Solo se habilita si la prenda nueva vale menos; si vale más, el cobro se define abajo.</div></div>
                 </div>
-
-                <div class="col-md-8" id="panel-pago-adicional">
+            </div>
+            <input id="permite-reembolso" type="checkbox" class="d-none">
+            <select id="medio-reembolso" class="d-none"><option value=""></option><option value="EFECTIVO">Efectivo</option><option value="TRANSFERENCIA">Transferencia</option></select>
+            <div class="row g-3 align-items-end" id="panel-pago-adicional">
+                <div class="col-md-4">
+                    <label class="form-label mb-1" for="medio-pago-adicional">Cobro adicional</label>
+                    <select id="medio-pago-adicional" class="form-select" disabled><option value="">El cliente no debe pagar</option><option value="EFECTIVO">Efectivo</option><option value="TRANSFERENCIA">Transferencia</option><option value="COMBINADO">Pago combinado</option></select>
+                </div>
+                <div class="col-md-8">
                     <div class="row g-2">
-                        <div class="col-md-12">
-                            <label class="form-label mb-1" for="medio-pago-adicional">
-                                Medio de pago adicional
-                            </label>
-                            <select id="medio-pago-adicional" class="form-select" disabled>
-                                <option value="">Seleccione cómo paga el cliente</option>
-                                <option value="EFECTIVO">Efectivo</option>
-                                <option value="TARJETA">Tarjeta</option>
-                                <option value="TRANSFERENCIA">Transferencia</option>
-                                <option value="COMBINADO">Combinado</option>
-                            </select>
-                            <div class="form-text" id="ayuda-pago-adicional">
-                                Se habilita cuando la prenda entregada tiene un valor mayor.
-                            </div>
-                        </div>
-                        <div class="col-md-4">
-                            <label class="form-label">
-                                Pago adicional efectivo
-                            </label>
+                        <div class="col-md-6"><label class="form-label">Efectivo recibido</label>
                             <input
                                 id="efectivo"
-                                type="number"
-                                min="0"
-                                step="100"
-                                value="0"
+                                type="text"
+                                inputmode="numeric"
+                                placeholder="$ 0"
                                 class="form-control pago-adicional"
                                 disabled>
                         </div>
 
-                        <div class="col-md-4">
-                            <label class="form-label">
-                                Pago adicional tarjeta
-                            </label>
+                        {# TARJETA: preparada para activarse cuando se habilite ese medio de pago. #}
+                        <div class="col-md-4 d-none">
                             <input
                                 id="tarjeta"
-                                type="number"
-                                min="0"
-                                step="100"
-                                value="0"
+                                type="text"
+                                inputmode="numeric"
+                                placeholder="$ 0"
                                 class="form-control pago-adicional"
                                 disabled>
                         </div>
 
-                        <div class="col-md-4">
-                            <label class="form-label">
-                                Pago adicional transferencia
-                            </label>
+                        <div class="col-md-6"><label class="form-label">Transferencia recibida</label>
                             <input
                                 id="transferencia"
-                                type="number"
-                                min="0"
-                                step="100"
-                                value="0"
+                                type="text"
+                                inputmode="numeric"
+                                placeholder="$ 0"
                                 class="form-control pago-adicional"
                                 disabled>
                         </div>
                     </div>
-                    <div id="detalle-pago-adicional" class="small mt-2 text-muted"></div>
+                    <div id="detalle-pago-adicional" class="small mt-2 text-muted">Seleccione el medio solo si el cliente debe pagar un excedente.</div>
+                    <div id="valor-vuelto" class="small fw-semibold text-success mt-1" hidden>Vuelto: $0</div>
                 </div>
             </div>
 
             <hr>
 
             <div class="row g-3">
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <small class="text-muted">Valor recibido</small>
                     <h4 id="total-recibido">$0</h4>
                 </div>
 
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <small class="text-muted">Valor entregado</small>
                     <h4 id="total-entregado">$0</h4>
                 </div>
 
-                <div class="col-md-3">
+                <div class="col-md-4">
                     <small class="text-muted">Resultado</small>
                     <h4 id="resultado" class="text-primary">
                         Sin productos
                     </h4>
                 </div>
 
-                <div class="col-md-3 d-flex align-items-end justify-content-end">
+                <div class="col-md-12 d-flex align-items-end justify-content-end">
                     <button
                         id="btn-procesar"
                         type="button"
@@ -329,8 +291,25 @@ const dinero = new Intl.NumberFormat("es-CO", {
 });
 
 function valorNumerico(valor) {
-    const numero = Number(valor);
-    return Number.isFinite(numero) ? numero : 0;
+    const texto = String(valor ?? "").trim().replace(/\$/g, "").replace(/\s/g, "");
+    if (!texto) return 0;
+    // API: 12500.00; operación colombiana: 12.500. Ambos son válidos.
+    if (/^\d+\.\d{1,2}$/.test(texto)) return Number(texto) || 0;
+    return Number(texto.replace(/\D/g, "")) || 0;
+}
+
+function formatearCOP(valor) {
+    const monto = Math.round(valorNumerico(valor));
+    return monto ? monto.toLocaleString("es-CO") : "";
+}
+
+function configurarCampoCOP(campo) {
+    campo.addEventListener("focus", () => setTimeout(() => campo.select(), 0));
+    campo.addEventListener("input", () => {
+        const monto = valorNumerico(campo.value);
+        campo.value = formatearCOP(monto);
+    });
+    campo.addEventListener("blur", () => { campo.value = formatearCOP(campo.value); });
 }
 
 // Debe coincidir con redondear_a_peso_colombiano() del servidor. Cada línea
@@ -449,25 +428,25 @@ function renderTabla(tipo) {
             fila.appendChild(celdaEstado);
         }
 
+        const celdaPrecio = document.createElement("td");
+        celdaPrecio.className = "text-end";
+
+        // Debe existir antes de enlazar los campos. Si no se crea, al
+        // agregar una prenda el navegador lanza ReferenceError y no pinta
+        // ninguna fila aunque el producto sí se haya agregado a la lista.
         const celdaValor = document.createElement("td");
-        celdaValor.className = "text-end";
+        celdaValor.className = "text-end fw-semibold text-nowrap";
         celdaValor.textContent = dinero.format(
             totalLinea(item.cantidad, item.precio)
         );
 
-        fila.appendChild(celdaValor);
-
-        const celdaPrecio = document.createElement("td");
-        celdaPrecio.className = "text-end";
-
         if (puedeModificarPrecio) {
             const inputPrecio = document.createElement("input");
 
-            inputPrecio.type = "number";
-            inputPrecio.min = "1";
-            inputPrecio.step = "1";
-            inputPrecio.value = item.precio || "";
-            inputPrecio.placeholder = "Precio";
+            inputPrecio.type = "text";
+            inputPrecio.inputMode = "numeric";
+            inputPrecio.value = formatearCOP(item.precio);
+            inputPrecio.placeholder = "$ 0";
             inputPrecio.className =
                 "form-control form-control-sm text-end";
 
@@ -481,6 +460,7 @@ function renderTabla(tipo) {
 
                 actualizarResumen();
             });
+            configurarCampoCOP(inputPrecio);
 
             celdaPrecio.appendChild(inputPrecio);
 
@@ -524,6 +504,7 @@ function actualizarResumen() {
     document.getElementById("total-entregado").textContent =
         dinero.format(entregado);
 
+    sincronizarDecisionDinero(diferencia);
     const resultado = document.getElementById("resultado");
     actualizarPanelPago(diferencia);
 
@@ -562,19 +543,71 @@ function actualizarResumen() {
     resultado.textContent = "Cambio por valor igual";
 }
 
+function selectorTipoPrecio(tipo) {
+    return document.getElementById(
+        tipo === "recibido"
+            ? "tipo-venta-recibido"
+            : "tipo-venta-entregado"
+    );
+}
+
+function sincronizarDecisionDinero(diferencia) {
+    const panel = document.getElementById("panel-decision-dinero");
+    const accion = document.getElementById("accion-saldo");
+    const checkbox = document.getElementById("permite-reembolso");
+    const medio = document.getElementById("medio-reembolso");
+    const titulo = document.getElementById("titulo-decision-dinero");
+    const monto = document.getElementById("monto-decision-dinero");
+    const ayuda = document.getElementById("ayuda-decision-dinero");
+
+    panel.classList.remove("is-receivable", "is-refundable");
+    panel.hidden = diferencia >= 0;
+    if (diferencia > 0) {
+        titulo.textContent = "El cliente debe pagar";
+        monto.textContent = dinero.format(diferencia);
+        ayuda.textContent = "El cobro se configura abajo con efectivo, transferencia o combinado.";
+        accion.disabled = true;
+        accion.value = "";
+        checkbox.checked = false;
+        medio.value = "";
+        return;
+    }
+
+    if (diferencia < 0) {
+        const saldo = Math.abs(diferencia);
+        titulo.textContent = "Vuelto / saldo a favor del cliente";
+        monto.textContent = dinero.format(saldo);
+        ayuda.textContent = "Seleccione si reembolsa el saldo o si el cliente acepta la diferencia sin devolución.";
+        accion.disabled = false;
+        if (!accion.value) accion.value = "CONSERVAR";
+        checkbox.checked = accion.value !== "CONSERVAR";
+        medio.value = checkbox.checked ? accion.value : "";
+        panel.classList.add("is-refundable");
+        return;
+    }
+
+    titulo.textContent = "Cambio por el mismo valor";
+    monto.textContent = "$0";
+    ayuda.textContent = "No hay dinero por cobrar ni por devolver.";
+    accion.disabled = true;
+    accion.value = "";
+    checkbox.checked = false;
+    medio.value = "";
+}
+
 function valorPago(id) {
     return valorNumerico(document.getElementById(id).value);
 }
 
 function establecerPago(id, valor) {
-    document.getElementById(id).value = valor > 0 ? valor : 0;
+    document.getElementById(id).value = formatearCOP(valor);
 }
 
 function actualizarPanelPago(diferencia) {
     const medio = document.getElementById("medio-pago-adicional");
-    const permiteReembolso = document.getElementById("permite-reembolso");
-    const medioReembolso = document.getElementById("medio-reembolso");
+    const panelPago = document.getElementById("panel-pago-adicional");
     const detalle = document.getElementById("detalle-pago-adicional");
+    const valorVuelto = document.getElementById("valor-vuelto");
     const campos = {
         EFECTIVO: document.getElementById("efectivo"),
         TARJETA: document.getElementById("tarjeta"),
@@ -582,28 +615,20 @@ function actualizarPanelPago(diferencia) {
     };
 
     if (diferencia <= 0) {
+        panelPago.hidden = true;
         medio.disabled = true;
         medio.value = "";
         Object.values(campos).forEach((campo) => {
             campo.disabled = true;
             campo.value = 0;
         });
-        permiteReembolso.disabled = diferencia >= 0;
-        if (diferencia >= 0) {
-            permiteReembolso.checked = false;
-            medioReembolso.value = "";
-            medioReembolso.disabled = true;
-        }
         detalle.textContent = diferencia < 0
-            ? "No se cobra pago adicional. Active el reembolso solo si va a devolver el saldo al cliente."
+            ? "No se cobra: resuelva el saldo a favor en la sección superior."
             : "No hay diferencia por cobrar.";
+        valorVuelto.hidden = true;
         return;
     }
-
-    permiteReembolso.checked = false;
-    permiteReembolso.disabled = true;
-    medioReembolso.value = "";
-    medioReembolso.disabled = true;
+    panelPago.hidden = false;
     medio.disabled = false;
 
     const seleccionado = medio.value;
@@ -616,6 +641,7 @@ function actualizarPanelPago(diferencia) {
 
     if (!seleccionado) {
         detalle.textContent = "Seleccione el medio con el que el cliente pagará la diferencia.";
+        valorVuelto.hidden = true;
         return;
     }
 
@@ -629,10 +655,14 @@ function actualizarPanelPago(diferencia) {
     if (vuelto > 0) {
         detalle.textContent = "Recibido: " + dinero.format(totalIngresado)
             + " · Vuelto: " + dinero.format(vuelto);
+        valorVuelto.textContent = "Vuelto: " + dinero.format(vuelto);
+        valorVuelto.hidden = false;
     } else if (pendiente > 0) {
         detalle.textContent = "Pendiente por cobrar: " + dinero.format(pendiente);
+        valorVuelto.hidden = true;
     } else {
         detalle.textContent = "Pago completo: " + dinero.format(diferencia);
+        valorVuelto.hidden = true;
     }
 }
 
@@ -654,7 +684,13 @@ function configurarMedioPago() {
 
 function pagosParaEnviar(diferencia) {
     if (diferencia <= 0) {
-        return { efectivo: 0, tarjeta: 0, transferencia: 0 };
+        return {
+            efectivo: 0,
+            tarjeta: 0,
+            transferencia: 0,
+            efectivo_recibido: 0,
+            vuelto_efectivo: 0,
+        };
     }
 
     const efectivo = valorPago("efectivo");
@@ -677,6 +713,8 @@ function pagosParaEnviar(diferencia) {
         efectivo: efectivo - vuelto,
         tarjeta: tarjeta,
         transferencia: transferencia,
+        efectivo_recibido: efectivo,
+        vuelto_efectivo: vuelto,
     };
 }
 
@@ -685,9 +723,7 @@ async function buscarProducto(tipo, valor) {
         return [];
     }
 
-    const tipoVenta = document.getElementById(
-        "tipo-venta"
-    ).value;
+    const tipoVenta = selectorTipoPrecio(tipo).value;
 
     const url =
         "{% url 'sales:devolucion_buscar_producto' %}"
@@ -796,6 +832,7 @@ function activarBuscador(tipo) {
     );
 
     let temporizador;
+    input.cancelarBusquedaProducto = () => clearTimeout(temporizador);
 
     input.addEventListener("input", function () {
         clearTimeout(temporizador);
@@ -878,9 +915,11 @@ async function procesarOperacion() {
             motivo_precio: item.motivo_precio || motivo,
         })),
 
-        tipo_venta: document.getElementById(
-            "tipo-venta"
-        ).value,
+        // Cada lado conserva su propia lista: recibir una prenda a precio
+        // mayorista no obliga a entregar la nueva con esa misma lista.
+        tipo_venta: selectorTipoPrecio("entregado").value,
+        tipo_venta_recibido: selectorTipoPrecio("recibido").value,
+        tipo_venta_entregado: selectorTipoPrecio("entregado").value,
 
         venta_id: document.getElementById(
             "venta-id"
@@ -897,9 +936,14 @@ async function procesarOperacion() {
         efectivo: pagos.efectivo,
         tarjeta: pagos.tarjeta,
         transferencia: pagos.transferencia,
+        efectivo_recibido: pagos.efectivo_recibido,
+        vuelto_efectivo: pagos.vuelto_efectivo,
     };
 
     const boton = document.getElementById("btn-procesar");
+    // Debe crearse durante el clic, antes de la petición, para que el
+    // navegador no bloquee el nuevo comprobante por tratarlo como popup.
+    const ventanaComprobante = window.open("about:blank", "comprobante_devolucion", "popup=yes,width=420,height=680");
     boton.disabled = true;
     boton.textContent = "Procesando...";
 
@@ -929,6 +973,14 @@ async function procesarOperacion() {
             + " procesada correctamente.",
             "success"
         );
+        if (data.data.ticket_url) {
+            if (ventanaComprobante) ventanaComprobante.location.replace(data.data.ticket_url);
+        } else {
+            ventanaComprobante?.close();
+        }
+        if (data.data.error_impresion) {
+            mostrarMensaje("Operación registrada. " + data.data.error_impresion, "warning");
+        }
 
         recibidos.splice(0);
         entregados.splice(0);
@@ -942,6 +994,7 @@ async function procesarOperacion() {
         document.getElementById("referencia-externa").value = "";
 
     } catch (error) {
+        ventanaComprobante?.close();
         mostrarMensaje(error.message);
 
     } finally {
@@ -950,16 +1003,14 @@ async function procesarOperacion() {
     }
 }
 
-async function actualizarPreciosPorTipo() {
-    const items = [...recibidos, ...entregados];
+async function actualizarPreciosPorTipo(tipo) {
+    const items = tipo === "recibido" ? recibidos : entregados;
 
     if (!items.length) {
         return;
     }
 
-    const tipoVenta = document.getElementById(
-        "tipo-venta"
-    ).value;
+    const tipoVenta = selectorTipoPrecio(tipo).value;
 
     try {
         for (const item of items) {
@@ -969,7 +1020,7 @@ async function actualizarPreciosPorTipo() {
             }
 
             const resultados = await buscarProducto(
-                "recibido",
+                tipo,
                 item.sku
             );
 
@@ -987,13 +1038,13 @@ async function actualizarPreciosPorTipo() {
             item.precio = producto.precio;
         }
 
-        renderTabla("recibido");
-        renderTabla("entregado");
+        renderTabla(tipo);
         actualizarResumen();
 
         mostrarMensaje(
-            "Se conservaron los productos y se actualizaron "
-            + "sus precios de " + tipoVenta + ".",
+            "Se actualizaron los precios de "
+            + (tipo === "recibido" ? "las prendas recibidas" : "las prendas entregadas")
+            + " según la lista " + tipoVenta + ".",
             "success"
         );
 
@@ -1006,36 +1057,49 @@ document.addEventListener("DOMContentLoaded", function () {
 activarBuscador("recibido");
 activarBuscador("entregado");
 
+["recibido", "entregado"].forEach((tipo) => {
+    const input = document.getElementById(
+        tipo === "recibido" ? "buscar-recibido" : "buscar-entregado"
+    );
+    configurarLectorProducto({
+        input,
+        estado: document.getElementById(
+            tipo === "recibido" ? "estadoLectorRecibido" : "estadoLectorEntregado"
+        ),
+        endpoint: (codigo) => (
+            "{% url 'sales:devolucion_buscar_producto' %}"
+            + "?q=" + encodeURIComponent(codigo)
+            + "&tipo_venta=" + encodeURIComponent(selectorTipoPrecio(tipo).value)
+        ),
+        alEncontrar: (producto) => {
+            input.cancelarBusquedaProducto?.();
+            agregarProducto(tipo, producto);
+            document.getElementById(
+                tipo === "recibido" ? "sugerencias-recibido" : "sugerencias-entregado"
+            ).replaceChildren();
+        },
+    });
+});
+
 document.getElementById("medio-pago-adicional").addEventListener(
     "change", configurarMedioPago
 );
 
+document.getElementById("accion-saldo").addEventListener("change", function () {
+    actualizarResumen();
+});
+
 document.querySelectorAll(".pago-adicional").forEach((campo) => {
+    configurarCampoCOP(campo);
     campo.addEventListener("input", () => {
         actualizarPanelPago(total(entregados) - total(recibidos));
     });
 });
 
-    document.getElementById(
-        "permite-reembolso"
-    ).addEventListener("change", function () {
-        const medio = document.getElementById(
-            "medio-reembolso"
-        );
-
-        medio.disabled = !this.checked;
-
-        if (!this.checked) {
-            medio.value = "";
-        }
-
-        actualizarResumen();
-    });
-
-    document.getElementById(
-        "tipo-venta"
-    ).addEventListener("change", function () {
-        actualizarPreciosPorTipo();
+    ["recibido", "entregado"].forEach((tipo) => {
+        selectorTipoPrecio(tipo).addEventListener("change", () => {
+            actualizarPreciosPorTipo(tipo);
+        });
     });
 
     document.getElementById(
