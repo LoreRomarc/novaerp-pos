@@ -16,16 +16,17 @@ pip install -r requirements.txt
 
 Crea un archivo `.env` con las variables requeridas por `settings.py`: clave secreta, `DEBUG`, hosts permitidos, credenciales de la base de datos y cualquier integración de correo o almacenamiento que el proyecto tenga configurada. No subas ese archivo al repositorio.
 
-Después prepara la base de datos y el administrador inicial:
+Después prepara la base de datos y arranca el servidor:
 
 ```powershell
 python manage.py migrate
-python manage.py createsuperuser
 python manage.py collectstatic --noinput
 python manage.py runserver 0.0.0.0:8001
 ```
 
-Abre `http://127.0.0.1:8001/` e inicia sesión. En producción ejecuta `collectstatic`, configura `DEBUG=False`, HTTPS, copias de seguridad y un servidor WSGI/ASGI detrás de un proxy web. Nunca uses `runserver` como servidor de producción.
+Abra `http://127.0.0.1:8001/setup/` y complete el asistente una sola vez: ahí se crea el superadministrador, la empresa, la primera sucursal y la caja. Después ingrese en `http://127.0.0.1:8001/accounts/login/`. No ejecute el asistente por segunda vez para editar datos: use Administración.
+
+`python manage.py createsuperuser` es opcional y solo sirve como cuenta técnica de recuperación para el administrador de Django; no es necesario para usar NovaERP por primera vez. En producción ejecuta `collectstatic`, configura `DEBUG=False`, HTTPS, copias de seguridad y un servidor WSGI/ASGI detrás de un proxy web. Nunca uses `runserver` como servidor de producción.
 
 ## 2. Orden recomendado de configuración inicial
 
@@ -34,12 +35,18 @@ La puesta en marcha se realiza una sola vez y debe hacerla un superadministrador
 1. En **Setup inicial**, registra los datos de la empresa. Cuando ya exista una empresa, el setup no debe usarse como formulario para crear una nueva; usa **Administración > Empresa** para actualizar los datos.
 2. En **Administración > Sucursales**, crea cada sede activa. Cada sucursal debe tener su caja operativa configurada antes de vender.
 3. En **Administración > Usuarios**, crea los usuarios, asígnales rol y sucursal. Los empleados de producción no necesitan usuario: se administran desde el módulo de producción.
-4. En **Administración > Catálogos**, registra telas, colores y tallas.
+4. En **Administración > Catálogos**, revisa telas, colores y tallas. El setup crea las telas técnicas iniciales, el color **Sin Definir** y las tallas operativas. Para cargas masivas, edita `apps/inventory/data/catalogo_productos.py` y ejecuta `python manage.py cargar_catalogo_productos` desde la carpeta del proyecto.
 5. En **Productos**, crea el producto base y después sus variantes (SKU, tela, color y talla).
 6. En **Administración > Listas de precios**, crea **Mayorista** y **Detal** y marca, en una sola operación, las sucursales que las usan.
 7. En **Administración > Precios por producto**, busca una variante, escoge las sucursales y captura los precios mayorista y/o detal. Un guardado crea o actualiza ambos precios sin repetir el producto por sede.
 
 Antes de que un cajero pueda vender, el administrador debe crear las cajas de cada sucursal y el cajero debe abrir su turno.
+
+Si el sistema ya existía antes de esta versión y quieres añadir los catálogos iniciales sin alterar registros históricos, ejecuta una sola vez:
+
+```powershell
+python manage.py reparar_sistema
+```
 
 ## 3. Roles y sucursales
 

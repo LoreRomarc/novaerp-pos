@@ -2,7 +2,7 @@
 from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.db.models import Q, Sum
+from django.db.models import Case, IntegerField, Q, Sum, Value, When
 from django.urls import reverse_lazy
 from django.views.generic import (
     ListView,
@@ -92,32 +92,43 @@ class VarianteForm(forms.ModelForm):
 
         super().__init__(*args, **kwargs)
 
-        self.fields["tipo_tela"].queryset = (
-            self.fields["tipo_tela"]
-            .queryset
-            .filter(activo=True)
-            .order_by("nombre")
-        )
+        telas = self.fields["tipo_tela"].queryset.filter(activo=True)
+        if self.instance.pk and self.instance.tipo_tela_id:
+            telas = self.fields["tipo_tela"].queryset.filter(
+                Q(activo=True) | Q(pk=self.instance.tipo_tela_id)
+            )
+        self.fields["tipo_tela"].queryset = telas.order_by("nombre")
 
-        self.fields["talla"].queryset = (
-            self.fields["talla"]
-            .queryset
-            .filter(activo=True)
-            .order_by("orden", "nombre")
-        )
+        tallas = self.fields["talla"].queryset.filter(activo=True)
+        if self.instance.pk and self.instance.talla_id:
+            tallas = self.fields["talla"].queryset.filter(
+                Q(activo=True) | Q(pk=self.instance.talla_id)
+            )
+        self.fields["talla"].queryset = tallas.order_by("orden", "nombre")
 
+        colores = self.fields["color"].queryset.filter(activo=True)
+        if self.instance.pk and self.instance.color_id:
+            colores = self.fields["color"].queryset.filter(
+                Q(activo=True) | Q(pk=self.instance.color_id)
+            )
         self.fields["color"].queryset = (
-            self.fields["color"]
-            .queryset
-            .order_by("nombre")
+            colores
+            .annotate(
+                es_sin_definir=Case(
+                    When(nombre__iexact="Sin Definir", then=Value(0)),
+                    default=Value(1),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by("es_sin_definir", "nombre")
         )
 
-        self.fields["producto_base"].queryset = (
-            self.fields["producto_base"]
-            .queryset
-            .filter(activo=True)
-            .order_by("nombre")
-        )
+        productos = self.fields["producto_base"].queryset.filter(activo=True)
+        if self.instance.pk and self.instance.producto_base_id:
+            productos = self.fields["producto_base"].queryset.filter(
+                Q(activo=True) | Q(pk=self.instance.producto_base_id)
+            )
+        self.fields["producto_base"].queryset = productos.order_by("nombre")
 
         self.fields["producto_base"].empty_label = "Seleccione producto"
         self.fields["tipo_tela"].empty_label = "Seleccione tela"
@@ -127,6 +138,12 @@ class VarianteForm(forms.ModelForm):
         self.fields["sku"].widget.attrs["placeholder"] = "Se genera automáticamente"
         self.fields["codigo_barras"].required = False
         self.fields["codigo_barras"].widget.attrs["placeholder"] = "Se genera automáticamente"
+        if not self.instance.pk:
+            color = self.fields["color"].queryset.filter(
+                nombre__iexact="Sin Definir"
+            ).first()
+            if color:
+                self.initial.setdefault("color", color.pk)
 
 
 # ======================================================

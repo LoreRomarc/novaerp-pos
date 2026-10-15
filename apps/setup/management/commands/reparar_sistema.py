@@ -25,7 +25,7 @@ class Command(BaseCommand):
         )
 
 
-        reparado = SetupRepairService.reparar_cajas()
+        reparado = SetupRepairService.reparar_sistema()
 
 
 
@@ -34,7 +34,7 @@ class Command(BaseCommand):
             self.stdout.write(
 
                 self.style.SUCCESS(
-                    "Revisión de cajas completada."
+                    "Perfiles y datos maestros revisados correctamente."
                 )
 
             )

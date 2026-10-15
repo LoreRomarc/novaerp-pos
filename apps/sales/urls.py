@@ -57,6 +57,7 @@ from .views import (
     POSCerrarVentaView,
     POSEliminarItemView,
     POSGuardarEstadoView,
+    POSVendedoresVisiblesView,
     POSView,
     ProductoAutocompleteView,
 )
@@ -77,6 +78,7 @@ urlpatterns = [
     path("pos/cargar/", POSCargarVentaView.as_view(), name="pos_cargar"),
     path("pos/nueva/", POSNuevaVentaView.as_view(), name="pos_nueva_venta"),
     path("pos/guardar/", POSGuardarEstadoView.as_view(), name="pos_guardar"),
+    path("pos/vendedores-visibles/", POSVendedoresVisiblesView.as_view(), name="pos_vendedores_visibles"),
     path("ventas/<int:pk>/comprobante/", TicketVentaView.as_view(), name="ticket_venta"),
     path("devoluciones/<int:pk>/comprobante/", TicketDevolucionView.as_view(), name="ticket_devolucion"),
     path("ventas/impresion/", ConfiguracionImpresionVentaView.as_view(), name="configuracion_impresion"),

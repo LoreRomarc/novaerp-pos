@@ -7,7 +7,6 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
-from django.urls import reverse
 from django.views.generic import TemplateView, View
 from django.contrib.auth import get_user_model
 from django.db.models import Q
@@ -239,71 +238,44 @@ class CajaConfiguracionView(
 
     template_name = "sales/caja/configuracion.html"
 
-    def _obtener_sucursal_configuracion(self, request):
-        """Resuelve la sede elegida explícitamente para administrar sus cajas."""
-        sucursal_id = (
-            request.POST.get("sucursal_id")
-            or request.GET.get("sucursal")
-        )
-
-        if not sucursal_id:
-            return self.get_sucursal()
-
+    def _obtener_sucursal_formulario(self, request):
         sucursal = Sucursal.objects.filter(
-            pk=sucursal_id,
+            pk=request.POST.get("sucursal_id"),
             activa=True,
         ).first()
         if not sucursal:
             raise ValidationError(
-                "Seleccione una sucursal activa válida para administrar cajas."
+                "Seleccione una sucursal activa para la caja."
             )
         return sucursal
 
-    @staticmethod
-    def _redirigir_configuracion(sucursal):
-        return redirect(
-            f"{reverse('sales:caja_configuracion')}?sucursal={sucursal.id}"
-        )
-
-    def _contexto(self, sucursal, error=None):
+    def _contexto(self, error=None, sucursal_formulario=None):
         return {
-            "sucursal": sucursal,
             "error": error,
+            "sucursal_formulario": sucursal_formulario or self.get_sucursal(),
             "sucursales": Sucursal.objects.filter(activa=True).order_by("nombre"),
             "cajas": (
                 Caja.objects
-                .filter(sucursal=sucursal)
-                .order_by("codigo")
+                .select_related("sucursal")
+                .order_by("sucursal__nombre", "codigo")
             ),
         }
 
     def get(self, request):
-        try:
-            sucursal = self._obtener_sucursal_configuracion(request)
-        except ValidationError as error:
-            sucursal = self.get_sucursal()
-            return render(
-                request,
-                self.template_name,
-                self._contexto(sucursal, error.messages[0]),
-                status=400,
-            )
-
         return render(
             request,
             self.template_name,
-            self._contexto(sucursal),
+            self._contexto(),
         )
 
     def post(self, request):
         try:
-            sucursal = self._obtener_sucursal_configuracion(request)
+            sucursal = self._obtener_sucursal_formulario(request)
         except ValidationError as error:
-            sucursal = self.get_sucursal()
             return render(
                 request,
                 self.template_name,
-                self._contexto(sucursal, error.messages[0]),
+                self._contexto(error.messages[0]),
                 status=400,
             )
 
@@ -311,32 +283,47 @@ class CajaConfiguracionView(
         caja_id = request.POST.get("caja_id")
 
         if accion in {"actualizar", "cambiar_estado"}:
-            caja = Caja.objects.filter(pk=caja_id, sucursal=sucursal).first()
+            caja = Caja.objects.filter(pk=caja_id).first()
             if not caja:
                 return render(request, self.template_name, self._contexto(
-                    sucursal, "La caja indicada no existe en esta sucursal."
+                    "La caja indicada no existe."
                 ), status=404)
+
+            # No se permite alterar la sucursal de una caja con historial:
+            # turnos y movimientos ya registrados deben conservar su sede.
+            if (
+                caja.sucursal_id != sucursal.id
+                and (caja.turnos.exists() or caja.movimientos.exists())
+            ):
+                return render(request, self.template_name, self._contexto(
+                    "No se puede mover una caja que ya tiene turnos o movimientos. "
+                    "Desactívela y cree una nueva en la sucursal correcta.",
+                    sucursal,
+                ), status=400)
+
             if accion == "cambiar_estado":
                 caja.activa = not caja.activa
                 caja.save(update_fields=["activa"])
-                return self._redirigir_configuracion(sucursal)
+                return redirect("sales:caja_configuracion")
 
             codigo = (request.POST.get("codigo") or "").strip().upper()
             nombre = (request.POST.get("nombre") or "").strip()
             if not codigo or not nombre:
                 return render(request, self.template_name, self._contexto(
-                    sucursal, "Código y nombre son obligatorios."
+                    "Código y nombre son obligatorios.", sucursal
                 ), status=400)
+            caja.sucursal = sucursal
             caja.codigo = codigo
             caja.nombre = nombre
             try:
                 caja.full_clean()
-                caja.save(update_fields=["codigo", "nombre"])
+                caja.save(update_fields=["sucursal", "codigo", "nombre"])
             except (ValidationError, IntegrityError):
                 return render(request, self.template_name, self._contexto(
-                    sucursal, "No fue posible actualizar: el código ya existe o los datos no son válidos."
+                    "No fue posible actualizar: el código ya existe o los datos no son válidos.",
+                    sucursal,
                 ), status=400)
-            return self._redirigir_configuracion(sucursal)
+            return redirect("sales:caja_configuracion")
 
         codigo = (request.POST.get("codigo") or "").strip().upper()
         nombre = (request.POST.get("nombre") or "").strip()
@@ -346,8 +333,8 @@ class CajaConfiguracionView(
                 request,
                 self.template_name,
                 self._contexto(
-                    sucursal,
                     "Código y nombre son obligatorios.",
+                    sucursal,
                 ),
                 status=400,
             )
@@ -368,8 +355,8 @@ class CajaConfiguracionView(
                 request,
                 self.template_name,
                 self._contexto(
-                    sucursal,
                     " ".join(error.messages),
+                    sucursal,
                 ),
                 status=400,
             )
@@ -379,13 +366,13 @@ class CajaConfiguracionView(
                 request,
                 self.template_name,
                 self._contexto(
-                    sucursal,
                     "Ya existe una caja con ese código en esta sucursal.",
+                    sucursal,
                 ),
                 status=400,
             )
 
-        return self._redirigir_configuracion(sucursal)
+        return redirect("sales:caja_configuracion")
         
 class CajaDashboardView(
     LoginRequiredMixin,

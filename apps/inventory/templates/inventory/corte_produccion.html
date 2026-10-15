@@ -19,7 +19,7 @@
 
     .rollo-header {
         display: grid;
-            grid-template-columns: minmax(240px, 2fr) 140px 170px 135px auto auto;
+            grid-template-columns: minmax(180px, 1.4fr) 130px 155px minmax(155px, 1fr) auto auto;
         gap: 8px;
         align-items: center;
         padding: 10px;
@@ -125,15 +125,19 @@
             </div>
         </div>
 
-        <div id="rollosContainer"></div>
-
-        <div class="d-flex justify-content-between align-items-center mt-3">
+        <div class="d-flex align-items-center justify-content-between gap-2 mb-2">
             <button
                 type="button"
                 class="btn btn-outline-primary"
                 onclick="addRollo()">
-                + Agregar rollo
+                <i class="bi bi-plus-lg"></i> Agregar rollo
             </button>
+            <small class="text-muted">Agregue solo los rollos que se usarán en este corte.</small>
+        </div>
+
+        <div id="rollosContainer"></div>
+
+        <div class="d-flex justify-content-end align-items-center mt-3">
 
             <button class="btn btn-success px-4">
                 Registrar corte
@@ -198,7 +202,6 @@ function opcionesTallas() {
 
 function opcionesCortadores() {
     return `
-        <option value="">Cortador</option>
         {% for cortador in cortadores %}
         <option value="{{ cortador.id }}">
             {{ cortador.nombre }}
@@ -257,7 +260,7 @@ function addRollo() {
             <div>Color</div>
             <div>Talla</div>
             <div>Cant.</div>
-            <div>Cortador</div>
+            <div>Equipo de corte</div>
             <div></div>
         </div>
 
@@ -383,8 +386,8 @@ function actualizarRestante(bloque) {
         select.selectedOptions[0].dataset.disponible
     );
 
-    const metros = Number(
-        bloque.querySelector(".metros-input").value || 0
+    const metros = leerNumeroDecimal(
+        bloque.querySelector(".metros-input").value
     );
 
     const etiqueta = bloque.querySelector(".restante");
@@ -395,7 +398,7 @@ function actualizarRestante(bloque) {
         return;
     }
 
-    const restante = disponible - metros;
+    const restante = disponible - (Number.isFinite(metros) ? metros : 0);
 
     etiqueta.textContent =
         `Disponible: ${disponible.toFixed(2)} m · Restan: `
@@ -451,9 +454,13 @@ function addItem(bloque) {
             value="1"
             class="form-control cantidad-input">
 
-        <select class="form-select cortador-select" required>
+        <div>
+        <select class="form-select cortador-select" multiple size="2" required aria-label="Cortadores que participaron">
             ${opcionesCortadores()}
         </select>
+        <input type="hidden" class="cortadores-hidden">
+        <small class="form-text">Puede seleccionar varios.</small>
+        </div>
 
         <button
             type="button"
@@ -472,6 +479,13 @@ function addItem(bloque) {
         opcion.dataset.color;
 
     renombrarFila(fila, select.value);
+
+    fila.querySelector(".cortador-select").addEventListener("change", function () {
+        fila.querySelector(".cortadores-hidden").value = [...this.selectedOptions]
+            .map((opcion) => opcion.value)
+            .filter(Boolean)
+            .join(",");
+    });
 
     fila.querySelector(".cantidad-input")
         .addEventListener("input", calcularTotales);
@@ -517,14 +531,14 @@ function renombrarFila(fila, rolloId) {
     fila.querySelector(".cantidad-input").name =
         `cantidad_${rolloId}[]`;
 
-    fila.querySelector(".cortador-select").name =
-        `cortador_${rolloId}[]`;
+    fila.querySelector(".cortadores-hidden").name =
+        `cortadores_${rolloId}[]`;
 }
 
 function calcularTotales() {
     const metros = [...document.querySelectorAll(".metros-input")]
         .reduce(
-            (total, input) => total + Number(input.value || 0),
+            (total, input) => total + (leerNumeroDecimal(input.value) || 0),
             0
         );
 
@@ -571,7 +585,7 @@ document
             }
 
             bloque
-                .querySelectorAll(".cortador-select")
+                .querySelectorAll(".cortadores-hidden")
                 .forEach(selector => {
                     if (!selector.value) {
                         error = (
@@ -598,6 +612,5 @@ document
         }
     });
 
-addRollo();
 </script>
 {% endblock %}

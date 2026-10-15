@@ -159,11 +159,14 @@ class ClienteForm(forms.ModelForm):
 class ColorForm(forms.ModelForm):
     class Meta:
         model = Color
-        fields = ["nombre", "codigo_hex"]
+        fields = ["nombre", "codigo_hex", "activo"]
         widgets = {
             "nombre": forms.TextInput(attrs={"class": "form-control"}),
             "codigo_hex": forms.TextInput(
                 attrs={"class": "form-control", "placeholder": "#000000"}
+            ),
+            "activo": forms.CheckboxInput(
+                attrs={"class": "form-check-input"}
             ),
         }
 

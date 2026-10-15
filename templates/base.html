@@ -87,10 +87,9 @@
         box-shadow: 0 0 0 .2rem rgba(44, 122, 99, .14);
     }
 
-    /* Nombres, referencias, notas y motivos se leen de manera uniforme en
-       operación. Los campos de correo, claves y datos técnicos no cambian. */
-    .content input[type="text"],
-    .content textarea { text-transform: uppercase; }
+    /* El texto se muestra exactamente como se escribió. Los identificadores
+       técnicos se normalizan en el modelo, no con CSS, para no engañar al
+       usuario mientras diligencia un formulario. */
 
     .btn-primary {
         --bs-btn-bg: var(--brand);
@@ -302,6 +301,9 @@
     .sidebar:hover .user-box form button, .sidebar:focus-within .user-box form button, .sidebar.is-expanded .user-box form button { justify-content: flex-start; gap: .35rem; }
     .sidebar:not(:hover):not(:focus-within):not(.is-expanded) .sidebar-user { justify-content: center; }
     .sidebar:not(:hover):not(:focus-within):not(.is-expanded) .sidebar-user .nav-icon { margin-right: 0 !important; }
+    .sidebar:not(:hover):not(:focus-within):not(.is-expanded) .user-box { padding: 1rem .55rem; }
+    .sidebar:not(:hover):not(:focus-within):not(.is-expanded) .user-box form button { width: 100%; display: grid; place-items: center; padding-left: 0; padding-right: 0; }
+    .user-box form button > i { width: 1.35rem; height: 1.35rem; display: inline-grid; place-items: center; font-size: 1.08rem; flex: 0 0 auto; }
 
     @media (max-width: 991.98px) {
         .sidebar { position: static; width: 100%; height: auto; min-height: 0; }
@@ -509,11 +511,17 @@ const currentPath = window.location.pathname.replace(/\/$/, "");
 const sidebar = document.querySelector(".sidebar");
 const sidebarToggle = document.querySelector(".sidebar-toggle");
 if (sidebar && sidebarToggle) {
+    if (localStorage.getItem("sidebar-expanded") === "true") {
+        sidebar.classList.add("is-expanded");
+        sidebarToggle.setAttribute("aria-expanded", "true");
+        sidebarToggle.innerHTML = '<i class="bi bi-chevron-left"></i>';
+    }
     sidebar.querySelectorAll("a").forEach((link) => {
         if (!link.title) link.title = link.textContent.replace(/\s+/g, " ").trim();
     });
     sidebarToggle.addEventListener("click", () => {
         const expanded = sidebar.classList.toggle("is-expanded");
+        localStorage.setItem("sidebar-expanded", String(expanded));
         sidebarToggle.setAttribute("aria-expanded", String(expanded));
         sidebarToggle.innerHTML = `<i class="bi bi-${expanded ? "chevron-left" : "list"}"></i>`;
     });
@@ -573,7 +581,9 @@ if (sidebarContent) {
     // Al recargar, el enlace actual tiene prioridad para no quedar oculto.
     const activeSidebarLink = sidebarContent.querySelector("a.active");
     if (activeSidebarLink) {
-        activeSidebarLink.scrollIntoView({ block: "nearest" });
+        // Mantiene visible el enlace de la pantalla actual al recargar,
+        // incluso en menús largos y estando el lateral contraído.
+        activeSidebarLink.scrollIntoView({ block: "center" });
     } else {
         const savedScroll = localStorage.getItem("sidebar-scroll");
         if (savedScroll !== null) sidebarContent.scrollTop = parseInt(savedScroll);

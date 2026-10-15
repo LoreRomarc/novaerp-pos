@@ -4,14 +4,20 @@ import logging
 
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
-from django.db.models import Q
+from django.db.models import Case, IntegerField, Q, Value, When
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views import View
 
 from apps.inventory.models import ProductoVariante, Stock
-from apps.sales.models import ConfiguracionImpresionVenta, Venta, Vendedor
+from apps.customers.models import Cliente
+from apps.sales.models import (
+    ConfiguracionImpresionVenta,
+    Venta,
+    Vendedor,
+    VendedorPreferenciaPOS,
+)
 from apps.sales.services.carrito_service import CarritoService
 from apps.sales.services.pos_service import POSService
 from apps.sales.services.serializers import serializar_carrito
@@ -149,15 +155,40 @@ class POSView(POSBaseView):
             )
             carritos = [carrito_actual]
 
+        vendedores_todos = list(
+            Vendedor.objects.filter(activo=True).annotate(
+                es_vendedora_fija=Case(
+                    When(sucursal=sucursal, then=Value(0)),
+                    default=Value(1),
+                    output_field=IntegerField(),
+                )
+            ).select_related("sucursal").order_by("es_vendedora_fija", "nombre", "id")
+        )
+        preferencias = {
+            preferencia.vendedor_id: preferencia.visible
+            for preferencia in VendedorPreferenciaPOS.objects.filter(
+                usuario=request.user,
+                sucursal=sucursal,
+                vendedor__in=vendedores_todos,
+            )
+        }
+        vendedores_visibles = [
+            vendedor for vendedor in vendedores_todos
+            if preferencias.get(vendedor.id, True)
+        ]
+
         return render(
             request,
             "sales/pos.html",
             {
                 "turno": turno,
                 "sucursal": sucursal,
-                "vendedores": Vendedor.objects.filter(
-                    sucursal=sucursal, activo=True
-                ).order_by("nombre"),
+                # Todas las vendedoras activas pueden vender en cualquier
+                # sede. Se priorizan visualmente las fijas de esta sucursal.
+                "vendedores": vendedores_visibles,
+                "vendedores_configuracion": vendedores_todos,
+                "vendedores_visibles_ids": [vendedor.id for vendedor in vendedores_visibles],
+                "clientes_pos": Cliente.objects.filter(activo=True).order_by("nombre")[:500],
                 "venta": json.dumps(
                     serializar_carrito(carrito_actual)
                 ),
@@ -175,6 +206,41 @@ class POSView(POSBaseView):
                 "impresion_ticket_navegador": False,
             },
         )
+
+
+class POSVendedoresVisiblesView(POSBaseView):
+    """Guarda el filtro personal de vendedores mostrado por el POS."""
+
+    def post(self, request):
+        try:
+            data = self.obtener_json(request)
+            ids = data.get("vendedor_ids", [])
+            if not isinstance(ids, list):
+                raise ValidationError("La selección de vendedores es inválida.")
+            ids = {int(vendedor_id) for vendedor_id in ids}
+            sucursal = self.get_sucursal()
+            vendedores = list(Vendedor.objects.filter(activo=True))
+            ids_validos = {vendedor.id for vendedor in vendedores}
+            if not ids.issubset(ids_validos):
+                raise ValidationError("La selección contiene un vendedor no disponible.")
+
+            preferencias = [
+                VendedorPreferenciaPOS(
+                    usuario=request.user,
+                    sucursal=sucursal,
+                    vendedor=vendedor,
+                    visible=vendedor.id in ids,
+                )
+                for vendedor in vendedores
+            ]
+            VendedorPreferenciaPOS.objects.filter(
+                usuario=request.user,
+                sucursal=sucursal,
+            ).delete()
+            VendedorPreferenciaPOS.objects.bulk_create(preferencias)
+            return success({"vendedor_ids": sorted(ids)})
+        except (ValidationError, ValueError) as error_validacion:
+            return error(error_validacion)
 
 
 class POSAgregarProductoView(POSBaseView):

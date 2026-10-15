@@ -171,6 +171,41 @@ class Vendedor(models.Model):
         return self.nombre
 
 
+class VendedorPreferenciaPOS(models.Model):
+    """Selección personal de vendedores visibles para cada cajero y sede.
+
+    No limita quién puede vender: todos los vendedores activos pueden operar
+    temporalmente en cualquier sucursal. Solo evita listas largas en el POS.
+    Si no existe una preferencia, el vendedor se considera visible.
+    """
+
+    usuario = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="preferencias_vendedores_pos",
+    )
+    sucursal = models.ForeignKey(
+        "core.Sucursal",
+        on_delete=models.CASCADE,
+        related_name="preferencias_vendedores_pos",
+    )
+    vendedor = models.ForeignKey(
+        Vendedor,
+        on_delete=models.CASCADE,
+        related_name="preferencias_pos",
+    )
+    visible = models.BooleanField(default=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["usuario", "sucursal", "vendedor"],
+                name="venta_preferencia_vendedor_pos_unica",
+            )
+        ]
+        indexes = [models.Index(fields=["usuario", "sucursal", "visible"])]
+
+
 class Carrito(models.Model):
 
     ESTADOS = (

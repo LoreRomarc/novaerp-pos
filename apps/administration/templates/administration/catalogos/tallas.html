@@ -19,16 +19,17 @@
     </div>
     <div class="table-responsive">
         <table class="table admin-table align-middle">
-            <thead><tr><th>Talla</th><th>Orden</th><th>Estado</th></tr></thead>
+            <thead><tr><th>Talla</th><th>Orden</th><th>Estado</th><th class="text-end">Acciones</th></tr></thead>
             <tbody id="tallaTable">
                 {% for talla in tallas %}
                     <tr>
                         <td class="fw-semibold text-dark">{{ talla.nombre }}</td>
                         <td>{{ talla.orden }}</td>
                         <td>{% if talla.activo %}<span class="admin-badge admin-badge-success">Activa</span>{% else %}<span class="admin-badge admin-badge-muted">Inactiva</span>{% endif %}</td>
+                        <td class="text-end table-actions"><span class="action-buttons"><a class="btn btn-sm btn-light border" href="{% url 'administration:talla_update' talla.pk %}" title="Editar talla"><i class="bi bi-pencil"></i><span class="visually-hidden">Editar</span></a><form method="post" class="d-inline" action="{% url 'administration:talla_delete' talla.pk %}" onsubmit="return confirm('¿Eliminar esta talla? Solo será posible si no tiene historial.');">{% csrf_token %}<button class="btn btn-sm btn-light border text-danger" title="Eliminar" type="submit"><i class="bi bi-trash"></i><span class="visually-hidden">Eliminar</span></button></form></span></td>
                     </tr>
                 {% empty %}
-                    <tr><td colspan="3"><div class="admin-empty"><i class="bi bi-rulers"></i>No hay tallas registradas.</div></td></tr>
+                    <tr><td colspan="4"><div class="admin-empty"><i class="bi bi-rulers"></i>No hay tallas registradas.</div></td></tr>
                 {% endfor %}
             </tbody>
         </table>

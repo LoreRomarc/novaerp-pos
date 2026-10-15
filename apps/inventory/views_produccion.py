@@ -1,5 +1,6 @@
 # apps/inventory/views_produccion.py
 from django.core.exceptions import ValidationError
+from django.db.models import Case, IntegerField, Value, When
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import redirect, render
 from django.views import View
@@ -43,7 +44,17 @@ class CorteProduccionView(
             "telas": TipoTela.objects.filter(
                 activo=True
             ).order_by("nombre"),
-            "colores": Color.objects.all().order_by("nombre"),
+            "colores": (
+                Color.objects.filter(activo=True)
+                .annotate(
+                    es_sin_definir=Case(
+                        When(nombre__iexact="Sin Definir", then=Value(0)),
+                        default=Value(1),
+                        output_field=IntegerField(),
+                    )
+                )
+                .order_by("es_sin_definir", "nombre")
+            ),
             "tallas": Talla.objects.filter(
                 activo=True
             ).order_by("orden", "nombre"),
@@ -93,7 +104,7 @@ class CorteProduccionView(
                     f"cantidad_{rollo_id}[]"
                 )
                 cortadores = request.POST.getlist(
-                    f"cortador_{rollo_id}[]"
+                    f"cortadores_{rollo_id}[]"
                 )
 
                 longitudes = {
@@ -114,7 +125,7 @@ class CorteProduccionView(
                     producto_id,
                     talla,
                     cantidad,
-                    cortador_id,
+                    cortadores_csv,
                 ) in zip(
                     productos,
                     tallas,
@@ -124,9 +135,14 @@ class CorteProduccionView(
                     if not cantidad:
                         continue
 
-                    if not cortador_id:
+                    operario_ids = [
+                        int(operario_id)
+                        for operario_id in cortadores_csv.split(",")
+                        if operario_id.strip()
+                    ]
+                    if not operario_ids:
                         raise ValidationError(
-                            "Debe seleccionar el cortador "
+                            "Debe seleccionar al menos un cortador "
                             "de cada prenda."
                         )
 
@@ -135,7 +151,7 @@ class CorteProduccionView(
                             "producto_base_id": int(producto_id),
                             "talla": talla,
                             "cantidad": int(cantidad),
-                            "operario_id": int(cortador_id),
+                            "operario_ids": operario_ids,
                         }
                     )
 

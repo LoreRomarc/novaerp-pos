@@ -1,10 +1,10 @@
 {% extends "administration/base_admin.html" %}
 
-{% block title %}Nueva talla{% endblock %}
+{% block title %}{% if object %}Editar talla{% else %}Nueva talla{% endif %}{% endblock %}
 
 {% block admin_content %}
 <div class="admin-page-header">
-    <div><div class="admin-eyebrow">Catálogo</div><h1 class="admin-page-title">Nueva talla</h1><p class="admin-page-subtitle">Agregue una talla y defina su orden de visualización.</p></div>
+    <div><div class="admin-eyebrow">Catálogo</div><h1 class="admin-page-title">{% if object %}Editar talla{% else %}Nueva talla{% endif %}</h1><p class="admin-page-subtitle">Agregue una talla y defina su orden de visualización.</p></div>
     <a href="{% url 'administration:talla_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Volver</a>
 </div>
 <form method="post">

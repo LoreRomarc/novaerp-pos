@@ -423,7 +423,7 @@ class POSService:
                 "Los montos de pago no pueden ser negativos."
             )
 
-        carrito.cliente = (cliente or "").strip().upper()
+        carrito.cliente = (cliente or "").strip()
         carrito.observaciones = (
             observaciones or ""
         ).strip().upper()
@@ -435,10 +435,11 @@ class POSService:
         if vendedor_id:
             from apps.sales.models import Vendedor
             carrito.vendedor = Vendedor.objects.filter(
-                pk=vendedor_id, sucursal=sucursal, activo=True
+                pk=vendedor_id,
+                activo=True,
             ).first()
             if not carrito.vendedor:
-                raise ValidationError("El vendedor seleccionado no está disponible en esta sucursal.")
+                raise ValidationError("El vendedor seleccionado no está activo.")
         else:
             carrito.vendedor = None
 
@@ -535,7 +536,18 @@ class POSService:
                 usuario=usuario,
             )
 
-        carrito.cliente = (cliente or "").strip().upper()
+        cliente_normalizado = (cliente or "").strip() or "Consumidor final"
+        from apps.customers.models import Cliente
+        cliente_registrado = Cliente.objects.filter(
+            nombre__iexact=cliente_normalizado
+        ).first()
+        if not cliente_registrado:
+            Cliente.objects.create(
+                nombre=cliente_normalizado,
+                tipo_cliente="DETAL",
+                activo=True,
+            )
+        carrito.cliente = cliente_normalizado
         carrito.observaciones = (
             observaciones or ""
         ).strip().upper()
@@ -551,10 +563,11 @@ class POSService:
         if vendedor_id:
             from apps.sales.models import Vendedor
             carrito.vendedor = Vendedor.objects.filter(
-                pk=vendedor_id, sucursal=sucursal, activo=True
+                pk=vendedor_id,
+                activo=True,
             ).first()
             if not carrito.vendedor:
-                raise ValidationError("El vendedor seleccionado no está disponible en esta sucursal.")
+                raise ValidationError("El vendedor seleccionado no está activo.")
         else:
             carrito.vendedor = None
 

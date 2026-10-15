@@ -1,5 +1,4 @@
 {% extends "administration/base_admin.html" %}
-
 {% block title %}Clientes{% endblock %}
 
 {% block admin_content %}
@@ -15,15 +14,22 @@
     </a>
 </div>
 
-<div class="admin-card">
+<form method="get" class="admin-card mb-3">
     <div class="admin-card-header">
         <h2 class="admin-card-title">Clientes registrados</h2>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
         <div class="admin-search">
             <i class="bi bi-search"></i>
-            <input id="clienteSearch" type="search" class="form-control" placeholder="Buscar cliente o identificación">
+            <input name="q" type="search" class="form-control" value="{{ request.GET.q }}" placeholder="Nombre o identificación">
+        </div>
+        <select name="tipo" class="form-select form-select-sm"><option value="">Todos los tipos</option><option value="DETAL" {% if request.GET.tipo == "DETAL" %}selected{% endif %}>Detal</option><option value="MAYORISTA" {% if request.GET.tipo == "MAYORISTA" %}selected{% endif %}>Mayorista</option></select>
+        <select name="estado" class="form-select form-select-sm"><option value="">Todos los estados</option><option value="activo" {% if request.GET.estado == "activo" %}selected{% endif %}>Activos</option><option value="inactivo" {% if request.GET.estado == "inactivo" %}selected{% endif %}>Inactivos</option></select>
+        <button class="btn btn-sm btn-primary" type="submit">Buscar</button>
         </div>
     </div>
+</form>
 
+<div class="admin-card">
     <div class="table-responsive">
         <table class="table admin-table align-middle">
             <thead>
@@ -32,6 +38,7 @@
                     <th>Identificación</th>
                     <th>Tipo de compra</th>
                     <th>Estado</th>
+                    <th class="text-end">Acciones</th>
                 </tr>
             </thead>
             <tbody id="clienteTable">
@@ -47,27 +54,15 @@
                                 <span class="admin-badge admin-badge-muted">Inactivo</span>
                             {% endif %}
                         </td>
+                        <td class="text-end"><a class="btn btn-sm btn-light border" href="{% url 'administration:cliente_update' cliente.pk %}" title="Editar cliente"><i class="bi bi-pencil"></i><span class="visually-hidden">Editar</span></a></td>
                     </tr>
                 {% empty %}
                     <tr>
-                        <td colspan="4"><div class="admin-empty"><i class="bi bi-person-vcard"></i>No hay clientes registrados.</div></td>
+                        <td colspan="5"><div class="admin-empty"><i class="bi bi-person-vcard"></i>No hay clientes registrados.</div></td>
                     </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
-{% endblock %}
-
-{% block content-script %}
-<script>
-    const inputCliente = document.getElementById("clienteSearch");
-    const filasCliente = document.querySelectorAll("#clienteTable tr");
-    inputCliente.addEventListener("input", function () {
-        const consulta = this.value.trim().toLowerCase();
-        filasCliente.forEach((fila) => {
-            fila.hidden = Boolean(consulta) && !fila.innerText.toLowerCase().includes(consulta);
-        });
-    });
-</script>
 {% endblock %}

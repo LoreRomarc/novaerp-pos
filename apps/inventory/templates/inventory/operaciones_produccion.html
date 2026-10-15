@@ -33,7 +33,7 @@
                         placeholder="Lote, empleado, producto o SKU">
                 </div>
 
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <select name="operario" class="form-select">
                         <option value="">Todos los operarios</option>
 
@@ -49,7 +49,7 @@
                     </select>
                 </div>
 
-                <div class="col-md-3">
+                <div class="col-md-2">
                     <select name="tipo" class="form-select">
                         <option value="">Corte y confección</option>
 
@@ -64,6 +64,9 @@
                         {% endfor %}
                     </select>
                 </div>
+
+                <div class="col-md-2"><input type="date" name="desde" class="form-control" value="{{ request.GET.desde }}" aria-label="Fecha desde"></div>
+                <div class="col-md-2"><input type="date" name="hasta" class="form-control" value="{{ request.GET.hasta }}" aria-label="Fecha hasta"></div>
 
                 <div class="col-md-2 d-flex gap-2">
                     <button class="btn btn-dark w-100">
@@ -118,6 +121,9 @@
 
                         <td>
                             <strong>{{ operacion.operario.nombre }}</strong>
+                            {% if operacion.participantes.all|length > 1 %}
+                                <small class="d-block text-muted">Equipo: {% for participante in operacion.participantes.all %}{{ participante.operario.nombre }}{% if not forloop.last %}, {% endif %}{% endfor %}</small>
+                            {% endif %}
                         </td>
 
                         <td>
@@ -167,7 +173,7 @@
             <li class="page-item">
                 <a
                     class="page-link"
-                    href="?page={{ page_obj.previous_page_number }}&q={{ request.GET.q }}&operario={{ request.GET.operario }}&tipo={{ request.GET.tipo }}">
+                    href="?page={{ page_obj.previous_page_number }}&q={{ request.GET.q }}&operario={{ request.GET.operario }}&tipo={{ request.GET.tipo }}&desde={{ request.GET.desde }}&hasta={{ request.GET.hasta }}">
                     Anterior
                 </a>
             </li>
@@ -183,7 +189,7 @@
             <li class="page-item">
                 <a
                     class="page-link"
-                    href="?page={{ page_obj.next_page_number }}&q={{ request.GET.q }}&operario={{ request.GET.operario }}&tipo={{ request.GET.tipo }}">
+                    href="?page={{ page_obj.next_page_number }}&q={{ request.GET.q }}&operario={{ request.GET.operario }}&tipo={{ request.GET.tipo }}&desde={{ request.GET.desde }}&hasta={{ request.GET.hasta }}">
                     Siguiente
                 </a>
             </li>

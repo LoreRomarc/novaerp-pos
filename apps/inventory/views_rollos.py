@@ -8,7 +8,7 @@ from django import forms
 
 from apps.inventory.models_produccion import RolloTela
 from apps.inventory.mixins import InventoryAccessMixin
-from django.db.models import Sum, F, ExpressionWrapper, DecimalField
+from django.db.models import Case, DecimalField, ExpressionWrapper, F, IntegerField, Sum, Value, When
 from django.db.models.functions import Coalesce
 
 # ==========================================
@@ -78,7 +78,8 @@ class RolloForm(forms.ModelForm):
             }),
 
             "codigo": forms.TextInput(attrs={
-                "class": "form-control"
+                "class": "form-control",
+                "placeholder": "Se genera automáticamente si lo deja vacío",
             }),
 
             "cantidad_inicial": forms.NumberInput(attrs={
@@ -106,11 +107,25 @@ class RolloForm(forms.ModelForm):
         self.fields["color"].queryset = (
             self.fields["color"]
             .queryset
-            .order_by("nombre")
+            .filter(activo=True)
+            .annotate(
+                es_sin_definir=Case(
+                    When(nombre__iexact="Sin Definir", then=Value(0)),
+                    default=Value(1),
+                    output_field=IntegerField(),
+                )
+            )
+            .order_by("es_sin_definir", "nombre")
         )
 
         self.fields["tipo_tela"].empty_label = "Seleccione una tela"
         self.fields["color"].empty_label = "Seleccione un color"
+        if not self.instance.pk:
+            color_predeterminado = self.fields["color"].queryset.filter(
+                nombre__iexact="Sin Definir"
+            ).first()
+            if color_predeterminado:
+                self.initial.setdefault("color", color_predeterminado.pk)
 
 class RolloCreateView(
     LoginRequiredMixin,
@@ -153,4 +168,3 @@ class RolloCreateView(
         )
 
         return redirect(self.get_success_url())
-        

@@ -35,7 +35,7 @@
                     <tr>
                         <th>Lote</th>
                         <th>Fecha</th>
-                        <th>Prendas cortadas</th>
+                        <th>Prendas pendientes</th>
                         <th>Estado</th>
                         <th class="text-end"></th>
                     </tr>
@@ -52,7 +52,14 @@
                             {{ lote.creado|date:"d/m/Y H:i" }}
                         </td>
 
-                        <td>{{ lote.total_prendas }}</td>
+                        <td>
+                            <strong>{{ lote.total_prendas }}</strong>
+                            <div class="small text-muted mt-1">
+                                {% for detalle in lote.detalles.all %}
+                                    <div>{{ detalle.variante }}</div>
+                                {% endfor %}
+                            </div>
+                        </td>
 
                         <td>
                             {% if lote.estado == "PENDIENTE_CONFECCION" %}

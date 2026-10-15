@@ -1,12 +1,12 @@
 {% extends "administration/base_admin.html" %}
 
-{% block title %}Nuevo cliente{% endblock %}
+{% block title %}{% if object %}Editar cliente{% else %}Nuevo cliente{% endif %}{% endblock %}
 
 {% block admin_content %}
 <div class="admin-page-header">
     <div>
         <div class="admin-eyebrow">Relaciones comerciales</div>
-        <h1 class="admin-page-title">Nuevo cliente</h1>
+        <h1 class="admin-page-title">{% if object %}Editar cliente{% else %}Nuevo cliente{% endif %}</h1>
         <p class="admin-page-subtitle">Registre los datos necesarios para identificar al cliente en ventas y reportes.</p>
     </div>
 
@@ -48,7 +48,7 @@
             </div>
 
             <div class="d-flex gap-2 mt-4">
-                <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle"></i> Guardar cliente</button>
+                <button type="submit" class="btn btn-primary"><i class="bi bi-check-circle"></i> {% if object %}Guardar cambios{% else %}Guardar cliente{% endif %}</button>
                 <a href="{% url 'administration:cliente_list' %}" class="btn btn-light border">Cancelar</a>
             </div>
         </div>

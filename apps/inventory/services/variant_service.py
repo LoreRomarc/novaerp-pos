@@ -7,6 +7,7 @@ from apps.inventory.models import (
     Talla,
     TipoTela,
     Color,
+    codigo_identificador,
 )
 
 
@@ -14,12 +15,12 @@ class VariantService:
 
     @staticmethod
     def generar_sku(producto_base, tipo_tela, color, talla):
-        return (
-            f"{producto_base.nombre[:3]}"
-            f"-{tipo_tela.nombre[:3]}"
-            f"-{color.nombre[:3]}"
-            f"-{talla.nombre}"
-        ).upper()
+        return "-".join((
+            codigo_identificador(producto_base.nombre, "producto", 8),
+            codigo_identificador(tipo_tela.nombre, "tela", 8),
+            codigo_identificador(color.nombre, "color", 5),
+            codigo_identificador(talla.nombre, "talla", 4),
+        ))
 
     @staticmethod
     @transaction.atomic

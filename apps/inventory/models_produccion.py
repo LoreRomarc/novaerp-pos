@@ -1,14 +1,18 @@
 # apps/inventory/models_produccion.py
+import re
+
 from django.conf import settings
 from django.db import models
 from django.db.models import Sum
 from django.core.exceptions import ValidationError
+from django.utils import timezone
 
 from apps.core.models import Sucursal
 from apps.inventory.models import (
     Color,
     ProductoVariante,
     TipoTela,
+    codigo_identificador,
 )
 
 
@@ -25,6 +29,7 @@ class RolloTela(models.Model):
     codigo = models.CharField(
         max_length=50,
         unique=True,
+        blank=True,
     )
 
     cantidad_inicial = models.DecimalField(
@@ -54,6 +59,37 @@ class RolloTela(models.Model):
     )
 
     creado = models.DateTimeField(auto_now_add=True)
+
+    def _generar_codigo(self):
+        fecha = timezone.localdate().strftime("%y%m")
+        prefijo = "-".join((
+            codigo_identificador(self.tipo_tela.nombre, "tela", 8),
+            codigo_identificador(self.color.nombre, "color", 5),
+            fecha,
+        ))
+        ultimo = (
+            type(self).objects.filter(codigo__startswith=prefijo)
+            .order_by("-codigo")
+            .values_list("codigo", flat=True)
+            .first()
+        )
+        consecutivo = 1
+        if ultimo:
+            try:
+                consecutivo = int(ultimo.rsplit("-", 1)[1]) + 1
+            except (IndexError, ValueError):
+                pass
+        return f"{prefijo}-{consecutivo:03d}"
+
+    def clean(self):
+        codigo = re.sub(r"[^A-Z0-9]+", "-", (self.codigo or "").upper())
+        self.codigo = codigo.strip("-")
+
+    def save(self, *args, **kwargs):
+        if not (self.codigo or "").strip():
+            self.codigo = self._generar_codigo()
+        self.full_clean()
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return (
@@ -423,3 +459,30 @@ class OperacionProduccion(models.Model):
             f"{self.operario} | "
             f"{self.detalle.variante} x {self.cantidad}"
         )
+
+
+class OperacionProduccionParticipante(models.Model):
+    """Participantes adicionales en un corte hecho en equipo.
+
+    La cantidad queda en la operación principal para no sumar varias veces la
+    misma prenda en productividad. Esta tabla conserva quién participó.
+    """
+
+    operacion = models.ForeignKey(
+        OperacionProduccion,
+        related_name="participantes",
+        on_delete=models.CASCADE,
+    )
+    operario = models.ForeignKey(
+        OperarioProduccion,
+        related_name="participaciones_equipo",
+        on_delete=models.PROTECT,
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["operacion", "operario"],
+                name="produccion_participante_operacion_unico",
+            )
+        ]

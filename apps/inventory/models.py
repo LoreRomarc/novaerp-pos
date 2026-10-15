@@ -1,5 +1,7 @@
 # apps/inventory/models.py
 
+import re
+
 from django.utils import timezone
 from django.db import models, transaction
 from django.db.models import Q, Sum
@@ -8,6 +10,48 @@ from django.db.models.functions import Lower
 from django.utils.text import slugify
 
 from apps.core.models import Sucursal
+
+
+# Los nombres comerciales se conservan como fueron escritos por el usuario.
+# Los identificadores internos, en cambio, deben ser cortos, estables y
+# comparables entre módulos (SKU, rollos y códigos de barra).
+CODIGOS_CONOCIDOS = {
+    "producto": {
+        "sueter": "STR",
+        "short": "SHT",
+    },
+    "tela": {
+        "lycra-algodon": "ALGL",
+        "algodon-puro": "ALG100",
+        "seda-fria": "TFRI",
+        "algodon-heavy-weight-250g": "ALGP250",
+        "algodon-perchado": "ALGP",
+        "tela-burda": "BURD",
+        "suplex-poliamida": "SUPL",
+    },
+    "color": {
+        "sin-definir": "SDF",
+        "negro": "NEG",
+    },
+    "talla": {
+        "adulto": "ADU",
+        "nino": "NIN",
+        "unica": "UNI",
+        "plus": "PLS",
+    },
+}
+
+
+def codigo_identificador(valor, tipo, limite=12):
+    """Devuelve un código técnico seguro, en mayúsculas y sin espacios."""
+    clave = slugify(str(valor or ""))
+    conocido = CODIGOS_CONOCIDOS.get(tipo, {}).get(clave)
+    if conocido:
+        return conocido
+
+    # Conserva dígitos útiles (2XL, 250G) y elimina separadores extraños.
+    codigo = clave.replace("-", "").upper()
+    return (codigo[:limite] or "ITEM")
 
 
 # ======================================================
@@ -26,6 +70,8 @@ class Color(models.Model):
         blank=True
     )
 
+    activo = models.BooleanField(default=True)
+
     class Meta:
         ordering = ["nombre"]
 
@@ -37,8 +83,7 @@ class Color(models.Model):
         ]
 
     def clean(self):
-
-        self.nombre = self.nombre.strip().upper()
+        self.nombre = self.nombre.strip()
 
     def save(self, *args, **kwargs):
 
@@ -72,8 +117,7 @@ class TipoTela(models.Model):
         ]
 
     def clean(self):
-
-        self.nombre = self.nombre.strip().upper()
+        self.nombre = self.nombre.strip()
 
     def save(self, *args, **kwargs):
 
@@ -107,8 +151,7 @@ class Talla(models.Model):
         ]
 
     def clean(self):
-
-        self.nombre = self.nombre.strip().upper()
+        self.nombre = self.nombre.strip()
 
     def save(self, *args, **kwargs):
 
@@ -142,8 +185,7 @@ class ProductoBase(models.Model):
         ]
 
     def clean(self):
-
-        self.nombre = self.nombre.strip().upper()
+        self.nombre = self.nombre.strip()
 
     def save(self, *args, **kwargs):
 
@@ -238,21 +280,25 @@ class ProductoVariante(models.Model):
         )
 
     def clean(self):
-        self.sku = (self.sku or "").strip().upper()
+        self.sku = re.sub(
+            r"[^A-Z0-9]+",
+            "-",
+            (self.sku or "").upper(),
+        ).strip("-")
+        self.codigo_barras = (self.codigo_barras or "").strip().upper() or None
         # En formularios Django la validación ocurre antes de `save()`. El
         # SKU vacío es válido temporalmente y se genera justo antes de guardar.
 
     @staticmethod
     def _codigo_legible(valor, limite=12):
-        codigo = slugify(str(valor or "")).replace("-", "").upper()
-        return (codigo[:limite] or "ITEM")
+        return codigo_identificador(valor, "producto", limite)
 
     def _generar_sku_automatico(self):
         base = "-".join([
-            self._codigo_legible(self.producto_base.nombre, 8),
-            self._codigo_legible(self.tipo_tela.nombre, 5),
-            self._codigo_legible(self.color.nombre, 5),
-            self._codigo_legible(self.talla.nombre, 4),
+            codigo_identificador(self.producto_base.nombre, "producto", 8),
+            codigo_identificador(self.tipo_tela.nombre, "tela", 8),
+            codigo_identificador(self.color.nombre, "color", 5),
+            codigo_identificador(self.talla.nombre, "talla", 4),
         ])
         candidato = base
         consecutivo = 2
@@ -295,10 +341,10 @@ class ProductoVariante(models.Model):
     def __str__(self):
 
         return (
-            f"{self.producto_base.nombre} | "
-            f"{self.tipo_tela.nombre} | "
-            f"{self.color.nombre} | "
-            f"TALLA {self.talla.nombre}"
+            f"{self.producto_base.nombre} · "
+            f"{self.tipo_tela.nombre} · "
+            f"{self.color.nombre} · "
+            f"{self.talla.nombre}"
         )
 
     @property
@@ -314,9 +360,9 @@ class ProductoVariante(models.Model):
     def nombre_completo(self):
 
         return (
-            f"{self.producto_base.nombre} "
-            f"{self.tipo_tela.nombre} "
-            f"{self.color.nombre} "
+            f"{self.producto_base.nombre} · "
+            f"{self.tipo_tela.nombre} · "
+            f"{self.color.nombre} · "
             f"{self.talla.nombre}"
         )
 

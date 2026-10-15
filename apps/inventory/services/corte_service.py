@@ -13,6 +13,7 @@ from apps.inventory.models_produccion import (
     CorteRollo,
     MovimientoRollo,
     OperacionProduccion,
+    OperacionProduccionParticipante,
     OperarioProduccion,
     ProduccionDetalle,
     ProduccionLote,
@@ -71,7 +72,10 @@ class CorteService:
             for item in items:
                 try:
                     cantidad = int(item.get("cantidad", 0))
-                    operario_id = int(item.get("operario_id"))
+                    operario_ids = [
+                        int(operario_id)
+                        for operario_id in item.get("operario_ids", [])
+                    ]
                 except (TypeError, ValueError) as error:
                     raise ValidationError(
                         "La cantidad o el cortador son inválidos."
@@ -82,9 +86,12 @@ class CorteService:
                         "La cantidad debe ser mayor a cero."
                     )
 
+                if not operario_ids:
+                    raise ValidationError("Debe indicar al menos un cortador.")
+
                 total_prendas += cantidad
                 producto_ids.add(int(item["producto_base_id"]))
-                operarios_ids.add(operario_id)
+                operarios_ids.update(operario_ids)
 
         if total_prendas <= 0:
             raise ValidationError("No hay prendas para cortar.")
@@ -285,15 +292,22 @@ class CorteService:
                     ),
                 )
 
-                OperacionProduccion.objects.create(
+                operacion = OperacionProduccion.objects.create(
                     detalle=detalle,
                     operario=cortadores[
-                        int(item["operario_id"])
+                        int(item["operario_ids"][0])
                     ],
                     tipo=OperacionProduccion.Tipo.CORTE,
                     cantidad=cantidad,
                     registrado_por=usuario,
                 )
+                OperacionProduccionParticipante.objects.bulk_create([
+                    OperacionProduccionParticipante(
+                        operacion=operacion,
+                        operario=cortadores[int(operario_id)],
+                    )
+                    for operario_id in set(item["operario_ids"])
+                ])
 
                 orden += 1
 

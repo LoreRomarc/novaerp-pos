@@ -38,6 +38,7 @@ class OperacionProduccionListView(
                 "detalle__variante__color",
                 "detalle__variante__talla",
             )
+            .prefetch_related("participantes", "participantes__operario")
             .filter(detalle__lote__sucursal=sucursal)
             .order_by("-creado", "-id")
         )
@@ -48,6 +49,8 @@ class OperacionProduccionListView(
             "operario",
             "",
         ).strip()
+        fecha_desde = self.request.GET.get("desde", "").strip()
+        fecha_hasta = self.request.GET.get("hasta", "").strip()
 
         if q:
             qs = qs.filter(
@@ -67,6 +70,11 @@ class OperacionProduccionListView(
 
         if operario_id.isdigit():
             qs = qs.filter(operario_id=int(operario_id))
+
+        if fecha_desde:
+            qs = qs.filter(creado__date__gte=fecha_desde)
+        if fecha_hasta:
+            qs = qs.filter(creado__date__lte=fecha_hasta)
 
         return qs
 

@@ -1,10 +1,10 @@
 {% extends "administration/base_admin.html" %}
 
-{% block title %}Nuevo tipo de tela{% endblock %}
+{% block title %}{% if object %}Editar tipo de tela{% else %}Nuevo tipo de tela{% endif %}{% endblock %}
 
 {% block admin_content %}
 <div class="admin-page-header">
-    <div><div class="admin-eyebrow">Catálogo</div><h1 class="admin-page-title">Nuevo tipo de tela</h1><p class="admin-page-subtitle">Registre una materia prima disponible para productos y producción.</p></div>
+    <div><div class="admin-eyebrow">Catálogo</div><h1 class="admin-page-title">{% if object %}Editar tipo de tela{% else %}Nuevo tipo de tela{% endif %}</h1><p class="admin-page-subtitle">Registre una materia prima disponible para productos y producción.</p></div>
     <a href="{% url 'administration:tipo_tela_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Volver</a>
 </div>
 <form method="post">

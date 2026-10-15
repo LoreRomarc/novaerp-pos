@@ -299,4 +299,4 @@ Luego haga el `git add`, `commit` y `push`. **Nunca borre, renombre ni edite mig
 
 Render gratuito permite verificar que todas las sedes pueden trabajar sobre una misma base desde Internet, pero no es apto para operación real por sus pausas, expiración de base, falta de backups y sistema de archivos efímero. [Limitaciones de Render](https://render.com/docs/free)
 
-Cuando las pruebas estén aprobadas, siga [DESPLIEGUE_PRODUCCION.md](DESPLIEGUE_PRODUCCION.md) para pasar a una VPS persistente con respaldos, HTTPS y dominio propio.
+Cuando las pruebas estén aprobadas, siga [DESPLIEGUE_PRODUCCION.md](DESPLIEGUE_PRODUCCION.md) para pasar a servicios de pago administrados, PostgreSQL central persistente, respaldos, HTTPS y dominio propio.

@@ -22,7 +22,8 @@ from apps.administration.views.user_views import (
 
 from apps.administration.views.customer_views import (
     ClienteListView,
-    ClienteCreateView
+    ClienteCreateView,
+    ClienteUpdateView,
 )
 
 from apps.administration.views.catalog_views import (
@@ -30,8 +31,14 @@ from apps.administration.views.catalog_views import (
     TipoTelaListView,
     TallaListView,
     TallaCreateView,
+    TallaUpdateView,
     ColorCreateView,
+    ColorUpdateView,
     TipoTelaCreateView,
+    TipoTelaUpdateView,
+    TallaDeleteView,
+    ColorDeleteView,
+    TipoTelaDeleteView,
 )
 
 from apps.administration.views.precio_views import (
@@ -78,18 +85,25 @@ urlpatterns = [
     # ======================
     path("clientes/", ClienteListView.as_view(), name="cliente_list"),
     path("clientes/create/", ClienteCreateView.as_view(), name="cliente_create"),
+    path("clientes/<int:pk>/editar/", ClienteUpdateView.as_view(), name="cliente_update"),
 
     # ======================
     # CATALOGOS
     # ======================
     path("colores/", ColorListView.as_view(), name="color_list"),
     path("colores/create/", ColorCreateView.as_view(), name="color_create"),
+    path("colores/<int:pk>/editar/", ColorUpdateView.as_view(), name="color_update"),
+    path("colores/<int:pk>/eliminar/", ColorDeleteView.as_view(), name="color_delete"),
 
     path("tipos-tela/", TipoTelaListView.as_view(), name="tipo_tela_list"),
     path("tipos-tela/create/", TipoTelaCreateView.as_view(), name="tipo_tela_create"),
+    path("tipos-tela/<int:pk>/editar/", TipoTelaUpdateView.as_view(), name="tipo_tela_update"),
+    path("tipos-tela/<int:pk>/eliminar/", TipoTelaDeleteView.as_view(), name="tipo_tela_delete"),
 
     path("tallas/", TallaListView.as_view(), name="talla_list"),
     path("tallas/create/", TallaCreateView.as_view(), name="talla_create"),
+    path("tallas/<int:pk>/editar/", TallaUpdateView.as_view(), name="talla_update"),
+    path("tallas/<int:pk>/eliminar/", TallaDeleteView.as_view(), name="talla_delete"),
 
     # =====================
     # LISTAS DE PRECIOS

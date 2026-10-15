@@ -1,303 +1,337 @@
-# NovaERP: despliegue oficial de pago en Hostinger VPS
+# NovaERP: despliegue profesional recomendado, paso a paso
 
-Esta guía es para operar el ERP real con varias sucursales y una base de datos
-central. El computador de la empresa continúa siendo **Windows**: no debe
-instalar Ubuntu allí. Ubuntu estará solamente en la VPS remota de Hostinger y
-los comandos se copian en la consola web del navegador.
+Esta es la ruta recomendada para operar NovaERP de forma real entre varias
+sucursales: **Render de pago para la aplicación + Render PostgreSQL de pago para
+la base de datos**, ambos en la misma región. El equipo de cada caja sigue
+siendo Windows; sólo abre el ERP con el navegador. No se instala Ubuntu ni
+PostgreSQL en los computadores de las sucursales.
 
-> Primero complete las pruebas de `DESPLIEGUE_GRATUITO_PASO_A_PASO.md`.
-> Antes de tocar el servidor real, realice y compruebe un respaldo.
+> Esta guía reemplaza la ruta de prueba gratuita. La prueba gratuita sirve para
+> validar el sistema, pero no para ventas reales: sus servicios se suspenden y
+> PostgreSQL gratuito vence. No suba datos reales hasta completar esta guía.
 
-## 1. Qué comprar
+## 1. La respuesta corta: dónde queda la base de datos
 
-1. Compre una **VPS** de Hostinger, no hosting compartido. Para varias cajas,
-   empiece con al menos 2 GB de RAM; puede subir de plan después.
-2. Compre un dominio, por ejemplo `miempresa.com`, en Hostinger o en cualquier
-   proveedor.
-3. En Hostinger abra **hPanel → VPS**, pulse **Setup**, elija **Ubuntu 24.04
-   LTS** y una ubicación cercana a Colombia si está disponible.
-
-Hostinger explica estas pantallas en su [guía de compra de VPS](https://www.hostinger.com/support/1583582-how-and-why-to-purchase-vps-hosting-at-hostinger/).
-
-## 2. Separar el repositorio de despliegue del compartido
-
-No tiene que “salirse” del proyecto compartido. Una rama es una línea local de
-trabajo y un remoto es el lugar de GitHub al que se publica el código. En este
-equipo:
-
-- `origin` es el repositorio compartido;
-- `pruebas` es su repositorio propio `jnstudiotech/novaerp-pruebas`;
-- `dev` es la rama compartida;
-- `despliegue-pruebas` es su rama privada de despliegue.
-
-En PowerShell ejecute:
-
-```powershell
-cd C:\Users\User\novaerp-pos
-git branch --show-current
-git remote -v
-git switch despliegue-pruebas
-```
-
-Si el último comando indica que la rama no existe, créela sólo una vez:
-
-```powershell
-git switch -c despliegue-pruebas
-```
-
-Para publicar código hacia su repositorio sin modificar el de otra persona:
-
-```powershell
-git add -A
-git status
-git commit -m "Preparar NovaERP para producción"
-git push -u pruebas HEAD:main
-```
-
-No ejecute `git push origin ...`: ese comando enviaría cambios al repositorio
-compartido. Para volver al trabajo compartido después use `git switch dev`.
-Cambiar de rama no borra ni publica archivos. Antes de `git add -A`, confirme
-con `git status` que no aparezcan `.env`, `venv`, `staticfiles` ni respaldos.
-
-## 3. Abrir la consola del servidor
-
-1. Entre a [hPanel](https://hpanel.hostinger.com/).
-2. Abra **VPS** y pulse **Manage** sobre su servidor.
-3. En **Overview**, copie la IP pública y guárdela.
-4. Pulse **Web Console**. Si pide usuario escriba `root`; cuando escriba la
-   contraseña no se mostrarán caracteres, lo cual es normal.
-
-La [guía oficial de la consola web](https://www.hostinger.com/support/how-to-use-the-web-console-in-hostinger/) muestra estas pantallas.
-
-En esa consola ejecute, una línea o bloque a la vez:
-
-```bash
-apt update
-apt upgrade -y
-apt install -y git nginx postgresql postgresql-contrib python3 python3-venv python3-pip python3-dev build-essential libpq-dev certbot python3-certbot-nginx ufw
-adduser --disabled-password --gecos "" novaerp
-usermod -aG www-data novaerp
-ufw allow OpenSSH
-ufw allow 'Nginx Full'
-ufw --force enable
-```
-
-Espere siempre a que vuelva a aparecer el cursor terminado en `#` antes de
-pegar el bloque siguiente.
-
-## 4. Permitir que la VPS lea el repositorio privado
-
-En la consola de la VPS ejecute:
-
-```bash
-sudo -u novaerp mkdir -p /home/novaerp/.ssh
-sudo -u novaerp ssh-keygen -t ed25519 -C "novaerp-vps" -f /home/novaerp/.ssh/id_ed25519 -N ""
-sudo -u novaerp cat /home/novaerp/.ssh/id_ed25519.pub
-```
-
-Copie todo el resultado de la última línea, que empieza por `ssh-ed25519`.
-Luego, en GitHub:
-
-1. Abra `https://github.com/jnstudiotech/novaerp-pruebas`.
-2. Pulse **Settings → Deploy keys → Add deploy key**.
-3. Como título escriba `VPS NovaERP producción`.
-4. Pegue la clave copiada, deje desmarcado **Allow write access** y pulse
-   **Add key**.
-
-Vuelva a la consola y descargue el proyecto:
-
-```bash
-sudo -u novaerp ssh-keyscan github.com >> /home/novaerp/.ssh/known_hosts
-sudo -u novaerp git clone git@github.com:jnstudiotech/novaerp-pruebas.git /opt/novaerp-pos
-chown -R novaerp:www-data /opt/novaerp-pos
-```
-
-Si su repositorio cambia de nombre, sustituya solamente
-`jnstudiotech/novaerp-pruebas.git` por la URL de **GitHub → Code → SSH**.
-
-## 5. Base de datos y archivo privado de configuración
-
-Cree la base de datos. El primer comando pedirá una contraseña: use una larga
-y única, y guárdela en un gestor de contraseñas.
-
-```bash
-sudo -u postgres createuser --pwprompt novaerp_app
-sudo -u postgres createdb --owner=novaerp_app novaerp
-```
-
-Ahora cree el archivo privado:
-
-```bash
-mkdir -p /etc/novaerp
-nano /etc/novaerp/novaerp.env
-```
-
-Pegue el siguiente contenido. Reemplace cada valor entre corchetes. Use el
-subdominio real, por ejemplo `erp.miempresa.com`:
+Al publicar correctamente NovaERP, la base de datos PostgreSQL queda en un
+servidor administrado de Render, en la nube. **No queda encendida en su PC, ni
+en el PC de una sucursal.** Todos los computadores entran por Internet a una
+sola aplicación y esta se conecta a una sola base central.
 
 ```text
-DJANGO_SECRET_KEY=[clave_larga_aleatoria]
-DJANGO_DEBUG=False
-DJANGO_ALLOWED_HOSTS=[erp.tudominio.com]
-DJANGO_CSRF_TRUSTED_ORIGINS=https://[erp.tudominio.com]
-DJANGO_SECURE_SSL_REDIRECT=True
-DJANGO_HSTS_SECONDS=31536000
-POSTGRES_DB=novaerp
-POSTGRES_USER=novaerp_app
-POSTGRES_PASSWORD=[contrasena_de_la_base]
-POSTGRES_HOST=127.0.0.1
-POSTGRES_PORT=5432
-POSTGRES_CONN_MAX_AGE=60
+PC de caja 1 ─┐
+PC de caja 2 ─┼── HTTPS ──> NovaERP en Render ── red privada ──> PostgreSQL en Render
+PC de fábrica ┘
 ```
 
-Para generar el valor de `DJANGO_SECRET_KEY`, abra una segunda consola y ejecute:
+Esto permite que una venta, traslado, caja o inventario se vea de inmediato en
+la sede que corresponda. Si se apaga un computador de caja, los datos ya
+guardados siguen en la nube. Lo que sí se necesita en cada sede es Internet.
+
+### Qué se actualiza automáticamente y qué no
+
+| Lo que cambia | ¿Llega solo a Render? | Qué debe hacer |
+|---|---|---|
+| Código (`.py`, HTML, CSS, JavaScript) | Sí, al hacer `git push` a la rama conectada | Esperar a que termine el deploy. |
+| Estructura de la BD (campos, tablas) | Sí, si la migración fue creada y subida | Crear migración local, probarla, incluirla en el `git push`. |
+| Datos creados en el ERP desplegado | Sí | Ya se guardan directamente en la BD de Render. |
+| Datos creados sólo en su BD local | No | Debe capturarlos de nuevo en la nube o hacer una importación planificada. |
+| Archivo de migración que no subió a Git | No | Nunca llegará al servidor. |
+
+El archivo [build.sh](build.sh) ya ejecuta estas acciones en cada despliegue:
 
 ```bash
-python3 -c "import secrets; print(secrets.token_urlsafe(64))"
+python manage.py collectstatic --noinput
+python manage.py migrate --noinput
+python manage.py check --deploy
 ```
 
-En `nano`, guarde con `Ctrl+O`, luego `Enter`, y salga con `Ctrl+X`. Proteja el
-archivo:
+Por tanto, **no ejecute `makemigrations` en Render**. Hágalo en su proyecto de
+Windows, pruébelo y suba tanto el código como los archivos de migración. Render
+aplicará `migrate` sobre la base central sin borrar los datos existentes.
 
-```bash
-chown root:novaerp /etc/novaerp/novaerp.env
-chmod 640 /etc/novaerp/novaerp.env
-```
+## 2. Por qué esta es la ruta recomendada
 
-Nunca suba este archivo a GitHub, WhatsApp o correo.
+Para una empresa que quiere concentrarse en ventas, producción e inventario,
+una base administrada es más segura que alojar PostgreSQL dentro de una VPS que
+usted mismo tendría que actualizar, proteger, respaldar y reparar. Render
+ofrece PostgreSQL administrado; sus bases de pago tienen recuperación a un
+momento anterior (PITR) y exportaciones lógicas desde el panel. El periodo de
+recuperación depende del plan del espacio de trabajo: actualmente 3 días en
+Hobby y 7 días en Pro o superior. Revise siempre los valores actuales antes de
+comprar: [copias y recuperación de Render](https://render.com/docs/postgresql-backups).
 
-## 6. Instalar NovaERP
+Render no tiene región en Colombia. Para sus sucursales, elija **Oregon, USA**
+o la región de Estados Unidos que dé mejor resultado en sus pruebas, pero
+mantenga *web* y *PostgreSQL* en exactamente la misma región. Render no permite
+mover una base o servicio de región después de creado; para hacerlo hay que
+migrarlos. Consulte las regiones disponibles antes de crear los servicios:
+[regiones de Render](https://render.com/docs/regions).
 
-Ejecute estos comandos:
+### Cuándo elegir Hostinger VPS en su lugar
 
-```bash
-sudo -u novaerp bash -c 'cd /opt/novaerp-pos && python3 -m venv venv && venv/bin/python -m pip install --upgrade pip && venv/bin/pip install -r requirements.txt'
-sudo -u novaerp env $(cat /etc/novaerp/novaerp.env | xargs) /opt/novaerp-pos/venv/bin/python manage.py migrate --noinput
-sudo -u novaerp env $(cat /etc/novaerp/novaerp.env | xargs) /opt/novaerp-pos/venv/bin/python manage.py collectstatic --noinput
-sudo -u novaerp env $(cat /etc/novaerp/novaerp.env | xargs) /opt/novaerp-pos/venv/bin/python manage.py check --deploy
-```
+Hostinger VPS es una alternativa si ya cuenta con una persona técnica que se
+responsabilice de Linux, actualizaciones de seguridad, firewall, PostgreSQL,
+respaldos externos y recuperación ante fallos. Puede tener costo previsible,
+pero es administración propia. Para su primera operación profesional
+multisucursal, recomiendo Render administrado; reduce ese riesgo operativo.
 
-El último comando debe finalizar sin problemas críticos. Una advertencia por
-dominio antes de crear el DNS se resolverá en el siguiente paso.
+## 3. Antes de comprar: deje lista su copia de código
 
-## 7. Dominio, servicio web y HTTPS
+Estas instrucciones se realizan una vez desde Windows.
 
-### 7.1 DNS
+1. Abra **Windows PowerShell**.
+2. Copie y pegue exactamente:
 
-En el proveedor donde compró el dominio cree un registro:
+   ```powershell
+   cd C:\Users\User\novaerp-pos
+   git status
+   ```
 
-| Campo | Valor |
+3. Confirme que no aparezcan archivos privados como `.env`, `venv`,
+   `staticfiles`, archivos `.sql` de respaldo ni contraseñas.
+4. Compruebe que `.env` esté ignorado:
+
+   ```powershell
+   git check-ignore .env
+   ```
+
+   Si la terminal muestra `.env`, está protegido por `.gitignore`. Si no
+   muestra nada, **no publique todavía**: agregue `.env` a `.gitignore` y
+   confirme con el mismo comando.
+5. Pruebe el proyecto y las migraciones localmente:
+
+   ```powershell
+   .\venv\Scripts\Activate.ps1
+   python manage.py check
+   python manage.py makemigrations --check --dry-run
+   ```
+
+   El último comando debe indicar que no hay cambios pendientes. Si usted hizo
+   un cambio de modelo que aún no tiene migración, ejecute `python manage.py
+   makemigrations`, pruebe `python manage.py migrate` localmente y vuelva a
+   ejecutar la comprobación.
+
+6. Publique sólo los cambios que ya probó en su repositorio de despliegue:
+
+   ```powershell
+   git add -A
+   git status
+   git commit -m "Preparar version de produccion"
+   git push pruebas HEAD:main
+   ```
+
+   En este proyecto `pruebas` es su repositorio propio de Render. No utilice
+   `git push origin` si `origin` pertenece al repositorio compartido de otra
+   persona.
+
+## 4. Crear la base PostgreSQL profesional
+
+1. Entre a [Render Dashboard](https://dashboard.render.com/) con la misma
+   cuenta que usa para la prueba.
+2. Pulse **New +** y elija **PostgreSQL**.
+3. Escriba como nombre: `novaerp-produccion-db`.
+4. Elija una región, por ejemplo **Oregon**. Anótela: la aplicación deberá usar
+   esa misma región.
+5. Seleccione un plan de pago adecuado para comenzar. No seleccione `Free`.
+6. Pulse **Create Database** y espere el estado **Available**.
+7. Abra la base y entre a **Info**. No copie ni comparta públicamente sus URL,
+   usuario o contraseña: son credenciales de la base.
+
+La base queda creada antes que la aplicación para poder vincularla mediante la
+red privada de Render. No necesita abrir puertos ni instalar PostgreSQL en
+Windows.
+
+## 5. Crear la aplicación web profesional
+
+1. En Render pulse **New + → Web Service**.
+2. Conecte su cuenta de GitHub si Render la solicita.
+3. Seleccione el repositorio `jnstudiotech/novaerp-pruebas` (o el repositorio
+   privado que usted haya destinado exclusivamente al despliegue).
+4. En **Branch** seleccione `main`.
+5. Escriba como nombre `novaerp-produccion`.
+6. Elija **Python 3** como entorno y la misma región de la base.
+7. Use estos comandos:
+
+   | Campo de Render | Valor |
+   |---|---|
+   | Build Command | `bash build.sh` |
+   | Start Command | `gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120` |
+8. Seleccione una instancia web de pago. No use la instancia gratuita para una
+   operación de caja.
+
+### 5.1 Variables de entorno obligatorias
+
+Dentro de la nueva aplicación abra **Environment** y agregue estas variables.
+No las escriba en archivos del repositorio.
+
+| Variable | Valor |
 |---|---|
-| Tipo | `A` |
-| Nombre / Host | `erp` |
-| Apunta a | La IP pública de la VPS |
-| TTL | Automático o 300 |
+| `DATABASE_URL` | La **Internal Database URL** de `novaerp-produccion-db`. |
+| `DJANGO_SECRET_KEY` | Pulse **Generate** si Render ofrece esa opción; de lo contrario use una clave aleatoria larga. |
+| `DJANGO_DEBUG` | `False` |
+| `DJANGO_USE_WHITENOISE` | `True` |
+| `DJANGO_SECURE_SSL_REDIRECT` | `True` |
+| `DJANGO_HSTS_SECONDS` | `31536000` |
+| `POSTGRES_CONN_MAX_AGE` | `60` |
+| `PYTHON_VERSION` | `3.12.7` |
 
-Espere la propagación antes de activar HTTPS.
+Para agregar `DATABASE_URL`, prefiera la opción de Render de enlazar una
+variable desde la base de datos, si aparece. Eso evita copiar manualmente una
+contraseña. Si no aparece, copie **Internal Database URL**, nunca la URL
+externa, y péguela sólo en el campo secreto de `DATABASE_URL`.
 
-### 7.2 Servicio de NovaERP
+Deje `DJANGO_ALLOWED_HOSTS` y `DJANGO_CSRF_TRUSTED_ORIGINS` sin configurar por
+el momento si el proyecto ya obtiene el dominio de Render automáticamente. Los
+agregará explícitamente en el siguiente paso cuando tenga su dominio real.
 
-El proyecto trae el servicio preparado. Ejecute:
+9. Pulse **Create Web Service**.
+10. Abra **Events**. El primer despliegue termina bien únicamente cuando el
+    último evento diga **Live**. En los logs debe verse que `migrate` terminó
+    sin error.
 
-```bash
-cp /opt/novaerp-pos/deploy/novaerp.service /etc/systemd/system/novaerp.service
-systemctl daemon-reload
-systemctl enable --now novaerp
-systemctl status novaerp --no-pager
-```
+## 6. Dominio empresarial y HTTPS
 
-Debe verse `active (running)`. Si no, copie el resultado de:
+1. Compre el dominio donde prefiera (Hostinger puede vender el dominio aunque
+   no use su VPS).
+2. En Render abra `novaerp-produccion` → **Settings** → **Custom Domains**.
+3. Escriba `erp.sudominio.com` y pulse para agregarlo.
+4. Render mostrará exactamente el registro DNS que necesita. Abra el panel del
+   proveedor del dominio, por ejemplo **Hostinger hPanel → Domains → DNS Zone**,
+   y cree ese registro. No invente valores: copie los que Render muestra.
+5. Vuelva a Render y espere a que el dominio sea verificado y HTTPS quede
+   activo.
+6. En **Environment** agregue o reemplace estos valores con su dominio real:
 
-```bash
-journalctl -u novaerp -n 80 --no-pager
-```
+   ```text
+   DJANGO_ALLOWED_HOSTS=erp.sudominio.com
+   DJANGO_CSRF_TRUSTED_ORIGINS=https://erp.sudominio.com
+   ```
 
-### 7.3 Nginx
+7. Pulse **Save Changes** y espere el despliegue. Abra
+   `https://erp.sudominio.com` y compruebe que aparece el candado HTTPS.
 
-```bash
-cp /opt/novaerp-pos/deploy/nginx-novaerp.conf /etc/nginx/sites-available/novaerp
-nano /etc/nginx/sites-available/novaerp
-```
+## 7. Primera instalación o paso desde pruebas
 
-Reemplace las dos apariciones de `erp.tudominio.com` por el dominio real.
-Guarde con `Ctrl+O`, `Enter`, `Ctrl+X`; luego ejecute:
+### Si es una instalación nueva
 
-```bash
-ln -s /etc/nginx/sites-available/novaerp /etc/nginx/sites-enabled/novaerp
-rm -f /etc/nginx/sites-enabled/default
-nginx -t
-systemctl reload nginx
-```
+1. Abra la URL de producción.
+2. Complete `/setup/` una sola vez: empresa, primera sucursal, primera caja y
+   usuario superadministrador.
+3. Guarde la contraseña en un gestor de contraseñas.
+4. Después del setup, no vuelva a usar esa pantalla para modificar datos.
+   Use los módulos de Administración del ERP.
 
-### 7.4 Certificado HTTPS
+### Si ya tiene datos de prueba y quiere conservarlos
 
-Cuando el DNS ya apunte a la VPS, ejecute cambiando dominio y correo:
+No conecte a producción una base de prueba sin respaldarla primero. En la base
+de prueba de Render, abra **Recovery** y cree/descargue un export lógico, o
+use `pg_dump` desde un equipo seguro. Luego restaure únicamente sobre una base
+de destino vacía. La restauración puede duplicar o destruir datos si se hace
+sobre una base que ya tiene tablas con información. Para datos reales o si
+tiene dudas, haga este traslado una vez con asistencia técnica y conserve una
+copia sin modificar antes de empezar.
 
-```bash
-certbot --nginx -d erp.tudominio.com -m tu-correo@empresa.com --agree-tos --no-eff-email
-```
+## 8. Actualizar NovaERP después de estar en producción
 
-Si pregunta por redirigir HTTP a HTTPS, elija sí. Abra después
-`https://erp.tudominio.com`: en la primera visita complete `/setup/` una sola
-vez con empresa, sucursal inicial, caja y usuario administrador.
+Este es el flujo normal para cada mejora. No necesita tocar la base a mano.
 
-## 8. Lector, impresora y uso por sucursales
+1. Haga el cambio en `C:\Users\User\novaerp-pos`.
+2. Si cambió un `models.py`, cree la migración local:
 
-### Lector USB con cable
+   ```powershell
+   python manage.py makemigrations
+   python manage.py migrate
+   ```
 
-El lector se conecta al computador de cada caja, no a la VPS. Abra Bloc de
-notas, escanee una etiqueta y confirme que el lector añade Enter al final. En
-el POS haga clic en “Buscar o escanear” y escanee. No requiere programa extra:
-funciona como un teclado. También puede usarse en los campos “Buscar o
-escanear” de inventario, traslados, devoluciones y precios.
+3. Pruebe el flujo afectado localmente.
+4. Revise los archivos a publicar:
 
-### Impresora
+   ```powershell
+   git status
+   ```
 
-Una VPS remota no puede imprimir directamente en una impresora USB conectada
-a la caja. Para el uso remoto utilice la impresión del navegador; para una
-impresión silenciosa se requiere un agente de impresión local en cada caja o
-un servicio de impresión ejecutado en un Windows local con la impresora.
+5. Publique:
+
+   ```powershell
+   git add -A
+   git commit -m "Explicar el cambio"
+   git push pruebas HEAD:main
+   ```
+
+6. Abra Render → `novaerp-produccion` → **Events** y espere **Live**.
+7. Pruebe el cambio en una cuenta de prueba antes de usarlo en caja.
+
+Si el cambio de modelo trae una migración, `build.sh` ejecutará `migrate` en la
+base de Render. Las ventas, cajas e inventario que ya existían se conservan;
+una migración bien diseñada transforma la estructura, no reinicia la base.
+
+**Nunca** borre o edite una migración que ya se aplicó en Render. Para corregir
+una estructura cree una nueva migración. Antes de cambios grandes, exporte la
+base desde **Recovery**.
+
+## 9. Copias de seguridad y recuperación
+
+La recuperación administrada no sustituye una copia independiente. Configure
+ambas cosas:
+
+1. En Render → `novaerp-produccion-db` → **Recovery**, confirme que la base es
+   de pago y que aparece **Point-in-Time Recovery**.
+2. Una vez por semana, pulse **Create export** y descargue el archivo a un
+   disco seguro o almacenamiento de la empresa con acceso restringido.
+3. Antes de una actualización grande, haga otro export manual.
+4. Anote quién puede entrar a Render y active autenticación de dos pasos en esa
+   cuenta.
+5. Una vez antes de operar en serio, ensaye una restauración sobre una base de
+   prueba nueva, nunca sobre la base viva.
+
+Las bases de pago de Render tienen PITR y permiten exportaciones lógicas en su
+panel; las bases gratuitas no ofrecen la misma recuperación. Consulte el
+procedimiento actualizado: [PostgreSQL Recovery and Backups](https://render.com/docs/postgresql-backups).
+
+## 10. Lector, impresora y sucursales
+
+### Lector de código de barras USB
+
+El lector va conectado al PC Windows de cada caja. Debe funcionar en modo
+teclado (HID): al escanear escribe el código y normalmente envía Enter. No se
+conecta a Render y no necesita una base instalada localmente.
+
+### Impresora de tickets
+
+Una aplicación alojada en la nube no puede controlar por sí sola una impresora
+USB conectada a Windows. Para imprimir desde la nube se utiliza el navegador
+de la caja, o se instala/integra un agente local de impresión si más adelante
+se requiere impresión silenciosa. Mantenga instalado el driver de la impresora
+en cada PC que vaya a imprimir.
 
 ### Varias sucursales
 
-Todos los equipos entran a la misma URL HTTPS y usan una sola base de datos.
-No instale una base por sucursal. Desde el ERP cree las sucursales, cajas y
-usuarios; los permisos de cada usuario limitan su operación a su sede.
+Todas usan una sola URL y una sola PostgreSQL central. No cree una base por
+sucursal. Los permisos, la sucursal activa y las transacciones atómicas de
+NovaERP son los que delimitan qué puede operar cada usuario.
 
-## 9. Respaldos y actualizaciones
+## 11. Lista final antes de vender en producción
 
-Instale el respaldo diario incluido y pruébelo:
+- [ ] La aplicación y PostgreSQL son planes de pago y están en la misma región.
+- [ ] El dominio usa HTTPS y abre `https://erp.sudominio.com`.
+- [ ] `DJANGO_DEBUG=False` está en Environment de Render.
+- [ ] `DJANGO_SECRET_KEY` y `DATABASE_URL` existen sólo como secretos de Render.
+- [ ] Hay un superadministrador con contraseña guardada de forma segura.
+- [ ] Cada sucursal tiene caja, usuarios, permisos y prueba de apertura/cierre.
+- [ ] Se probó venta, crédito, abono, devolución, traslado y recepción.
+- [ ] Se probó lector e impresión en cada PC de caja.
+- [ ] Existe al menos una exportación de PostgreSQL descargada fuera de Render.
+- [ ] Sólo personas autorizadas tienen acceso a GitHub y Render.
 
-```bash
-install -m 700 -o root -g root /opt/novaerp-pos/deploy/backup_postgres.sh /usr/local/sbin/novaerp-backup
-echo '30 2 * * * root /usr/local/sbin/novaerp-backup' > /etc/cron.d/novaerp-backup
-/usr/local/sbin/novaerp-backup
-ls -lh /var/backups/novaerp
-```
+## 12. Soporte: qué información guardar si algo falla
 
-Descargue además una copia cifrada fuera de la VPS al menos cada semana. Antes
-de cada actualización ejecute el respaldo. Para actualizar código ya probado:
+No copie contraseñas ni URLs de base. Guarde únicamente:
 
-```bash
-/usr/local/sbin/novaerp-backup
-cd /opt/novaerp-pos
-sudo -u novaerp git pull --ff-only origin main
-sudo -u novaerp /opt/novaerp-pos/venv/bin/pip install -r requirements.txt
-sudo -u novaerp env $(cat /etc/novaerp/novaerp.env | xargs) /opt/novaerp-pos/venv/bin/python manage.py migrate --noinput
-sudo -u novaerp env $(cat /etc/novaerp/novaerp.env | xargs) /opt/novaerp-pos/venv/bin/python manage.py collectstatic --noinput
-systemctl restart novaerp
-systemctl status novaerp --no-pager
-```
+1. El nombre del servicio de Render.
+2. La hora aproximada del error en Colombia.
+3. Una captura del mensaje completo.
+4. La sección **Logs** o **Events** del servicio, ocultando secretos si los
+   hubiera.
+5. El paso que estaba realizando: venta, cierre, traslado, despliegue, etc.
 
-No edite ni borre migraciones ya aplicadas.
-
-## 10. Prueba final de producción
-
-1. Entre por `https://erp.tudominio.com`, no por la IP.
-2. Cree usuarios de prueba de sucursales distintas.
-3. Pruebe lector, venta, crédito, abono, devolución, traslado, recepción y
-   cierre de caja.
-4. Revise que exista un archivo nuevo en `/var/backups/novaerp`.
-5. Compruebe el acceso desde un teléfono usando datos móviles.
-
-La [documentación de VPS de Hostinger](https://www.hostinger.com/support/vps/) sirve como referencia para credenciales, consola, firewall y copias de seguridad.
+Con esos datos se puede diagnosticar el problema sin exponer la base de datos.

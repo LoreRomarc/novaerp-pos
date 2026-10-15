@@ -401,10 +401,11 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
     <hr>
 
     <div class="mb-2">
-        <label class="small text-muted" for="vendedor">Vendedor <span class="text-muted">(opcional)</span></label>
+        <div class="d-flex justify-content-between align-items-center"><label class="small text-muted" for="vendedor">Vendedor <span class="text-muted">(opcional)</span></label><button type="button" class="btn btn-link btn-sm p-0" data-bs-toggle="modal" data-bs-target="#modalVendedoresPOS">Configurar</button></div>
+        <input id="buscar-vendedor" class="form-control form-control-sm mb-1" type="search" autocomplete="off" placeholder="Buscar vendedor en esta sucursal">
         <select id="vendedor" class="form-select form-select-sm">
           <option value="">Sin asignar</option>
-          {% for vendedor in vendedores %}<option value="{{ vendedor.id }}">{{ vendedor.nombre }}</option>{% endfor %}
+          {% for vendedor in vendedores %}<option value="{{ vendedor.id }}">{{ vendedor.nombre }} · {{ vendedor.sucursal.nombre }}</option>{% endfor %}
         </select>
     </div>
 
@@ -417,7 +418,11 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
         type="text"
         id="cliente"
         class="form-control form-control-sm"
-        placeholder="Nombre cliente">
+        list="clientes-pos"
+        placeholder="Consumidor final o buscar cliente">
+        <datalist id="clientes-pos">
+          {% for cliente in clientes_pos %}<option value="{{ cliente.nombre }}">{{ cliente.identificacion|default:"" }}</option>{% endfor %}
+        </datalist>
     </div>
 
 
@@ -511,6 +516,16 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
   </div>
 </div>
 
+<div class="modal fade" id="modalVendedoresPOS" tabindex="-1" aria-labelledby="modalVendedoresPOSTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="modalVendedoresPOSTitle">Vendedores visibles en este POS</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div><div class="modal-body">
+    <p class="small text-muted">Esta selección es personal para esta sucursal. No cambia quién está autorizado a vender.</p>
+    <div class="input-group input-group-sm mb-2"><span class="input-group-text"><i class="bi bi-search"></i></span><input id="buscar-config-vendedor" class="form-control" type="search" placeholder="Buscar vendedor"></div>
+    <div id="lista-config-vendedores" class="vstack gap-1">
+      {% for vendedor in vendedores_configuracion %}<label class="d-flex align-items-center gap-2 border rounded px-2 py-2 vendedor-config-item"><input class="form-check-input m-0 vendedor-visible-check" type="checkbox" value="{{ vendedor.id }}" {% if vendedor.id in vendedores_visibles_ids %}checked{% endif %}><span class="flex-grow-1">{{ vendedor.nombre }}<small class="d-block text-muted">Principal: {{ vendedor.sucursal.nombre }}</small></span></label>{% empty %}<span class="text-muted small">No hay vendedores activos.</span>{% endfor %}
+    </div>
+  </div><div class="modal-footer"><button type="button" class="btn btn-light border" data-bs-dismiss="modal">Cancelar</button><button type="button" id="guardar-vendedores-visibles" class="btn btn-primary">Guardar selección</button></div></div></div>
+</div>
+
 <script>
       function getCSRFToken() {
         const name = "csrftoken=";
@@ -559,6 +574,7 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
       const inputCliente = $("cliente");
       const inputObservaciones = $("observaciones");
       const inputVendedor = $("vendedor");
+      const inputBuscarVendedor = $("buscar-vendedor");
 
 
       const btnCerrar = $("btnCerrar");
@@ -598,6 +614,76 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
       const money = (v) => {
         return moneyFormatter.format(toNumber(v));
       };
+
+      function filtrarVendedores() {
+        const consulta = (inputBuscarVendedor.value || "").trim().toLocaleLowerCase("es-CO");
+        let visibles = [];
+
+        [...inputVendedor.options].forEach((opcion, indice) => {
+          if (indice === 0) {
+            opcion.hidden = false;
+            return;
+          }
+          const coincide = !consulta || opcion.text.toLocaleLowerCase("es-CO").includes(consulta);
+          opcion.hidden = !coincide;
+          if (coincide) visibles.push(opcion);
+        });
+
+        // Si el filtro devuelve un solo vendedor, Enter lo selecciona sin
+        // obligar al cajero a recorrer una lista larga.
+        return visibles;
+      }
+
+      inputBuscarVendedor?.addEventListener("input", filtrarVendedores);
+      inputBuscarVendedor?.addEventListener("keydown", (evento) => {
+        if (evento.key !== "Enter") return;
+        const visibles = filtrarVendedores();
+        if (visibles.length === 1) {
+          evento.preventDefault();
+          inputVendedor.value = visibles[0].value;
+          inputVendedor.dispatchEvent(new Event("change", { bubbles: true }));
+          inputBuscarVendedor.value = visibles[0].text;
+        }
+      });
+      inputVendedor?.addEventListener("change", () => {
+        if (inputVendedor.value) {
+          inputBuscarVendedor.value = inputVendedor.selectedOptions[0]?.text || "";
+        } else {
+          inputBuscarVendedor.value = "";
+        }
+      });
+
+      const inputBuscarConfigVendedor = $("buscar-config-vendedor");
+      inputBuscarConfigVendedor?.addEventListener("input", function () {
+        const consulta = this.value.trim().toLocaleLowerCase("es-CO");
+        document.querySelectorAll(".vendedor-config-item").forEach((item) => {
+          item.hidden = Boolean(consulta) && !item.innerText.toLocaleLowerCase("es-CO").includes(consulta);
+        });
+      });
+
+      $("guardar-vendedores-visibles")?.addEventListener("click", function () {
+        const boton = this;
+        const vendedorIds = [...document.querySelectorAll(".vendedor-visible-check:checked")]
+          .map((campo) => Number(campo.value));
+        boton.disabled = true;
+        postJSON("{% url 'sales:pos_vendedores_visibles' %}", { vendedor_ids: vendedorIds })
+          .then((respuesta) => {
+            if (!respuesta.success) throw new Error(respuesta.error || "No fue posible guardar la selección.");
+            window.location.reload();
+          })
+          .catch((error) => {
+            alert(error.message);
+            boton.disabled = false;
+          });
+      });
+
+      function seleccionarVendedor(vendedorId) {
+        inputVendedor.value = vendedorId || "";
+        inputBuscarVendedor.value = inputVendedor.value
+          ? (inputVendedor.selectedOptions[0]?.text || "")
+          : "";
+        filtrarVendedores();
+      }
 
       // VENTA INICIAL (si hay) 
       const ventaInicial = {{ venta|safe }};
@@ -779,7 +865,7 @@ function guardarEstadoVenta(){
               inputTransferencia.value=venta.transferencia;
 
               inputTarjeta.value=venta.tarjeta;
-              inputVendedor.value=venta.vendedor_id || "";
+              seleccionarVendedor(venta.vendedor_id);
 
               setTipoVentaUI(venta.tipo_venta);
 
@@ -1143,7 +1229,7 @@ function guardarEstadoVenta(){
 
         inputCliente.value = data.cliente || "";
         inputObservaciones.value = data.observaciones || "";
-        inputVendedor.value = data.vendedor_id || "";
+        seleccionarVendedor(data.vendedor_id);
 
         inputEfectivo.value = data.efectivo || "";
         inputTransferencia.value = data.transferencia || "";
@@ -1392,7 +1478,7 @@ function guardarEstadoVenta(){
           $("cantidad_items").innerText = "0";
           inputCliente.value = "";
           inputObservaciones.value = "";
-          inputVendedor.value = "";
+          seleccionarVendedor("");
 
           btnCerrar.disabled = true;
           pagoEditadoManualmente = false;
