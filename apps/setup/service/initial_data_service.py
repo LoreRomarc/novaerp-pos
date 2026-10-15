@@ -1,5 +1,6 @@
 # apps/setup/service/initial_data_service.py
 from django.db import transaction
+from django.core.management import call_command
 
 from apps.customers.models import Cliente
 
@@ -61,11 +62,12 @@ class InitialDataService:
         telas = [
             ("Lycra Algodón", "Tejido elástico de punto."),
             ("Algodón Puro", "Fibra natural rígida o jersey estándar."),
-            ("Seda Fría", "Tejido sintético fluido y fresco."),
-            ("Algodón Heavy Weight 250g", "Tela gruesa para prendas premium."),
+            ("Tela Fría", "Tejido sintético fluido y fresco."),
+            ("Algodón Pesado 250gr", "Tela gruesa para prendas premium."),
             ("Algodón Perchado", "Tela con reverso abrigado."),
             ("Tela Burda", "Tejido de punto con rulos internos."),
             ("Suplex Poliamida", "Tela deportiva de alta compresión."),
+            ("Tela Piqué", "Tejido texturizado para camisetas polo."),
         ]
 
         for tela, descripcion in telas:
@@ -105,5 +107,12 @@ class InitialDataService:
                 nombre,
                 {"orden": orden, "activo": True},
             )
+
+        # Si el archivo editable de catálogo ya contiene productos, la primera
+        # instalación los crea aquí. El comando es idempotente: en instalaciones
+        # existentes sólo agrega lo que falte y nunca reescribe el historial.
+        # Así la misma fuente sirve tanto para iniciar desde cero como para
+        # ampliar el catálogo más adelante de forma manual.
+        call_command("cargar_catalogo_productos", verbosity=0)
 
         return True

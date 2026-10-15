@@ -86,7 +86,89 @@ El stock es independiente por variante y sucursal. Nunca se debe editar la tabla
 
 Un ajuste no requiere caja porque no representa un pago de cliente. Las ventas, cambios con cobro y reembolsos sí requieren un turno abierto para que el dinero quede conciliado.
 
-## 6. Producción
+## 6. Catálogo masivo de productos y variantes
+
+El archivo editable está en:
+
+```text
+apps/inventory/data/catalogo_productos.py
+```
+
+### Paso 1: editar el catálogo
+
+1. Abra VS Code.
+2. Pulse `Ctrl + P`.
+3. Escriba y abra: `apps/inventory/data/catalogo_productos.py`.
+4. Dentro de `PRODUCTOS`, copie uno de los bloques existentes para agregar una
+   prenda nueva; cambie únicamente `nombre`, `descripcion` y las telas dentro
+   de `variantes_para_telas(...)`.
+5. Guarde con `Ctrl + S`.
+
+Use siempre los nombres ya creados en **Telas**, **Colores** y **Tallas**. Por
+ejemplo, `Lycra Algodón`, `Sin Definir` y `Adulto` generan
+`STR-ALGL-SDF-ADU` para un Suéter. Los SKU y códigos de barras no se escriben
+manualmente en este archivo.
+
+Si edita el archivo **antes de completar `/setup/` por primera vez**, el setup
+creará automáticamente ese catálogo junto con las telas, colores y tallas
+base. Si el sistema ya existe, use el comando siguiente: el resultado es el
+mismo y no duplica registros.
+
+### Paso 2: probar el cambio localmente
+
+Abra **Windows PowerShell** y copie estos comandos, uno por vez:
+
+```powershell
+cd C:\Users\User\novaerp-pos
+.\venv\Scripts\Activate.ps1
+python manage.py cargar_catalogo_productos --simular
+```
+
+La simulación no guarda nada; muestra qué productos y variantes agregaría. La
+ejecución normal **sólo agrega faltantes**: nunca duplica una variante ni cambia
+datos existentes. Puede volver a ejecutarla tantas veces como quiera después de
+agregar nuevas filas al archivo.
+
+Si la simulación muestra lo esperado y quiere crear el catálogo también en su
+base de datos local, ejecute:
+
+```powershell
+python manage.py cargar_catalogo_productos
+```
+
+### Paso 3: publicar el catálogo en Render
+
+En la misma ventana de PowerShell, desde `C:\Users\User\novaerp-pos`, ejecute:
+
+```powershell
+cd C:\Users\User\novaerp-pos
+git add -A
+git status
+git commit -m "Actualizar catálogo de productos"
+git push pruebas HEAD:main
+```
+
+Luego abra **Render → novaerp-pruebas → Events** y espere que el último evento
+diga **Live**. En Render el comando se ejecuta automáticamente después de las
+migraciones: agregará sólo las novedades a la base central. No incluya
+`--actualizar` en el despliegue: los cambios de precio o estado deben ser
+decisiones explícitas desde el ERP o mediante el comando manual.
+
+Para actualizar de forma deliberada la descripción, estado, precio, costo o
+stock mínimo ya definidos en el archivo, ejecute:
+
+```powershell
+python manage.py cargar_catalogo_productos --actualizar --simular
+python manage.py cargar_catalogo_productos --actualizar
+```
+
+Este comando nunca modifica SKU, código de barras, stock físico, ventas,
+movimientos ni producción. Para cambiar tela, color o talla, cree otra variante
+y desactive la anterior cuando ya no se venda. Para renombrar un producto use
+`nombre_anterior` como se muestra en el propio archivo y ejecute con
+`--actualizar`.
+
+## 7. Producción
 
 Primero registra los rollos de tela: código, tipo, color, cantidad inicial y costo. En **Corte/Producción** registra el corte, rollos consumidos, variantes y cantidades. El sistema descuenta el material y deja trazabilidad del corte.
 
@@ -94,7 +176,7 @@ Después asigna las operaciones (por ejemplo corte o confección) y los empleado
 
 La prenda terminada entra al inventario de fábrica o de la sucursal definida únicamente cuando el flujo de producción se completa. Consulta el historial de producción para saber qué persona cortó o confeccionó cada lote.
 
-## 7. Caja
+## 8. Caja
 
 ### Apertura
 
@@ -117,7 +199,7 @@ El resumen del turno separa:
 
 Al cerrar, cuenta el efectivo físico e informa el valor real. Revisa cualquier diferencia antes de confirmar. No elimines turnos ni movimientos para cuadrar caja: registra el ajuste con motivo y conserva la auditoría.
 
-## 8. Punto de venta (POS)
+## 9. Punto de venta (POS)
 
 1. Abre la caja de tu sucursal.
 2. Ingresa al POS y crea una venta nueva.
@@ -128,11 +210,11 @@ Al cerrar, cuenta el efectivo físico e informa el valor real. Revisa cualquier 
 
 Si se recarga el navegador, el carrito/factura abierta debe recuperarse desde los datos persistidos del sistema. No crees otra venta para continuar una factura existente.
 
-## 9. Anulación de ventas
+## 10. Anulación de ventas
 
 Una venta anulada no se borra. Conserva su número, detalle, usuario y fecha con estado **Anulada**. La anulación debe revertir el stock y el efecto de caja mediante movimientos de reversión, no eliminando registros. Así el historial financiero y el kardex siguen siendo confiables.
 
-## 10. Cambios y devoluciones
+## 11. Cambios y devoluciones
 
 En **Cambios y devoluciones** no es obligatorio conocer el número de venta anterior: puedes buscar y registrar la prenda por SKU o nombre. Si tienes el número, inclúyelo como referencia para mayor auditoría.
 
@@ -153,7 +235,7 @@ Agrega la nueva prenda si existe cambio. El sistema calcula `valor entregado - v
 
 Todos los casos crean el comprobante de devolución/cambio, movimientos de stock y kardex. Los cobros adicionales, reembolsos y devoluciones en efectivo afectan el turno de caja abierto.
 
-## 11. Operación diaria sugerida
+## 12. Operación diaria sugerida
 
 1. Verificar sucursal activa.
 2. Abrir caja y confirmar base.
@@ -163,7 +245,7 @@ Todos los casos crean el comprobante de devolución/cambio, movimientos de stock
 6. Registrar retiros/ingresos manuales de caja cuando ocurran, nunca al final “de memoria”.
 7. Cerrar caja, contar efectivo y revisar el resumen por medio de pago.
 
-## 12. Controles y buenas prácticas
+## 13. Controles y buenas prácticas
 
 - No borres ventas, devoluciones, movimientos de stock ni movimientos de caja para corregir errores; usa anulación, ajuste o reversión autorizada.
 - Usa referencias claras: factura, proveedor, lote, motivo o responsable.
@@ -172,7 +254,7 @@ Todos los casos crean el comprobante de devolución/cambio, movimientos de stock
 - Realiza copias de seguridad diarias de la base de datos y prueba periódicamente una restauración.
 - Mantén actualizadas dependencias y credenciales; utiliza HTTPS y contraseñas individuales para cada operador.
 
-## 13. Soporte y diagnóstico
+## 14. Soporte y diagnóstico
 
 Cuando aparezca un error, anota URL, hora, usuario, sucursal y número de venta/cambio. Consulta el kardex y los movimientos de caja antes de hacer correcciones. Si un producto no aparece en POS o cambios, valida que la variante esté activa, tenga stock (cuando aplique) y cuente con precio en la lista activa de la sucursal.
 
