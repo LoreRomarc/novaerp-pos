@@ -22,7 +22,7 @@ class InitialDataService:
 
     @staticmethod
     @transaction.atomic
-    def crear_datos_base():
+    def crear_datos_base(cargar_catalogo=True):
 
         # ==========================================
         # CLIENTE GENERICO
@@ -108,11 +108,12 @@ class InitialDataService:
                 {"orden": orden, "activo": True},
             )
 
-        # Si el archivo editable de catálogo ya contiene productos, la primera
-        # instalación los crea aquí. El comando es idempotente: en instalaciones
-        # existentes sólo agrega lo que falte y nunca reescribe el historial.
-        # Así la misma fuente sirve tanto para iniciar desde cero como para
-        # ampliar el catálogo más adelante de forma manual.
-        call_command("cargar_catalogo_productos", verbosity=0)
+        if cargar_catalogo:
+            # Si el archivo editable de catálogo ya contiene productos, la
+            # primera instalación los crea aquí. El comando es idempotente: en
+            # instalaciones existentes sólo agrega lo que falte y nunca
+            # reescribe el historial. Así la misma fuente sirve tanto para
+            # iniciar desde cero como para ampliar el catálogo más adelante.
+            call_command("cargar_catalogo_productos", verbosity=0)
 
         return True

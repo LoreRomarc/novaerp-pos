@@ -42,6 +42,7 @@ El archivo [build.sh](build.sh) ya ejecuta estas acciones en cada despliegue:
 ```bash
 python manage.py collectstatic --noinput
 python manage.py migrate --noinput
+python manage.py cargar_datos_maestros
 python manage.py cargar_catalogo_productos
 python manage.py check --deploy
 ```
@@ -50,8 +51,9 @@ Por tanto, **no ejecute `makemigrations` en Render**. Hágalo en su proyecto de
 Windows, pruébelo y suba tanto el código como los archivos de migración. Render
 aplicará `migrate` sobre la base central sin borrar los datos existentes.
 
-El cargador de catálogo también se ejecuta automáticamente. Sólo agrega los
-productos y variantes faltantes definidos en
+Antes del catálogo se crean únicamente los maestros base faltantes (telas,
+colores y tallas). El cargador de catálogo también se ejecuta automáticamente.
+Sólo agrega los productos y variantes faltantes definidos en
 `apps/inventory/data/catalogo_productos.py`; nunca borra, cambia precios ni
 reescribe SKU, códigos de barras o historial.
 

@@ -150,9 +150,10 @@ git push pruebas HEAD:main
 
 Luego abra **Render → novaerp-pruebas → Events** y espere que el último evento
 diga **Live**. En Render el comando se ejecuta automáticamente después de las
-migraciones: agregará sólo las novedades a la base central. No incluya
-`--actualizar` en el despliegue: los cambios de precio o estado deben ser
-decisiones explícitas desde el ERP o mediante el comando manual.
+migraciones: primero verifica telas, colores y tallas base faltantes; después
+agregará sólo las novedades a la base central. No incluya `--actualizar` en el
+despliegue: los cambios de precio o estado deben ser decisiones explícitas
+desde el ERP o mediante el comando manual.
 
 Para actualizar de forma deliberada la descripción, estado, precio, costo o
 stock mínimo ya definidos en el archivo, ejecute:
