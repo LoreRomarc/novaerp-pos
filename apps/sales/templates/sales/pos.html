@@ -1441,6 +1441,31 @@ function guardarEstadoVenta(){
       /* =========================================================
         CERRAR / CANCELAR VENTA
     ========================================================= */
+      const agenteImpresionURL = "http://127.0.0.1:8765";
+      const impresionAutomaticaActiva = {{ impresion_automatica|yesno:"true,false" }};
+
+      async function imprimirConAgenteLocal(urlPayload) {
+        const respuestaPayload = await fetch(urlPayload, { credentials: "same-origin" });
+        if (!respuestaPayload.ok) throw new Error("No fue posible preparar el ticket.");
+        const payload = await respuestaPayload.json();
+        if (!payload.impresora) throw new Error("Seleccione una impresora en Impresión de tickets antes de activar la impresión automática.");
+        const respuestaAgente = await fetch(agenteImpresionURL + "/print", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const resultado = await respuestaAgente.json().catch(() => ({}));
+        if (!respuestaAgente.ok || !resultado.ok) {
+          throw new Error(resultado.error || "El agente local no pudo imprimir el ticket.");
+        }
+        return resultado;
+      }
+
+      function abrirTicket(ventana, url) {
+        if (ventana && !ventana.closed) ventana.location.replace(url);
+        else window.open(url, "_blank", "noopener");
+      }
+
       function cerrarVenta() {
       // Abrir la ventana durante el clic evita que el navegador bloquee el
       // comprobante. Se carga únicamente después de confirmar la venta.
@@ -1467,12 +1492,17 @@ function guardarEstadoVenta(){
           return;
         }
 
-        if (response.data.imprimir_ticket && response.data.ticket_url) {
-          if (ventanaTicket) {
-            ventanaTicket.location.replace(response.data.ticket_url);
-          } else {
-            window.open(response.data.ticket_url, "_blank", "noopener");
-          }
+        if (impresionAutomaticaActiva && !response.data.impresion_directa && response.data.payload_impresion_url) {
+          imprimirConAgenteLocal(response.data.payload_impresion_url)
+            .then(() => { if (ventanaTicket) ventanaTicket.close(); })
+            .catch((error) => {
+              // El comprobante nunca se pierde: si el agente no está activo,
+              // se usa el cuadro del navegador para imprimir o guardar PDF.
+              abrirTicket(ventanaTicket, response.data.ticket_url);
+              alert("Venta registrada. " + error.message + " Se abrió el comprobante para imprimir desde el navegador.");
+            });
+        } else if (response.data.imprimir_ticket && response.data.ticket_url) {
+          abrirTicket(ventanaTicket, response.data.ticket_url);
         }
 
         if (response.data.error_impresion) {

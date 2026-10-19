@@ -2,12 +2,13 @@
 """Vistas de comprobantes térmicos de venta."""
 
 import logging
+import sys
 
 from django.contrib import messages
 from django.contrib.messages import get_messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.http import Http404
+from django.http import Http404, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views import View
@@ -56,8 +57,39 @@ class TicketVentaView(LoginRequiredMixin, RolePermissionMixin, SucursalIsolation
                 "venta": venta,
                 "configuracion": configuracion,
                 "auto_imprimir": request.GET.get("autoprint") == "1",
+                "payload_impresion_url": reverse(
+                    "sales:ticket_venta_payload", kwargs={"pk": venta.pk}
+                ),
             },
         )
+
+
+class TicketVentaPayloadImpresionView(
+    LoginRequiredMixin, RolePermissionMixin, SucursalIsolationMixin, View
+):
+    """Entrega un ticket autenticado al agente local de impresión Windows."""
+
+    allowed_roles = ["SUPER_ADMIN", "ADMIN_SUCURSAL", "CAJERO", "SUPERVISOR"]
+
+    def get(self, request, pk):
+        try:
+            venta = Venta.objects.select_related(
+                "sucursal", "sucursal__empresa", "turno", "turno__caja",
+                "usuario", "vendedor",
+            ).prefetch_related("items").get(pk=pk, estado__in=["CERRADA", "CREDITO"])
+        except Venta.DoesNotExist as error:
+            raise Http404("La venta solicitada no existe o no está finalizada.") from error
+
+        perfil = request.user.profile
+        if perfil.role != "SUPER_ADMIN" and venta.sucursal_id != self.get_sucursal().id:
+            raise PermissionDenied("No puede imprimir una venta de otra sucursal.")
+
+        configuracion, _ = ConfiguracionImpresionVenta.objects.get_or_create(
+            sucursal=venta.sucursal,
+        )
+        if not configuracion.impresion_automatica:
+            raise PermissionDenied("La impresión automática está desactivada.")
+        return JsonResponse(ImpresionTermicaService.payload_venta_zpl(venta, configuracion))
 
 
 class TicketDevolucionView(LoginRequiredMixin, RolePermissionMixin, SucursalIsolationMixin, View):
@@ -89,7 +121,35 @@ class TicketDevolucionView(LoginRequiredMixin, RolePermissionMixin, SucursalIsol
             "devolucion": devolucion,
             "configuracion": configuracion,
             "auto_imprimir": request.GET.get("autoprint") == "1",
+            "payload_impresion_url": reverse(
+                "sales:ticket_devolucion_payload", kwargs={"pk": devolucion.pk}
+            ),
         })
+
+
+class TicketDevolucionPayloadImpresionView(
+    LoginRequiredMixin, RolePermissionMixin, SucursalIsolationMixin, View
+):
+    allowed_roles = ["SUPER_ADMIN", "ADMIN_SUCURSAL", "CAJERO", "SUPERVISOR"]
+
+    def get(self, request, pk):
+        try:
+            devolucion = Devolucion.objects.select_related(
+                "sucursal", "sucursal__empresa", "turno", "turno__caja", "usuario", "venta"
+            ).prefetch_related("items_devueltos__variante", "items_entregados__variante").get(pk=pk)
+        except Devolucion.DoesNotExist as error:
+            raise Http404("El comprobante de devolución no existe.") from error
+        perfil = request.user.profile
+        if perfil.role != "SUPER_ADMIN" and devolucion.sucursal_id != self.get_sucursal().id:
+            raise PermissionDenied("No puede imprimir una devolución de otra sucursal.")
+        configuracion, _ = ConfiguracionImpresionVenta.objects.get_or_create(
+            sucursal=devolucion.sucursal,
+        )
+        if not configuracion.impresion_automatica:
+            raise PermissionDenied("La impresión automática está desactivada.")
+        return JsonResponse(
+            ImpresionTermicaService.payload_devolucion_zpl(devolucion, configuracion)
+        )
 
 
 class ConfiguracionImpresionVentaView(
@@ -107,6 +167,7 @@ class ConfiguracionImpresionVentaView(
             "error": error,
             "url_ticket_prueba": reverse("sales:ticket_prueba"),
             "url_impresion_prueba_directa": reverse("sales:impresion_prueba_directa"),
+            "url_ticket_prueba_payload": reverse("sales:ticket_prueba_payload"),
         }
 
     def get(self, request):
@@ -176,6 +237,11 @@ class ImpresionPruebaDirectaView(
         configuracion, _ = ConfiguracionImpresionVenta.objects.get_or_create(
             sucursal=sucursal,
         )
+        # En Render/Linux la impresora pertenece al PC del usuario, no al
+        # servidor. Abrir el diálogo del navegador permite usar cualquier
+        # impresora Windows instalada sin generar un falso error de sistema.
+        if sys.platform != "win32":
+            return redirect(f"{reverse('sales:ticket_prueba')}?autoprint=1")
         try:
             impresora = ImpresionTermicaService.imprimir_prueba(
                 sucursal,
@@ -209,5 +275,23 @@ class TicketPruebaView(LoginRequiredMixin, RolePermissionMixin, SucursalIsolatio
                 "sucursal": sucursal,
                 "configuracion": configuracion,
                 "auto_imprimir": request.GET.get("autoprint") == "1",
+                "payload_impresion_url": reverse("sales:ticket_prueba_payload"),
             },
+        )
+
+
+class TicketPruebaPayloadImpresionView(
+    LoginRequiredMixin, RolePermissionMixin, SucursalIsolationMixin, View
+):
+    allowed_roles = ["SUPER_ADMIN", "ADMIN_SUCURSAL"]
+
+    def get(self, request):
+        sucursal = self.get_sucursal()
+        configuracion, _ = ConfiguracionImpresionVenta.objects.get_or_create(
+            sucursal=sucursal,
+        )
+        if not configuracion.impresion_automatica:
+            raise PermissionDenied("Active la impresión automática para usar la prueba directa.")
+        return JsonResponse(
+            ImpresionTermicaService.payload_prueba_zpl(sucursal, configuracion)
         )

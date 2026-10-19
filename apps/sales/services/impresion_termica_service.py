@@ -384,6 +384,42 @@ class ImpresionTermicaService:
         return impresora
 
     @classmethod
+    def payload_venta_zpl(cls, venta, configuracion):
+        """Datos del ticket para el agente local Windows de NovaERP."""
+        contenido = cls._ticket_venta(venta, configuracion)
+        return {
+            "impresora": configuracion.nombre_impresora.strip(),
+            "zpl": cls._ticket_zpl(
+                contenido, configuracion.ancho_papel_mm
+            ).decode("ascii", errors="replace"),
+        }
+
+    @classmethod
+    def payload_prueba_zpl(cls, sucursal, configuracion):
+        ancho = cls._ancho_caracteres(configuracion.ancho_papel_mm)
+        contenido = "\n".join(
+            cls._centrado("PRUEBA DE IMPRESION", ancho)
+            + cls._centrado(sucursal.nombre, ancho)
+            + ["-" * ancho, f"Ancho: {configuracion.ancho_papel_mm} mm", "Texto de prueba", "-" * ancho]
+        )
+        return {
+            "impresora": configuracion.nombre_impresora.strip(),
+            "zpl": cls._ticket_zpl(
+                contenido, configuracion.ancho_papel_mm
+            ).decode("ascii", errors="replace"),
+        }
+
+    @classmethod
+    def payload_devolucion_zpl(cls, devolucion, configuracion):
+        contenido = cls._ticket_devolucion(devolucion, configuracion)
+        return {
+            "impresora": configuracion.nombre_impresora.strip(),
+            "zpl": cls._ticket_zpl(
+                contenido, configuracion.ancho_papel_mm
+            ).decode("ascii", errors="replace"),
+        }
+
+    @classmethod
     def imprimir_devolucion(cls, devolucion, configuracion):
         """Imprime el comprobante independiente de cambio o devolución."""
         impresora = configuracion.nombre_impresora.strip() or cls._impresora_predeterminada()

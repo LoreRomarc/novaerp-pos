@@ -9,22 +9,80 @@
             <h3 class="mb-1">Impresión de comprobantes</h3>
             <p class="text-muted mb-0">Configuración de <strong>{{ sucursal.nombre }}</strong>.</p>
         </div>
-        <form method="post" action="{{ url_impresion_prueba_directa }}">
-            {% csrf_token %}
-            <button class="btn btn-outline-primary" type="submit"><i class="bi bi-printer"></i> Prueba directa</button>
-        </form>
+        <button class="btn btn-outline-primary" id="probar-impresion" type="button"><i class="bi bi-printer"></i> Probar impresión</button>
     </div>
 
     {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
 
     <div class="card"><div class="card-body"><form method="post" class="row g-3">{% csrf_token %}
-        <div class="col-12"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="impresion_automatica" name="impresion_automatica" {% if configuracion.impresion_automatica %}checked{% endif %}><label class="form-check-label fw-semibold" for="impresion_automatica">Impresión directa automática (solo servidor Windows local)</label></div><div class="form-text">En el ERP desplegado en Render o cualquier servidor en nube, el comprobante abre el diálogo del navegador: allí se puede escoger cualquiera de las impresoras activas del PC o guardarlo como PDF. Un sitio web no puede enumerar ni controlar silenciosamente impresoras del computador por seguridad.</div></div>
-        <div class="col-md-6"><label class="form-label">Perfil activo</label><div class="form-control bg-light">SAT TT448-2 ZPL · impresión directa</div><div class="form-text">La tecnología activa se mantiene fija; solo ajuste el ancho real del papel/etiqueta.</div></div>
-        <div class="col-md-6"><label class="form-label" for="nombre_impresora">Nombre de impresora Windows</label><input class="form-control" id="nombre_impresora" name="nombre_impresora" maxlength="255" value="{{ configuracion.nombre_impresora }}" placeholder="Vacío = impresora predeterminada"><div class="form-text">Debe coincidir exactamente con el nombre mostrado en Windows.</div></div>
+        <div class="col-12"><div class="form-check form-switch"><input class="form-check-input" type="checkbox" role="switch" id="impresion_automatica" name="impresion_automatica" {% if configuracion.impresion_automatica %}checked{% endif %}><label class="form-check-label fw-semibold" for="impresion_automatica">Impresión automática en la impresora seleccionada</label></div><div class="form-text">Activa: cada comprobante se envía a la impresora indicada mediante el Agente NovaERP de este PC. Desactiva: se abre el diálogo del navegador para elegir impresora o guardar PDF.</div></div>
+        <div class="col-md-6"><label class="form-label">Perfil activo</label><div class="form-control bg-light">SAT TT448-2 / impresoras ZPL · impresión directa</div><div class="form-text">Seleccione una impresora ZPL para automática. Para impresoras normales use el diálogo del navegador desactivando la automática.</div></div>
+        <div class="col-md-6"><label class="form-label" for="nombre_impresora">Impresora de este PC</label><div class="input-group"><input class="form-control" id="nombre_impresora" name="nombre_impresora" list="impresoras-disponibles" maxlength="255" value="{{ configuracion.nombre_impresora }}" placeholder="Inicie el agente y elija una impresora"><button class="btn btn-outline-secondary" id="buscar-impresoras" type="button" title="Actualizar impresoras"><i class="bi bi-arrow-clockwise"></i></button></div><datalist id="impresoras-disponibles"></datalist><div class="form-text" id="estado-agente">Verificando el Agente NovaERP local…</div></div>
         <div class="col-md-6"><label class="form-label" for="ancho_papel_mm">Ancho de papel / etiqueta (mm)</label><input class="form-control" id="ancho_papel_mm" name="ancho_papel_mm" type="number" min="20" max="120" step="1" value="{{ configuracion.ancho_papel_mm }}" required><div class="form-text">Use el mismo ancho configurado en Preferencias de impresión de Windows. Ejemplo SAT: 33 mm; POS común: normalmente 58 u 80 mm.</div></div>
         <div class="col-md-6"><label class="form-label" for="mensaje_pie">Mensaje al pie</label><input class="form-control" id="mensaje_pie" name="mensaje_pie" maxlength="180" value="{{ configuracion.mensaje_pie }}" placeholder="Gracias por su compra."></div>
         <div class="col-12 d-flex gap-2 justify-content-end"><a class="btn btn-light" href="{% url 'sales:pos' %}">Volver al POS</a><button class="btn btn-primary" type="submit"><i class="bi bi-check2"></i> Guardar configuración</button></div>
     </form></div></div>
     <div class="alert alert-info mt-3 mb-0 small"><strong>Importante:</strong> este comprobante es un ticket de venta. La facturación electrónica DIAN requiere integración y habilitación con un proveedor tecnológico autorizado.</div>
 </div>
+<script>
+(() => {
+    const agente = "http://127.0.0.1:8765";
+    const estado = document.getElementById("estado-agente");
+    const lista = document.getElementById("impresoras-disponibles");
+    const inputImpresora = document.getElementById("nombre_impresora");
+    const automatico = document.getElementById("impresion_automatica");
+
+    async function cargarImpresoras() {
+        estado.className = "form-text text-muted";
+        estado.textContent = "Buscando impresoras instaladas en este PC…";
+        try {
+            const respuesta = await fetch(agente + "/printers");
+            const datos = await respuesta.json();
+            if (!respuesta.ok || !datos.ok) throw new Error(datos.error || "No fue posible consultar impresoras.");
+            lista.replaceChildren(...datos.printers.map((nombre) => {
+                const opcion = document.createElement("option");
+                opcion.value = nombre;
+                return opcion;
+            }));
+            estado.className = "form-text text-success";
+            estado.textContent = datos.printers.length
+                ? `${datos.printers.length} impresora(s) disponible(s). Seleccione la SAT TT448-2 USE (ZPL).`
+                : "Windows no reportó impresoras disponibles.";
+        } catch (error) {
+            estado.className = "form-text text-warning";
+            estado.textContent = "Agente no activo. Para impresión automática ejecute tools\\agente_impresion_windows.py. Si está desactivada, se usará el diálogo del navegador.";
+        }
+    }
+
+    document.getElementById("buscar-impresoras").addEventListener("click", cargarImpresoras);
+    inputImpresora.addEventListener("focus", cargarImpresoras, { once: true });
+    cargarImpresoras();
+
+    document.getElementById("probar-impresion").addEventListener("click", async () => {
+        if (!automatico.checked) {
+            window.open("{{ url_ticket_prueba }}?autoprint=1", "_blank", "noopener");
+            return;
+        }
+        if (!inputImpresora.value.trim()) {
+            alert("Seleccione y guarde la impresora antes de realizar una prueba automática.");
+            return;
+        }
+        try {
+            const payload = await fetch("{{ url_ticket_prueba_payload }}", { credentials: "same-origin" }).then(async (respuesta) => {
+                const datos = await respuesta.json();
+                if (!respuesta.ok) throw new Error(datos.detail || "No fue posible preparar la prueba.");
+                return datos;
+            });
+            // Permite probar lo que está escrito incluso antes de guardar.
+            payload.impresora = inputImpresora.value.trim();
+            const resultado = await fetch(agente + "/print", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) }).then((respuesta) => respuesta.json());
+            if (!resultado.ok) throw new Error(resultado.error || "No fue posible enviar la prueba.");
+            alert("Prueba enviada a: " + resultado.impresora);
+        } catch (error) {
+            alert(error.message + "\n\nSe abrirá el comprobante de prueba para imprimir desde el navegador.");
+            window.open("{{ url_ticket_prueba }}?autoprint=1", "_blank", "noopener");
+        }
+    });
+})();
+</script>
 {% endblock %}

@@ -1,6 +1,7 @@
 # apps/sales/views_devoluciones.py
 import json
 import logging
+import sys
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -255,7 +256,7 @@ class CambioDirectoProcesarView(DevolucionBaseView):
             )
             error_impresion = ""
             impresion_directa = False
-            if configuracion.impresion_automatica:
+            if configuracion.impresion_automatica and sys.platform == "win32":
                 try:
                     ImpresionTermicaService.imprimir_devolucion(
                         devolucion, configuracion
@@ -294,6 +295,9 @@ class CambioDirectoProcesarView(DevolucionBaseView):
                         "ticket_url": reverse(
                             "sales:ticket_devolucion", kwargs={"pk": devolucion.id}
                         ) + ("" if impresion_directa else "?autoprint=1"),
+                        "payload_impresion_url": reverse(
+                            "sales:ticket_devolucion_payload", kwargs={"pk": devolucion.id}
+                        ),
                         "impresion_directa": impresion_directa,
                         "error_impresion": error_impresion,
                     },

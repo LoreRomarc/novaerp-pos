@@ -6,8 +6,11 @@ from apps.sales.views_facturacion import (
     ConfiguracionImpresionVentaView,
     ImpresionPruebaDirectaView,
     TicketPruebaView,
+    TicketPruebaPayloadImpresionView,
     TicketDevolucionView,
+    TicketDevolucionPayloadImpresionView,
     TicketVentaView,
+    TicketVentaPayloadImpresionView,
 )
 from apps.sales.report_views import (
     ReporteCajaView,
@@ -80,9 +83,12 @@ urlpatterns = [
     path("pos/guardar/", POSGuardarEstadoView.as_view(), name="pos_guardar"),
     path("pos/vendedores-visibles/", POSVendedoresVisiblesView.as_view(), name="pos_vendedores_visibles"),
     path("ventas/<int:pk>/comprobante/", TicketVentaView.as_view(), name="ticket_venta"),
+    path("ventas/<int:pk>/impresion-payload/", TicketVentaPayloadImpresionView.as_view(), name="ticket_venta_payload"),
     path("devoluciones/<int:pk>/comprobante/", TicketDevolucionView.as_view(), name="ticket_devolucion"),
+    path("devoluciones/<int:pk>/impresion-payload/", TicketDevolucionPayloadImpresionView.as_view(), name="ticket_devolucion_payload"),
     path("ventas/impresion/", ConfiguracionImpresionVentaView.as_view(), name="configuracion_impresion"),
     path("ventas/impresion/prueba/", TicketPruebaView.as_view(), name="ticket_prueba"),
+    path("ventas/impresion/prueba-payload/", TicketPruebaPayloadImpresionView.as_view(), name="ticket_prueba_payload"),
     path("ventas/impresion/prueba-directa/", ImpresionPruebaDirectaView.as_view(), name="impresion_prueba_directa"),
 
     path("caja/", CajaDashboardView.as_view(), name="caja_dashboard"),

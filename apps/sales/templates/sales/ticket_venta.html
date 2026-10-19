@@ -10,7 +10,7 @@
         @page { size: {{ configuracion.ancho_papel_mm }}mm auto; margin: 0; }
         * { box-sizing: border-box; }
         html, body { margin: 0; padding: 0; background: #eef3f5; color: #10263d; font-family: Arial, sans-serif; }
-        .ticket { width: min(var(--ticket-width), calc(100vw - 16px)); min-width: 0; margin: 8px auto; padding: 1.5mm .75mm; background: #fff; font-size: 8pt; line-height: 1.28; }
+        .ticket { width: min(var(--ticket-width), calc(100vw - 16px)); min-width: 0; margin: 8px auto; padding: 1.5mm .75mm; background: #fff; font-size: 8pt; line-height: 1.28; overflow: hidden; }
         .center { text-align: center; }
         .brand { font-size: 10pt; font-weight: 800; text-transform: uppercase; letter-spacing: .2px; }
         .muted { color: #52677a; font-size: 7pt; }
@@ -20,8 +20,8 @@
         th { text-align: left; font-size: 6.5pt; color: #52677a; font-weight: 700; padding-bottom: 1mm; }
         td { padding: 1mm 0; vertical-align: top; overflow-wrap: anywhere; }
         .qty { width: 15%; text-align: center; }
-        .money { width: 29%; text-align: right; white-space: nowrap; }
-        .product { width: 56%; padding-right: 1mm; }
+        .money { width: 29%; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .product { width: 56%; min-width:0; padding-right: 1mm; }
         .sku { display: block; color: #52677a; font-size: 6.5pt; }
         .totals { margin-left: auto; width: 100%; font-size: 8pt; }
         .totals td { padding: .6mm 0; }
@@ -29,7 +29,8 @@
         .footer { margin-top: 3mm; font-size: 7pt; text-align: center; }
         .screen-actions { width: min(var(--ticket-width), calc(100vw - 16px)); margin: 12px auto; text-align: center; }
         button { border: 0; border-radius: 6px; padding: 8px 10px; background: #182b49; color: #fff; cursor: pointer; }
-        @media print { html, body { width: var(--ticket-width); background: #fff; } .ticket { width: var(--ticket-width); margin: 0; box-shadow: none; } .screen-actions { display: none; } }
+        .print-note { width:min(720px,calc(100vw - 24px)); margin:12px auto; color:#52677a; font-size:.8rem; text-align:center; }
+        @media print { html, body { width: var(--ticket-width); background: #fff; } .ticket { width: var(--ticket-width); margin: 0; box-shadow: none; } .screen-actions, .print-note { display: none; } }
     </style>
 </head>
 <body>
@@ -71,6 +72,21 @@
         <div class="footer">{{ configuracion.mensaje_pie|default:"Gracias por su compra." }}</div>
     </main>
     <div class="screen-actions"><button type="button" onclick="window.print()">Imprimir comprobante</button></div>
-    {% if auto_imprimir %}<script>window.addEventListener("load", () => window.setTimeout(() => window.print(), 250)); window.addEventListener("afterprint", () => window.setTimeout(() => window.close(), 150));</script>{% endif %}
+    <div class="print-note">En el diálogo de impresión seleccione la impresora instalada y el mismo ancho de papel configurado para este comprobante ({{ configuracion.ancho_papel_mm }} mm).</div>
+    {% if auto_imprimir %}<script>
+        window.addEventListener("load", async () => {
+            try {
+                const payload = await fetch("{{ payload_impresion_url }}", {credentials:"same-origin"}).then(async r => {
+                    const data = await r.json(); if (!r.ok) throw new Error(data.detail || "Sin impresión automática."); return data;
+                });
+                const resultado = await fetch("http://127.0.0.1:8765/print", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)}).then(r => r.json());
+                if (!resultado.ok) throw new Error(resultado.error || "Agente no disponible.");
+                window.setTimeout(() => window.close(), 250);
+            } catch (_) {
+                window.setTimeout(() => window.print(), 250);
+            }
+        });
+        window.addEventListener("afterprint", () => window.setTimeout(() => window.close(), 150));
+    </script>{% endif %}
 </body>
 </html>

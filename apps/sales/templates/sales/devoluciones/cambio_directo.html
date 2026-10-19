@@ -973,8 +973,18 @@ async function procesarOperacion() {
             + " procesada correctamente.",
             "success"
         );
-        if (data.data.ticket_url) {
-            if (ventanaComprobante) ventanaComprobante.location.replace(data.data.ticket_url);
+        if (data.data.payload_impresion_url && !data.data.impresion_directa) {
+            try {
+                const payload = await fetch(data.data.payload_impresion_url, {credentials:"same-origin"}).then(async r => { const d=await r.json(); if(!r.ok) throw new Error(d.detail || "No fue posible preparar el comprobante."); return d; });
+                const resultado = await fetch("http://127.0.0.1:8765/print", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}).then(r=>r.json());
+                if (!resultado.ok) throw new Error(resultado.error || "El agente local no pudo imprimir.");
+                ventanaComprobante?.close();
+            } catch (errorImpresion) {
+                if (data.data.ticket_url) ventanaComprobante?.location.replace(data.data.ticket_url);
+                mostrarMensaje("Operación registrada. " + errorImpresion.message + " Se abrió el comprobante para imprimir desde el navegador.", "warning");
+            }
+        } else if (data.data.ticket_url) {
+            ventanaComprobante?.location.replace(data.data.ticket_url);
         } else {
             ventanaComprobante?.close();
         }

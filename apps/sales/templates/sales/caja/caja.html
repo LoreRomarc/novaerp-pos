@@ -9,6 +9,11 @@
     .cash-card { border:0; min-height:116px; }
     .cash-card .card-body { padding:1rem 1.1rem; }
     .cash-card .fs-5 { font-variant-numeric:tabular-nums; }
+    .cash-movement { display:inline-flex; align-items:center; gap:.42rem; font-size:.76rem; font-weight:700; }
+    .cash-movement::before { content:""; width:.48rem; height:.48rem; border-radius:50%; background:#64748b; }
+    .cash-movement.is-in::before, .cash-movement.is-sale::before, .cash-movement.is-credit::before { background:#2c7a63; }
+    .cash-movement.is-out::before { background:#b65352; }
+    .cash-movement.is-neutral::before { background:#64748b; }
 </style>
 <div class="container-fluid py-4">
     {% if turno %}
@@ -348,7 +353,7 @@
                             <div class="text-muted small">Esperado</div>
                             <div class="fs-5 fw-bold" id="arqueoEsperado">
                                 {% if arqueo_actual %}
-                                    ${{ arqueo_actual.monto_esperado|floatformat:0 }}
+                                    ${{ arqueo_actual.monto_esperado|floatformat:0|intcomma }}
                                 {% endif %}
                             </div>
                         </div>
@@ -359,7 +364,7 @@
                             <div class="text-muted small">Contado</div>
                             <div class="fs-5 fw-bold text-primary" id="arqueoContado">
                                 {% if arqueo_actual %}
-                                    ${{ arqueo_actual.total_contado|floatformat:0 }}
+                                    ${{ arqueo_actual.total_contado|floatformat:0|intcomma }}
                                 {% endif %}
                             </div>
                         </div>
@@ -370,7 +375,7 @@
                             <div class="text-muted small">Diferencia</div>
                             <div class="fs-5 fw-bold" id="arqueoDiferencia">
                                 {% if arqueo_actual %}
-                                    ${{ arqueo_actual.diferencia|floatformat:0 }}
+                                    ${{ arqueo_actual.diferencia|floatformat:0|intcomma }}
                                 {% endif %}
                             </div>
                         </div>
@@ -394,9 +399,9 @@
                                 {% if arqueo_actual %}
                                     {% for item in arqueo_actual.denominaciones.all %}
                                         <tr>
-                                            <td>${{ item.denominacion|floatformat:0 }}</td>
+                                            <td>${{ item.denominacion|floatformat:0|intcomma }}</td>
                                             <td class="text-end">{{ item.cantidad }}</td>
-                                            <td class="text-end">${{ item.subtotal|floatformat:0 }}</td>
+                                            <td class="text-end">${{ item.subtotal|floatformat:0|intcomma }}</td>
                                         </tr>
                                     {% endfor %}
                                 {% endif %}
@@ -475,11 +480,23 @@
                                             <td class="text-nowrap">
                                                 {{ movimiento.creado_en|date:"d/m/Y H:i" }}
                                             </td>
-                                            <td>{{ movimiento.get_tipo_display }}</td>
+                                            <td>
+                                                {% if movimiento.tipo == "EGRESO" or movimiento.tipo == "RETIRO_BOVEDA" or movimiento.tipo == "DEVOLUCION" %}
+                                                    <span class="cash-movement is-out">{{ movimiento.get_tipo_display }}</span>
+                                                {% elif movimiento.tipo == "VENTA" %}
+                                                    <span class="cash-movement is-sale">Venta</span>
+                                                {% elif movimiento.tipo == "ABONO_CREDITO" %}
+                                                    <span class="cash-movement is-credit">Abono a crédito</span>
+                                                {% elif movimiento.tipo == "INGRESO" %}
+                                                    <span class="cash-movement is-in">Ingreso</span>
+                                                {% else %}
+                                                    <span class="cash-movement is-neutral">{{ movimiento.get_tipo_display }}</span>
+                                                {% endif %}
+                                            </td>
                                             <td>{{ movimiento.usuario }}</td>
                                             <td>{{ movimiento.observacion|default:"-" }}</td>
-                                            <td class="text-end fw-semibold">
-                                                ${{ movimiento.monto|floatformat:0 }}
+                                            <td class="text-end fw-semibold {% if movimiento.tipo == 'EGRESO' or movimiento.tipo == 'RETIRO_BOVEDA' or movimiento.tipo == 'DEVOLUCION' %}text-danger{% else %}text-success{% endif %}">
+                                                {% if movimiento.tipo == "EGRESO" or movimiento.tipo == "RETIRO_BOVEDA" or movimiento.tipo == "DEVOLUCION" %}−{% else %}+{% endif %}${{ movimiento.monto|floatformat:0|intcomma }}
                                             </td>
                                         </tr>
                                     {% empty %}

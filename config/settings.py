@@ -193,6 +193,13 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'es-co'
 
+# Formato uniforme para todo valor monetario mostrado por los templates.
+# Django/humanize usará $ 50.000 y no $ 50000 ni separadores anglosajones.
+USE_THOUSAND_SEPARATOR = True
+THOUSAND_SEPARATOR = "."
+DECIMAL_SEPARATOR = ","
+NUMBER_GROUPING = 3
+
 TIME_ZONE = 'America/Bogota'
 
 USE_I18N = True

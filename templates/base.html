@@ -382,7 +382,7 @@
 
                     <div class="section">Inventario</div>
                     <a href="{% url 'inventory:stock_list' %}"><i class="bi bi-boxes nav-icon"></i> Stock por sucursal</a>
-                    <a href="{% url 'inventory:traslado_list' %}"><i class="bi bi-truck nav-icon"></i> Traslados{% if traslados_pendientes_recepcion %}<span class="badge rounded-pill text-bg-warning ms-auto">{{ traslados_pendientes_recepcion }}</span>{% endif %}</a>
+                    <a href="{% url 'inventory:traslado_list' %}" data-nav-prefix="/inventory/traslados"><i class="bi bi-truck nav-icon"></i> Traslados{% if traslados_pendientes_recepcion %}<span class="badge rounded-pill text-bg-warning ms-auto">{{ traslados_pendientes_recepcion }}</span>{% endif %}</a>
                     <a href="{% url 'inventory:kardex' %}"><i class="bi bi-journal-text nav-icon"></i> Kardex</a>
 
                     <div class="section">Producción</div>
@@ -529,6 +529,17 @@ if (sidebar && sidebarToggle) {
 
 let activeSet = false;
 
+// Algunas pantallas operativas comparten una ruta hija (por ejemplo,
+// /inventory/traslados/nuevo/). El prefijo explícito evita que otro enlace
+// como Dashboard quede marcado por error.
+document.querySelectorAll(".sidebar a[data-nav-prefix]").forEach((link) => {
+    const prefix = link.dataset.navPrefix.replace(/\/$/, "");
+    if (currentPath === prefix || currentPath.startsWith(prefix + "/")) {
+        link.classList.add("active");
+        activeSet = true;
+    }
+});
+
 document.querySelectorAll(".sidebar a").forEach(link => {
 
     let href = link.getAttribute("href");
@@ -538,7 +549,7 @@ document.querySelectorAll(".sidebar a").forEach(link => {
     href = href.replace(/\/$/, "");
 
     // EXACT MATCH
-    if (currentPath === href) {
+    if (!activeSet && currentPath === href) {
         link.classList.add("active");
         activeSet = true;
         return;

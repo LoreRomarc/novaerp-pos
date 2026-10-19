@@ -215,6 +215,7 @@ class POSView(POSBaseView):
                     ]
                 ),
                 "impresion_ticket_navegador": not usar_impresion_directa,
+                "impresion_automatica": configuracion_impresion.impresion_automatica,
             },
         )
 
@@ -397,6 +398,9 @@ class POSCerrarVentaView(POSBaseView):
                     "ticket_url": (
                         reverse("sales:ticket_venta", kwargs={"pk": venta.id})
                         + "?autoprint=1"
+                    ),
+                    "payload_impresion_url": reverse(
+                        "sales:ticket_venta_payload", kwargs={"pk": venta.id}
                     ),
                     "imprimir_ticket": not (
                         configuracion.impresion_automatica
