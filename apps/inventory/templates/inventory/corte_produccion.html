@@ -64,6 +64,15 @@
         border-top: 1px solid #e9ecef;
     }
 
+    .cortadores-picker summary {
+        cursor: pointer;
+        color: #415466;
+        font-size: .84rem;
+    }
+
+    .cortadores-picker[open] summary { margin-bottom: .4rem; }
+    .cortadores-opciones { max-height: 128px; overflow-y: auto; }
+
     @media (max-width: 1050px) {
         .rollo-header,
         .item-row,
@@ -180,13 +189,15 @@ function leerNumeroDecimal(valor) {
     return Number(texto.replace(",", "."));
 }
 
-function opcionesProductos() {
+let secuenciaProductoCorte = 0;
+
+function opcionesProductos(listaId) {
     return `
+        <datalist id="${listaId}">
         {% for producto in productos %}
-        <option value="{{ producto.id }}">
-            {{ producto.nombre }}
-        </option>
+        <option value="{{ producto.nombre|upper }}" data-id="{{ producto.id }}"></option>
         {% endfor %}
+        </datalist>
     `;
 }
 
@@ -203,9 +214,10 @@ function opcionesTallas() {
 function opcionesCortadores() {
     return `
         {% for cortador in cortadores %}
-        <option value="{{ cortador.id }}">
-            {{ cortador.nombre }}
-        </option>
+        <label class="form-check d-flex align-items-center gap-2 mb-1">
+            <input class="form-check-input m-0 cortador-check" type="checkbox" value="{{ cortador.id }}">
+            <span>{{ cortador.nombre|upper }}</span>
+        </label>
         {% endfor %}
     `;
 }
@@ -419,15 +431,15 @@ function addItem(bloque) {
 
     const opcion = select.selectedOptions[0];
     const fila = document.createElement("div");
+    const listaProductosId = `productos-corte-${++secuenciaProductoCorte}`;
 
     fila.className = "item-row";
 
     fila.innerHTML = `
         <div>
-            <input type="search" class="form-control lector-producto-corte mb-1" placeholder="Escanear código" autocomplete="off">
-            <select class="form-select producto-select">
-                ${opcionesProductos()}
-            </select>
+            <input type="search" class="form-control producto-picker lector-producto-corte" list="${listaProductosId}" placeholder="Buscar, seleccionar o escanear prenda" autocomplete="off" required>
+            ${opcionesProductos(listaProductosId)}
+            <input type="hidden" class="producto-select">
             <small class="form-text lector-producto-estado"></small>
         </div>
 
@@ -455,11 +467,12 @@ function addItem(bloque) {
             class="form-control cantidad-input">
 
         <div>
-        <select class="form-select cortador-select" multiple size="2" required aria-label="Cortadores que participaron">
-            ${opcionesCortadores()}
-        </select>
+        <details class="cortadores-picker border rounded p-2">
+            <summary>Seleccionar cortadores (varios)</summary>
+            <div class="cortadores-opciones">${opcionesCortadores()}</div>
+        </details>
         <input type="hidden" class="cortadores-hidden">
-        <small class="form-text">Puede seleccionar varios.</small>
+        <small class="form-text">Marque todas las personas que participaron.</small>
         </div>
 
         <button
@@ -480,11 +493,22 @@ function addItem(bloque) {
 
     renombrarFila(fila, select.value);
 
-    fila.querySelector(".cortador-select").addEventListener("change", function () {
-        fila.querySelector(".cortadores-hidden").value = [...this.selectedOptions]
+    fila.querySelectorAll(".cortador-check").forEach((campo) => campo.addEventListener("change", function () {
+        fila.querySelector(".cortadores-hidden").value = [...fila.querySelectorAll(".cortador-check:checked")]
             .map((opcion) => opcion.value)
             .filter(Boolean)
             .join(",");
+    }));
+
+    fila.querySelector(".producto-picker").addEventListener("change", function () {
+        const opcion = [...fila.querySelectorAll("datalist option")]
+            .find((item) => item.value.toLocaleLowerCase("es-CO") === this.value.toLocaleLowerCase("es-CO"));
+        fila.querySelector(".producto-select").value = opcion?.dataset.id || "";
+        if (!opcion && this.value) {
+            this.setCustomValidity("Seleccione una prenda de la lista o escanee su código.");
+        } else {
+            this.setCustomValidity("");
+        }
     });
 
     fila.querySelector(".cantidad-input")
@@ -497,11 +521,15 @@ function addItem(bloque) {
         alEncontrar: (variante) => {
             const productoSelect = fila.querySelector(".producto-select");
             const productoId = String(variante.producto_base_id || "");
-            if (!productoId || !productoSelect.querySelector(`option[value="${productoId}"]`)) {
+            const opcion = [...fila.querySelectorAll("datalist option")]
+                .find((item) => item.dataset.id === productoId);
+            if (!productoId || !opcion) {
                 throw new Error("El código leído no corresponde a un producto disponible para este corte.");
             }
             productoSelect.value = productoId;
-            productoSelect.dispatchEvent(new Event("change", { bubbles: true }));
+            const picker = fila.querySelector(".producto-picker");
+            picker.value = opcion.value;
+            picker.setCustomValidity("");
         },
     });
 

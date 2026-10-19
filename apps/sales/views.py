@@ -1,6 +1,7 @@
 # apps/sales/views.py
 import json
 import logging
+import sys
 
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
@@ -10,7 +11,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views import View
 
-from apps.inventory.models import ProductoVariante, Stock
+from apps.inventory.models import ProductoVariante, Stock, normalizar_busqueda
 from apps.customers.models import Cliente
 from apps.sales.models import (
     ConfiguracionImpresionVenta,
@@ -176,6 +177,16 @@ class POSView(POSBaseView):
             vendedor for vendedor in vendedores_todos
             if preferencias.get(vendedor.id, True)
         ]
+        configuracion_impresion, _ = ConfiguracionImpresionVenta.objects.get_or_create(
+            sucursal=sucursal,
+        )
+        # El navegador es quien conoce las impresoras del PC del cajero. En
+        # Render/Linux no existe acceso a la impresora Windows del usuario,
+        # por lo que siempre se abre el comprobante para imprimir o guardar.
+        usar_impresion_directa = (
+            configuracion_impresion.impresion_automatica
+            and sys.platform == "win32"
+        )
 
         return render(
             request,
@@ -203,7 +214,7 @@ class POSView(POSBaseView):
                         for carrito in carritos
                     ]
                 ),
-                "impresion_ticket_navegador": False,
+                "impresion_ticket_navegador": not usar_impresion_directa,
             },
         )
 
@@ -364,7 +375,7 @@ class POSCerrarVentaView(POSBaseView):
             )
             error_impresion = ""
             impresion_directa = False
-            if configuracion.impresion_automatica:
+            if configuracion.impresion_automatica and sys.platform == "win32":
                 try:
                     from apps.sales.services.impresion_termica_service import ImpresionTermicaService
 
@@ -387,7 +398,10 @@ class POSCerrarVentaView(POSBaseView):
                         reverse("sales:ticket_venta", kwargs={"pk": venta.id})
                         + "?autoprint=1"
                     ),
-                    "imprimir_ticket": False,
+                    "imprimir_ticket": not (
+                        configuracion.impresion_automatica
+                        and sys.platform == "win32"
+                    ),
                     "impresion_directa": impresion_directa,
                     "error_impresion": error_impresion,
                     "nuevo_carrito": serializar_carrito(nuevo_carrito),
@@ -478,30 +492,7 @@ class POSAnularVentaView(POSBaseView):
 class ProductoAutocompleteView(POSBaseView):
     @staticmethod
     def _nombre_producto(variante):
-        partes = [
-            variante.producto_base.nombre,
-            (
-                variante.tipo_tela.nombre
-                if variante.tipo_tela
-                else ""
-            ),
-            (
-                variante.color.nombre
-                if variante.color
-                else ""
-            ),
-            (
-                variante.talla.nombre
-                if variante.talla
-                else ""
-            ),
-        ]
-
-        return " - ".join(
-            parte
-            for parte in partes
-            if parte
-        )
+        return variante.nombre_completo
 
     def get(self, request):
         q = request.GET.get("q", "").strip()
@@ -528,18 +519,23 @@ class ProductoAutocompleteView(POSBaseView):
             coincidencia_codigo = list(
                 base_variantes.filter(codigo_barras__iexact=q)[:1]
             )
-            variantes = coincidencia_codigo or list(
-                base_variantes.filter(
-                    Q(sku__icontains=q)
-                    | Q(codigo_barras__icontains=q)
-                    | Q(producto_base__nombre__icontains=q)
-                    | Q(color__nombre__icontains=q)
-                    | Q(tipo_tela__nombre__icontains=q)
-                    | Q(talla__nombre__icontains=q)
-                )
-                .distinct()
-                .order_by("producto_base__nombre", "sku")[:25]
-            )
+            if coincidencia_codigo:
+                variantes = coincidencia_codigo
+            else:
+                # Búsqueda portable sin tildes: funciona igual en SQLite,
+                # PostgreSQL local y Render sin requerir extensiones del motor.
+                termino = normalizar_busqueda(q)
+                variantes = []
+                for variante in base_variantes.order_by("producto_base__nombre", "sku"):
+                    texto = " ".join((
+                        variante.nombre_completo,
+                        variante.sku or "",
+                        variante.codigo_barras or "",
+                    ))
+                    if termino in normalizar_busqueda(texto):
+                        variantes.append(variante)
+                        if len(variantes) == 25:
+                            break
 
             # Se consulta el stock de la sucursal activa directamente. Así un
             # producto devuelto en esta sede aparece aunque existan registros

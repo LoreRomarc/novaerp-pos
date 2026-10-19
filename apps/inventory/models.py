@@ -1,6 +1,7 @@
 # apps/inventory/models.py
 
 import re
+import unicodedata
 
 from django.utils import timezone
 from django.db import models, transaction
@@ -10,6 +11,15 @@ from django.db.models.functions import Lower
 from django.utils.text import slugify
 
 from apps.core.models import Sucursal
+
+
+def normalizar_busqueda(valor):
+    """Texto comparable para búsquedas humanas (sin depender de tildes)."""
+    return "".join(
+        caracter
+        for caracter in unicodedata.normalize("NFD", str(valor or "").casefold())
+        if unicodedata.category(caracter) != "Mn"
+    )
 
 
 # Los nombres comerciales se conservan como fueron escritos por el usuario.
@@ -350,13 +360,7 @@ class ProductoVariante(models.Model):
             self.codigo_barras = codigo
 
     def __str__(self):
-
-        return (
-            f"{self.producto_base.nombre} · "
-            f"{self.tipo_tela.nombre} · "
-            f"{self.color.nombre} · "
-            f"{self.talla.nombre}"
-        )
+        return self.nombre_completo
 
     @property
     def stock_total(self):
@@ -369,13 +373,16 @@ class ProductoVariante(models.Model):
 
     @property
     def nombre_completo(self):
-
-        return (
-            f"{self.producto_base.nombre} · "
-            f"{self.tipo_tela.nombre} · "
-            f"{self.color.nombre} · "
-            f"{self.talla.nombre}"
+        # Esta etiqueta es el estándar visual para cada punto del ERP. El
+        # SKU conserva el identificador técnico; la etiqueta permite a una
+        # persona reconocer la prenda sin conocer códigos internos.
+        partes = (
+            self.producto_base.nombre,
+            self.tipo_tela.nombre,
+            self.talla.nombre,
+            self.color.nombre,
         )
+        return " · ".join(str(parte or "").upper() for parte in partes)
 
     @property
     def nombre(self):

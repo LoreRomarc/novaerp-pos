@@ -401,9 +401,10 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
     <hr>
 
     <div class="mb-2">
-        <div class="d-flex justify-content-between align-items-center"><label class="small text-muted" for="vendedor">Vendedor <span class="text-muted">(opcional)</span></label><button type="button" class="btn btn-link btn-sm p-0" data-bs-toggle="modal" data-bs-target="#modalVendedoresPOS">Configurar</button></div>
-        <input id="buscar-vendedor" class="form-control form-control-sm mb-1" type="search" autocomplete="off" placeholder="Buscar vendedor en esta sucursal">
-        <select id="vendedor" class="form-select form-select-sm">
+        <div class="d-flex justify-content-between align-items-center"><label class="small text-muted" for="buscar-vendedor">Vendedor <span class="text-muted">(opcional)</span></label><button type="button" class="btn btn-link btn-sm p-0" data-bs-toggle="modal" data-bs-target="#modalVendedoresPOS">Configurar</button></div>
+        <input id="buscar-vendedor" class="form-control form-control-sm" type="search" autocomplete="off" list="vendedores-pos" placeholder="Buscar o seleccionar vendedor">
+        <datalist id="vendedores-pos">{% for vendedor in vendedores %}<option value="{{ vendedor.nombre|upper }} · {{ vendedor.sucursal.nombre|upper }}" data-id="{{ vendedor.id }}"></option>{% endfor %}</datalist>
+        <select id="vendedor" class="d-none" aria-hidden="true" tabindex="-1">
           <option value="">Sin asignar</option>
           {% for vendedor in vendedores %}<option value="{{ vendedor.id }}">{{ vendedor.nombre }} · {{ vendedor.sucursal.nombre }}</option>{% endfor %}
         </select>
@@ -589,8 +590,13 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
 
         v = String(v).trim();
 
-        // Si viene del backend como "12000.00"
-        if (/^\d+(\.\d+)?$/.test(v)) {
+        // Formato de miles colombiano: 12.000 / 1.200.000.
+        if (/^\d{1,3}(\.\d{3})+$/.test(v)) {
+          return parseFloat(v.replace(/\./g, ""));
+        }
+
+        // Valor decimal técnico enviado por Django: 12000.00
+        if (/^\d+(\.\d{1,2})?$/.test(v)) {
             return parseFloat(v);
         }
 
@@ -615,41 +621,49 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
         return moneyFormatter.format(toNumber(v));
       };
 
-      function filtrarVendedores() {
-        const consulta = (inputBuscarVendedor.value || "").trim().toLocaleLowerCase("es-CO");
-        let visibles = [];
-
-        [...inputVendedor.options].forEach((opcion, indice) => {
-          if (indice === 0) {
-            opcion.hidden = false;
-            return;
-          }
-          const coincide = !consulta || opcion.text.toLocaleLowerCase("es-CO").includes(consulta);
-          opcion.hidden = !coincide;
-          if (coincide) visibles.push(opcion);
-        });
-
-        // Si el filtro devuelve un solo vendedor, Enter lo selecciona sin
-        // obligar al cajero a recorrer una lista larga.
-        return visibles;
+      function formatearEntradaCOP(input) {
+        const digitos = String(input.value || "").replace(/\D/g, "");
+        input.value = digitos ? new Intl.NumberFormat("es-CO", {
+          maximumFractionDigits: 0,
+        }).format(Number(digitos)) : "";
       }
 
-      inputBuscarVendedor?.addEventListener("input", filtrarVendedores);
-      inputBuscarVendedor?.addEventListener("keydown", (evento) => {
-        if (evento.key !== "Enter") return;
-        const visibles = filtrarVendedores();
-        if (visibles.length === 1) {
-          evento.preventDefault();
-          inputVendedor.value = visibles[0].value;
-          inputVendedor.dispatchEvent(new Event("change", { bubbles: true }));
-          inputBuscarVendedor.value = visibles[0].text;
+      [inputEfectivo, inputTransferencia].forEach((input) => {
+        input.addEventListener("input", () => {
+          formatearEntradaCOP(input);
+          pagoEditadoManualmente = true;
+          actualizarTotalesPago();
+        });
+        input.addEventListener("focus", () => setTimeout(() => input.select(), 0));
+      });
+
+      function textoSinTildes(valor) {
+        return String(valor || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("es-CO");
+      }
+
+      function resolverVendedor(texto) {
+        const termino = textoSinTildes(texto);
+        const opciones = [...document.querySelectorAll("#vendedores-pos option")];
+        return opciones.find((opcion) => textoSinTildes(opcion.value) === termino)
+          || (termino ? opciones.find((opcion) => textoSinTildes(opcion.value).includes(termino)) : null);
+      }
+
+      inputBuscarVendedor?.addEventListener("change", () => {
+        const opcion = resolverVendedor(inputBuscarVendedor.value);
+        if (opcion) {
+          inputVendedor.value = opcion.dataset.id;
+          inputBuscarVendedor.value = opcion.value;
+        } else if (!inputBuscarVendedor.value.trim()) {
+          inputVendedor.value = "";
         }
       });
-      inputVendedor?.addEventListener("change", () => {
-        if (inputVendedor.value) {
-          inputBuscarVendedor.value = inputVendedor.selectedOptions[0]?.text || "";
-        } else {
-          inputBuscarVendedor.value = "";
+      inputBuscarVendedor?.addEventListener("keydown", (evento) => {
+        if (evento.key !== "Enter") return;
+        const opcion = resolverVendedor(inputBuscarVendedor.value);
+        if (opcion) {
+          evento.preventDefault();
+          inputVendedor.value = opcion.dataset.id;
+          inputBuscarVendedor.value = opcion.value;
         }
       });
 
@@ -680,9 +694,8 @@ import { parseMoney, formatMoney } from "{% static 'js/money.js' %}";
       function seleccionarVendedor(vendedorId) {
         inputVendedor.value = vendedorId || "";
         inputBuscarVendedor.value = inputVendedor.value
-          ? (inputVendedor.selectedOptions[0]?.text || "")
+          ? (document.querySelector(`#vendedores-pos option[data-id="${inputVendedor.value}"]`)?.value || "")
           : "";
-        filtrarVendedores();
       }
 
       // VENTA INICIAL (si hay) 
@@ -989,20 +1002,24 @@ function guardarEstadoVenta(){
           const nombre = document.createElement("strong");
           nombre.textContent = prod.nombre;
 
+          const principal = document.createElement("div");
+          principal.className = "d-flex flex-column min-w-0";
           const codigo = document.createElement("small");
           codigo.className = "text-muted";
-          codigo.textContent = prod.sku + " | Stock: " + prod.stock;
+          codigo.textContent = prod.sku + " · Stock actual: " + prod.stock;
+          principal.appendChild(nombre);
+          principal.appendChild(codigo);
           if(prod.otras_sucursales.length){
 
               const infoSucursal =
                   document.createElement("small");
 
               infoSucursal.className =
-                  "text-primary ms-2";
+                  "text-muted small text-end ms-3 flex-shrink-0";
 
 
               infoSucursal.textContent =
-                  " Otras: " +
+                  "Otras sucursales: " +
                   prod.otras_sucursales
                   .map(
                     x =>
@@ -1014,11 +1031,11 @@ function guardarEstadoVenta(){
                   .join(", ");
 
 
+              item.appendChild(principal);
               item.appendChild(infoSucursal);
+          } else {
+              item.appendChild(principal);
           }
-
-          item.appendChild(nombre);
-          item.appendChild(codigo);
 
           item.addEventListener("click", (e) => {
             e.preventDefault();
@@ -1374,6 +1391,8 @@ function guardarEstadoVenta(){
             inputEfectivo.value = "";
             inputTransferencia.value = "";
           }
+          formatearEntradaCOP(inputEfectivo);
+          formatearEntradaCOP(inputTransferencia);
           pagoEditadoManualmente = false;
         }
         actualizarTotalesPago();

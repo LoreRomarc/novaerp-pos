@@ -16,9 +16,9 @@ def _serializar_item(item, usar_snapshot=False):
         talla = item.talla
     else:
         sku = variante.sku
-        nombre = variante.producto_base.nombre
-        color = variante.color.nombre if variante.color else ""
-        talla = variante.talla.nombre if variante.talla else ""
+        nombre = variante.nombre_completo
+        color = (variante.color.nombre if variante.color else "").upper()
+        talla = (variante.talla.nombre if variante.talla else "").upper()
 
     return {
         "id": item.id,

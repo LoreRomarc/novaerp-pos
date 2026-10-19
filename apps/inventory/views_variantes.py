@@ -35,7 +35,6 @@ class VarianteForm(forms.ModelForm):
             "talla",
             "sku",
             "codigo_barras",
-            "precio_venta",
             "costo_unitario",
             "stock_minimo",
             "activo",
@@ -66,11 +65,6 @@ class VarianteForm(forms.ModelForm):
 
             "codigo_barras": forms.TextInput(attrs={
                 "class": "form-control"
-            }),
-
-            "precio_venta": forms.NumberInput(attrs={
-                "class": "form-control",
-                "step": "0.01"
             }),
 
             "costo_unitario": forms.NumberInput(attrs={
