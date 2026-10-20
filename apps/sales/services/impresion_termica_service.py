@@ -5,7 +5,6 @@ térmicos que solo aceptan trabajos gráficos de Windows.
 """
 
 import ctypes
-from html import escape
 import os
 import unicodedata
 from ctypes import POINTER, byref, c_int, c_void_p, create_unicode_buffer
@@ -31,9 +30,11 @@ class ImpresionTermicaService:
 
     @classmethod
     def _ancho_caracteres(cls, ancho_mm):
-        # La fuente ZPL actual ocupa 11 puntos de ancho; se reserva 4 puntos
-        # por cada margen. Así las líneas se adaptan al ancho configurado.
-        return max(12, (max(160, round(int(ancho_mm) * 8)) - 8) // 11)
+        # La SAT TT448-2 trabaja a 203 dpi (8 puntos/mm). El cálculo se basa
+        # en la fuente ZPL de 10 puntos y usa prácticamente todo el papel.
+        # Así 33 mm producen unas 25 columnas útiles, no media etiqueta.
+        puntos = max(160, round(int(ancho_mm) * 8))
+        return max(12, (puntos - 8) // 10)
 
     @staticmethod
     def _lineas(texto, ancho):
@@ -175,22 +176,28 @@ class ImpresionTermicaService:
     def _ticket_zpl(cls, contenido, ancho_mm):
         """Genera ZPL para etiquetas continuas de la SAT TT448-2/Zebra."""
         ancho_dots = max(160, round(int(ancho_mm) * 8))  # 203 dpi aprox.
-        # Cada tamaño usa todo su ancho físico: el contenido se parte con el
-        # mismo cálculo de `_ancho_caracteres` antes de generar el ZPL.
-        alto_fuente = 20
-        ancho_fuente = 11
-        salto = 25
+        # Fuerza el ancho ZPL configurado, independientemente del último
+        # tamaño de etiqueta usado por el driver de Windows.
+        alto_fuente = 21
+        ancho_fuente = 10
+        salto = 26
         margen = 4
         y = 8
         campos = []
         for linea in contenido.splitlines():
             linea = cls._zpl_texto(linea)
+            if linea and set(linea) == {"-"}:
+                campos.append(f"^FO{margen},{y + 10}^GB{ancho_dots - margen * 2},1,1^FS")
+                y += salto
+                continue
             campos.append(
                 f"^FO{margen},{y}^A0N,{alto_fuente},{ancho_fuente}^FD{linea}^FS"
             )
             y += salto
         comandos = [
             "^XA",
+            "^MNN",
+            "^MD0",
             f"^PW{ancho_dots}",
             f"^LL{y + 18}",
             "^LH0,0",
@@ -202,34 +209,6 @@ class ImpresionTermicaService:
         return "".join(comandos).encode("ascii", errors="replace")
 
     @staticmethod
-    def _ticket_html(contenido, configuracion, titulo):
-        """Documento HTML autocontenido que QZ entrega al driver de Windows.
-
-        A diferencia de ZPL o ESC/POS, la impresión pixel/HTML no depende del
-        lenguaje de una marca de impresora: usa cualquier impresora instalada
-        en Windows y su propio controlador.
-        """
-        ancho = int(configuracion.ancho_papel_mm)
-        alto = max(70, min(1000, len(contenido.splitlines()) * 5 + 28))
-        return {
-            "impresora": configuracion.nombre_impresora.strip(),
-            "tipo": "pixel",
-            "titulo": titulo,
-            "ancho_mm": ancho,
-            "alto_mm": alto,
-            "html": (
-                "<!doctype html><html><head><meta charset='utf-8'><style>"
-                f"@page{{size:{ancho}mm auto;margin:0}}"
-                f"html,body{{width:{ancho}mm;margin:0;padding:0;background:#fff;}}"
-                "pre{box-sizing:border-box;margin:0;padding:2mm 1.5mm;"
-                "font:8pt/1.28 'Courier New',monospace;white-space:pre-wrap;"
-                "word-break:break-word;color:#000;}"
-                "</style></head><body><pre>"
-                f"{escape(contenido)}"
-                "</pre></body></html>"
-            ),
-        }
-
     @staticmethod
     def _impresora_zpl(configuracion):
         """La SAT/Zebra de prueba necesita comandos ZPL, no HTML gráfico."""
@@ -237,7 +216,13 @@ class ImpresionTermicaService:
         return any(marca in nombre for marca in ("zpl", "zebra", "tt448"))
 
     @classmethod
-    def _payload_qz(cls, contenido, configuracion, titulo):
+    def _payload_conector(cls, contenido, configuracion, titulo):
+        """Datos para el conector local NovaERP de Windows.
+
+        Las impresoras ZPL reciben ZPL nativo. Las impresoras POS comunes
+        usan texto dibujado por su controlador Windows, por lo que no se
+        requiere QZ Tray, certificados ni diálogos del navegador.
+        """
         if cls._impresora_zpl(configuracion):
             return {
                 "impresora": configuracion.nombre_impresora.strip(),
@@ -247,31 +232,37 @@ class ImpresionTermicaService:
                     contenido, configuracion.ancho_papel_mm
                 ).decode("ascii", errors="replace"),
             }
-        return cls._ticket_html(contenido, configuracion, titulo)
+        return {
+            "impresora": configuracion.nombre_impresora.strip(),
+            "tipo": "texto-windows",
+            "titulo": titulo,
+            "ancho_mm": int(configuracion.ancho_papel_mm),
+            "contenido": contenido,
+        }
 
     @classmethod
-    def payload_venta_qz(cls, venta, configuracion):
-        return cls._payload_qz(
+    def payload_venta_impresora(cls, venta, configuracion):
+        return cls._payload_conector(
             cls._ticket_venta(venta, configuracion), configuracion,
             "NovaERP - venta",
         )
 
     @classmethod
-    def payload_devolucion_qz(cls, devolucion, configuracion):
-        return cls._payload_qz(
+    def payload_devolucion_impresora(cls, devolucion, configuracion):
+        return cls._payload_conector(
             cls._ticket_devolucion(devolucion, configuracion), configuracion,
             "NovaERP - devolución",
         )
 
     @classmethod
-    def payload_prueba_qz(cls, sucursal, configuracion):
+    def payload_prueba_impresora(cls, sucursal, configuracion):
         ancho = cls._ancho_caracteres(configuracion.ancho_papel_mm)
         contenido = "\n".join(
             cls._centrado("PRUEBA DE IMPRESION", ancho)
             + cls._centrado(sucursal.nombre, ancho)
             + ["-" * ancho, f"ANCHO: {configuracion.ancho_papel_mm} MM", "TEXTO DE PRUEBA", "-" * ancho]
         )
-        return cls._payload_qz(contenido, configuracion, "NovaERP - prueba")
+        return cls._payload_conector(contenido, configuracion, "NovaERP - prueba")
 
     # FUTURO — impresora POS convencional ESC/POS (58/80 mm).
     # Para activarla: (1) descomente `_ticket_escpos`; (2) en los métodos

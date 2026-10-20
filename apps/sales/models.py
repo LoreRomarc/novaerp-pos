@@ -71,7 +71,10 @@ class ConfiguracionImpresionVenta(models.Model):
     """Preferencias del ticket térmico, independientes en cada sucursal."""
 
     MODOS_IMPRESION = (
-        ("QZ_PIXEL", "Impresora de Windows mediante QZ Tray (recomendado)"),
+        (
+            "WINDOWS_CONNECTOR",
+            "Conector local de Windows (impresión automática)",
+        ),
     )
 
     sucursal = models.OneToOneField(
@@ -83,7 +86,7 @@ class ConfiguracionImpresionVenta(models.Model):
     modo_impresion = models.CharField(
         max_length=20,
         choices=MODOS_IMPRESION,
-        default="QZ_PIXEL",
+        default="WINDOWS_CONNECTOR",
     )
     nombre_impresora = models.CharField(
         max_length=255,

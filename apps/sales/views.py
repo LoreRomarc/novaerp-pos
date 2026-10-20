@@ -179,7 +179,7 @@ class POSView(POSBaseView):
         configuracion_impresion, _ = ConfiguracionImpresionVenta.objects.get_or_create(
             sucursal=sucursal,
         )
-        # QZ Tray se ejecuta en el PC del cajero y conoce sus impresoras,
+        # El conector local se ejecuta en el PC del cajero y conoce sus impresoras,
         # incluso cuando el ERP está desplegado en Render/Linux.
         usar_impresion_directa = configuracion_impresion.impresion_automatica
 

@@ -74,8 +74,7 @@
     </main>
     <div class="screen-actions"><button type="button" onclick="window.print()">Imprimir comprobante</button></div>
     <div class="print-note">En el diálogo de impresión seleccione la impresora instalada y el mismo ancho de papel configurado para este comprobante ({{ configuracion.ancho_papel_mm }} mm).</div>
-    <script src="{% static 'vendor/qz-tray-2.2.5.js' %}"></script>
-    <script src="{% static 'js/novaerp-qz-print.js' %}"></script>
+    <script src="{% static 'js/novaerp-print-connector.js' %}"></script>
     {% if auto_imprimir %}<script>
         window.addEventListener("load", async () => {
             if (!{{ configuracion.impresion_automatica|yesno:"true,false" }}) { window.print(); return; }

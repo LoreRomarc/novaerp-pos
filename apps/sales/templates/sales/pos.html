@@ -2,7 +2,7 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block content-link %}<script src="{% static 'vendor/qz-tray-2.2.5.js' %}"></script><script src="{% static 'js/novaerp-qz-print.js' %}"></script>{% endblock %}
+{% block content-link %}<script src="{% static 'js/novaerp-print-connector.js' %}"></script>{% endblock %}
 
 {% block content %}
 
@@ -1484,7 +1484,7 @@ function guardarEstadoVenta(){
           imprimirAutomaticamente(response.data.payload_impresion_url)
             .then(() => { if (ventanaTicket) ventanaTicket.close(); })
             .catch((error) => {
-              // El comprobante nunca se pierde: si QZ no está disponible,
+              // El comprobante nunca se pierde: si el conector no está disponible,
               // se usa el cuadro del navegador para imprimir o guardar PDF.
               abrirTicket(ventanaTicket, response.data.ticket_url);
               alert("Venta registrada. " + error.message + " Se abrió el comprobante para imprimir desde el navegador.");

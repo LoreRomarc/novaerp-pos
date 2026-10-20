@@ -2,17 +2,11 @@
 """Vistas de comprobantes térmicos de venta."""
 
 import logging
-import base64
-import json
-import os
-
-from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import padding
 from django.contrib import messages
 from django.contrib.messages import get_messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.http import Http404, HttpResponse, JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.views import View
@@ -24,49 +18,6 @@ from apps.sales.services.impresion_termica_service import ImpresionTermicaServic
 
 
 logger = logging.getLogger(__name__)
-
-
-def _qz_secret(nombre):
-    """Lee secretos Render/Windows conservando los saltos de línea PEM."""
-    return (os.environ.get(nombre) or "").replace("\\n", "\n").strip()
-
-
-class QZCertificateView(LoginRequiredMixin, View):
-    """Entrega el certificado público QZ, nunca la llave privada."""
-
-    def get(self, request):
-        certificado = _qz_secret("QZ_CERTIFICATE_PEM")
-        if not certificado:
-            return JsonResponse(
-                {"detail": "No hay un certificado QZ configurado."}, status=503
-            )
-        return HttpResponse(certificado, content_type="text/plain; charset=utf-8")
-
-
-class QZSignatureView(LoginRequiredMixin, View):
-    """Firma solicitudes QZ con la llave privada guardada solo en secretos."""
-
-    def post(self, request):
-        llave_pem = _qz_secret("QZ_PRIVATE_KEY_PEM")
-        if not llave_pem:
-            return JsonResponse(
-                {"detail": "No hay una llave privada QZ configurada."}, status=503
-            )
-        try:
-            contenido = json.loads(request.body.decode("utf-8"))
-            solicitud = contenido["request"]
-            llave = serialization.load_pem_private_key(
-                llave_pem.encode("utf-8"), password=None
-            )
-            firma = llave.sign(
-                solicitud.encode("utf-8"), padding.PKCS1v15(), hashes.SHA512()
-            )
-        except (KeyError, ValueError, TypeError) as error:
-            return JsonResponse({"detail": "Solicitud de firma inválida."}, status=400)
-        except Exception:
-            logger.exception("No fue posible firmar la solicitud de QZ.")
-            return JsonResponse({"detail": "No fue posible firmar la solicitud."}, status=500)
-        return HttpResponse(base64.b64encode(firma).decode("ascii"), content_type="text/plain")
 
 
 class TicketVentaView(LoginRequiredMixin, RolePermissionMixin, SucursalIsolationMixin, View):
@@ -114,7 +65,7 @@ class TicketVentaView(LoginRequiredMixin, RolePermissionMixin, SucursalIsolation
 class TicketVentaPayloadImpresionView(
     LoginRequiredMixin, RolePermissionMixin, SucursalIsolationMixin, View
 ):
-    """Entrega un ticket autenticado para QZ Tray en el PC del usuario."""
+    """Entrega un ticket autenticado para el conector local del PC."""
 
     allowed_roles = ["SUPER_ADMIN", "ADMIN_SUCURSAL", "CAJERO", "SUPERVISOR"]
 
@@ -136,7 +87,9 @@ class TicketVentaPayloadImpresionView(
         )
         if not configuracion.impresion_automatica:
             raise PermissionDenied("La impresión automática está desactivada.")
-        return JsonResponse(ImpresionTermicaService.payload_venta_qz(venta, configuracion))
+        return JsonResponse(
+            ImpresionTermicaService.payload_venta_impresora(venta, configuracion)
+        )
 
 
 class TicketDevolucionView(LoginRequiredMixin, RolePermissionMixin, SucursalIsolationMixin, View):
@@ -195,7 +148,9 @@ class TicketDevolucionPayloadImpresionView(
         if not configuracion.impresion_automatica:
             raise PermissionDenied("La impresión automática está desactivada.")
         return JsonResponse(
-            ImpresionTermicaService.payload_devolucion_qz(devolucion, configuracion)
+            ImpresionTermicaService.payload_devolucion_impresora(
+                devolucion, configuracion
+            )
         )
 
 
@@ -225,8 +180,8 @@ class ConfiguracionImpresionVentaView(
         # Esta pantalla no debe arrastrar notificaciones de otros módulos.
         # Se consumen para que el ticket no se convierta en una bandeja global.
         list(get_messages(request))
-        if configuracion.modo_impresion != "QZ_PIXEL":
-            configuracion.modo_impresion = "QZ_PIXEL"
+        if configuracion.modo_impresion != "WINDOWS_CONNECTOR":
+            configuracion.modo_impresion = "WINDOWS_CONNECTOR"
             configuracion.save(update_fields=["modo_impresion", "actualizado"])
         return render(request, self.template_name, self._contexto(sucursal, configuracion))
 
@@ -253,7 +208,7 @@ class ConfiguracionImpresionVentaView(
                 status=400,
             )
         configuracion.ancho_papel_mm = ancho_papel_mm
-        configuracion.modo_impresion = "QZ_PIXEL"
+        configuracion.modo_impresion = "WINDOWS_CONNECTOR"
         configuracion.nombre_impresora = (request.POST.get("nombre_impresora") or "").strip()
         configuracion.cortar_papel = request.POST.get("cortar_papel") == "on"
         configuracion.mensaje_pie = (request.POST.get("mensaje_pie") or "").strip()
@@ -321,5 +276,5 @@ class TicketPruebaPayloadImpresionView(
         if not configuracion.impresion_automatica:
             raise PermissionDenied("Active la impresión automática para usar la prueba directa.")
         return JsonResponse(
-            ImpresionTermicaService.payload_prueba_qz(sucursal, configuracion)
+            ImpresionTermicaService.payload_prueba_impresora(sucursal, configuracion)
         )

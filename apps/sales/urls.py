@@ -11,8 +11,6 @@ from apps.sales.views_facturacion import (
     TicketDevolucionPayloadImpresionView,
     TicketVentaView,
     TicketVentaPayloadImpresionView,
-    QZCertificateView,
-    QZSignatureView,
 )
 from apps.sales.report_views import (
     ReporteCajaView,
@@ -92,8 +90,6 @@ urlpatterns = [
     path("ventas/impresion/prueba/", TicketPruebaView.as_view(), name="ticket_prueba"),
     path("ventas/impresion/prueba-payload/", TicketPruebaPayloadImpresionView.as_view(), name="ticket_prueba_payload"),
     path("ventas/impresion/prueba-directa/", ImpresionPruebaDirectaView.as_view(), name="impresion_prueba_directa"),
-    path("ventas/impresion/qz/certificado/", QZCertificateView.as_view(), name="qz_certificado"),
-    path("ventas/impresion/qz/firmar/", QZSignatureView.as_view(), name="qz_firmar"),
 
     path("caja/", CajaDashboardView.as_view(), name="caja_dashboard"),
     path("caja/configuracion/",CajaConfiguracionView.as_view(),name="caja_configuracion",),

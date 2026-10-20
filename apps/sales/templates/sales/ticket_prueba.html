@@ -21,8 +21,7 @@
 <body>
     <main class="ticket"><strong>PRUEBA DE IMPRESIÓN</strong><br><small>{{ sucursal.nombre }}</small><hr class="line"><div>Ancho configurado: {{ configuracion.ancho_papel_mm }} mm</div><div>Texto centrado</div><div class="sample"><span>Producto de prueba</span><strong>$12.500</strong></div><hr class="line"><small>Si el contenido queda cortado, cambie el ancho aquí y en el controlador de Windows.</small></main>
     <div class="actions"><button type="button" onclick="window.print()">Imprimir prueba</button></div>
-    <script src="{% static 'vendor/qz-tray-2.2.5.js' %}"></script>
-    <script src="{% static 'js/novaerp-qz-print.js' %}"></script>
+    <script src="{% static 'js/novaerp-print-connector.js' %}"></script>
     {% if auto_imprimir %}<script>
         window.addEventListener("load", async () => {
             if (!{{ configuracion.impresion_automatica|yesno:"true,false" }}) { window.print(); return; }
