@@ -230,16 +230,35 @@ class ImpresionTermicaService:
             ),
         }
 
+    @staticmethod
+    def _impresora_zpl(configuracion):
+        """La SAT/Zebra de prueba necesita comandos ZPL, no HTML gráfico."""
+        nombre = (configuracion.nombre_impresora or "").casefold()
+        return any(marca in nombre for marca in ("zpl", "zebra", "tt448"))
+
+    @classmethod
+    def _payload_qz(cls, contenido, configuracion, titulo):
+        if cls._impresora_zpl(configuracion):
+            return {
+                "impresora": configuracion.nombre_impresora.strip(),
+                "tipo": "raw-zpl",
+                "titulo": titulo,
+                "datos": cls._ticket_zpl(
+                    contenido, configuracion.ancho_papel_mm
+                ).decode("ascii", errors="replace"),
+            }
+        return cls._ticket_html(contenido, configuracion, titulo)
+
     @classmethod
     def payload_venta_qz(cls, venta, configuracion):
-        return cls._ticket_html(
+        return cls._payload_qz(
             cls._ticket_venta(venta, configuracion), configuracion,
             "NovaERP - venta",
         )
 
     @classmethod
     def payload_devolucion_qz(cls, devolucion, configuracion):
-        return cls._ticket_html(
+        return cls._payload_qz(
             cls._ticket_devolucion(devolucion, configuracion), configuracion,
             "NovaERP - devolución",
         )
@@ -252,7 +271,7 @@ class ImpresionTermicaService:
             + cls._centrado(sucursal.nombre, ancho)
             + ["-" * ancho, f"ANCHO: {configuracion.ancho_papel_mm} MM", "TEXTO DE PRUEBA", "-" * ancho]
         )
-        return cls._ticket_html(contenido, configuracion, "NovaERP - prueba")
+        return cls._payload_qz(contenido, configuracion, "NovaERP - prueba")
 
     # FUTURO — impresora POS convencional ESC/POS (58/80 mm).
     # Para activarla: (1) descomente `_ticket_escpos`; (2) en los métodos

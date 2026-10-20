@@ -11,12 +11,38 @@ window.NovaERPPrint = (() => {
   // adelante sin cambiar el flujo del POS.
   let seguridadConfigurada = false;
 
+  function csrfToken() {
+    return document.cookie.split(";").map((valor) => valor.trim())
+      .find((valor) => valor.startsWith("csrftoken="))
+      ?.split("=").slice(1).join("=") || "";
+  }
+
   async function conectar() {
     if (!window.qz) {
       throw new Error("QZ Tray no está disponible en este navegador.");
     }
     if (!seguridadConfigurada) {
-      qz.security.setCertificatePromise((resolve) => resolve());
+      const certificado = await fetch("/ventas/impresion/qz/certificado/", {
+        credentials: "same-origin", cache: "no-store",
+      });
+      if (certificado.ok) {
+        const contenido = await certificado.text();
+        qz.security.setCertificatePromise((resolve) => resolve(contenido));
+        qz.security.setSignatureAlgorithm("SHA512");
+        qz.security.setSignaturePromise((solicitud) => (resolve, reject) => {
+          fetch("/ventas/impresion/qz/firmar/", {
+            method: "POST", credentials: "same-origin",
+            headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken() },
+            body: JSON.stringify({ request: solicitud }),
+          }).then(async (respuesta) => {
+            const texto = await respuesta.text();
+            respuesta.ok ? resolve(texto) : reject(new Error(texto));
+          }).catch(reject);
+        });
+      } else {
+        // Desarrollo sin certificado: QZ mostrará su advertencia de seguridad.
+        qz.security.setCertificatePromise((resolve) => resolve());
+      }
       seguridadConfigurada = true;
     }
     if (!qz.websocket.isActive()) {
@@ -35,21 +61,16 @@ window.NovaERPPrint = (() => {
       throw new Error("Seleccione una impresora y guarde la configuración.");
     }
     await conectar();
-    const ancho = Number(payload.ancho_mm || 80);
-    const alto = Number(payload.alto_mm || 250);
     const configuracion = qz.configs.create(payload.impresora, {
       jobName: payload.titulo || "NovaERP - comprobante",
       margins: 0,
-      size: { width: ancho, height: alto, units: "mm" },
       scaleContent: true,
+      colorType: "blackwhite",
     });
-    return qz.print(configuracion, [{
-      type: "pixel",
-      format: "html",
-      flavor: "plain",
-      data: payload.html,
-      options: { pageWidth: ancho, pageHeight: alto },
-    }]);
+    const datos = payload.tipo === "raw-zpl"
+      ? [{ type: "raw", format: "command", flavor: "plain", data: payload.datos }]
+      : [{ type: "pixel", format: "html", flavor: "plain", data: payload.html }];
+    return qz.print(configuracion, datos);
   }
 
   return { conectar, listarImpresoras, imprimir };
