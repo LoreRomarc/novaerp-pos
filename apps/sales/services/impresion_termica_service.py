@@ -30,11 +30,22 @@ class ImpresionTermicaService:
 
     @classmethod
     def _ancho_caracteres(cls, ancho_mm):
-        # La SAT TT448-2 trabaja a 203 dpi (8 puntos/mm). La fuente ZPL que
-        # usamos para texto mide 14 puntos de ancho: el cálculo evita que se
-        # corte y aprovecha todo el ancho realmente imprimible.
-        puntos = max(160, round(int(ancho_mm) * 8))
-        return max(12, (puntos - 8) // 14)
+        puntos = max(160, round(float(ancho_mm) * 8))
+        _, ancho_fuente = cls._medidas_fuente_zpl(puntos)
+        return max(12, (puntos - 8) // ancho_fuente)
+
+    @staticmethod
+    def _medidas_fuente_zpl(ancho_dots):
+        """Fuente única y proporcional al ancho físico configurado.
+
+        Mantener la misma medida por renglón evita que un producto corto se
+        vea enorme, y escalarla por papel permite usar perfiles de 25, 33,
+        58 u 80 mm sin modificar el diseño.
+        """
+        escala = ancho_dots / 264  # 264 dots equivale a 33 mm a 203 dpi.
+        ancho = max(14, min(22, round(16 * escala)))
+        alto = max(28, min(44, round(30 * escala)))
+        return alto, ancho
 
     @staticmethod
     def _lineas(texto, ancho):
@@ -188,11 +199,7 @@ class ImpresionTermicaService:
                 campos.append(f"^FO{margen},{y + 10}^GB{ancho_dots - margen * 2},1,1^FS")
                 y += 22
                 continue
-            # Aumenta automáticamente textos cortos y compacta los largos.
-            # Así cada renglón aprovecha el ancho físico del papel sin cortar.
-            longitud = max(len(linea), 6)
-            ancho_fuente = max(14, min(36, int((ancho_dots - margen * 2) * 0.84 / longitud)))
-            alto_fuente = max(27, min(52, ancho_fuente * 2))
+            alto_fuente, ancho_fuente = cls._medidas_fuente_zpl(ancho_dots)
             salto = alto_fuente + 7
             # ^FB fija el ancho exacto de cada renglón. Sin este bloque el
             # driver puede conservar el ancho de una etiqueta anterior y el
@@ -216,7 +223,6 @@ class ImpresionTermicaService:
         ]
         return "".join(comandos).encode("ascii", errors="replace")
 
-    @staticmethod
     @staticmethod
     def _impresora_zpl(configuracion):
         """La SAT/Zebra de prueba necesita comandos ZPL, no HTML gráfico."""

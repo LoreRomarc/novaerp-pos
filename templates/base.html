@@ -395,6 +395,11 @@
                 {% endif %}
             {% endif %}
 
+            {% if request.user.is_authenticated and request.user.profile.role == "CAJERO" %}
+                <div class="section">Inventario</div>
+                <a href="{% url 'inventory:traslado_list' %}" data-nav-prefix="/inventory/traslados"><i class="bi bi-truck nav-icon"></i> Traslados{% if traslados_pendientes_recepcion %}<span class="badge rounded-pill text-bg-warning ms-auto">{{ traslados_pendientes_recepcion }}</span>{% endif %}</a>
+            {% endif %}
+
             {% if request.user.is_authenticated and request.user.profile %}
                 {% if request.user.profile.role == "SUPER_ADMIN" or request.user.profile.role == "ADMIN_SUCURSAL" or request.user.profile.role == "CAJERO" %}
                     <div class="section">Operación</div>

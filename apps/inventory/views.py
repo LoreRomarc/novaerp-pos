@@ -252,6 +252,8 @@ class TrasladoRecibirView(
 ):
     """Confirma la recepción física desde la sucursal destino."""
 
+    allowed_roles = ["SUPER_ADMIN", "ADMIN_SUCURSAL", "CAJERO"]
+
     def post(self, request, pk):
         traslado = Traslado.objects.select_related("destino").filter(pk=pk).first()
         if not traslado:
@@ -560,6 +562,8 @@ class TrasladoCreateView(LoginRequiredMixin, InventoryAccessMixin, SucursalScope
 
     permission_required = "inventory.add_traslado"
 
+    allowed_roles = ["SUPER_ADMIN", "ADMIN_SUCURSAL", "CAJERO"]
+
     def dispatch(self, request, *args, **kwargs):
 
         if not request.user.is_authenticated:
@@ -572,7 +576,8 @@ class TrasladoCreateView(LoginRequiredMixin, InventoryAccessMixin, SucursalScope
 
         if profile.role not in [
             "SUPER_ADMIN",
-            "ADMIN_SUCURSAL"
+            "ADMIN_SUCURSAL",
+            "CAJERO",
         ]:
             raise PermissionDenied(
                 "No tienes permisos"
@@ -583,6 +588,17 @@ class TrasladoCreateView(LoginRequiredMixin, InventoryAccessMixin, SucursalScope
             *args,
             **kwargs
         )
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+        # Una sede no puede descontar inventario de otra. El superadmin ve
+        # todas las opciones; administrador y cajero siempre despachan desde
+        # su sede, aunque puedan elegir cualquier sede como destino.
+        if self.request.user.profile.role != UserProfile.Role.SUPER_ADMIN:
+            sucursal = self.get_sucursal()
+            form.fields["origen"].queryset = Sucursal.objects.filter(pk=sucursal.pk)
+            form.fields["origen"].initial = sucursal
+        return form
 
     def get_context_data(self, **kwargs):
 
@@ -603,23 +619,16 @@ class TrasladoCreateView(LoginRequiredMixin, InventoryAccessMixin, SucursalScope
                 origen = form.cleaned_data.get("origen")
                 destino = form.cleaned_data.get("destino")
 
-                if tipo in TrasladoService.TIPOS_DIRECTOS_SALIDA:
-                    sucursales_involucradas = [origen]
-                elif tipo in TrasladoService.TIPOS_DIRECTOS_ENTRADA:
-                    sucursales_involucradas = [destino]
-                else:
-                    sucursales_involucradas = [origen, destino]
-
-                if (
-                    self.request.user.profile.role != UserProfile.Role.SUPER_ADMIN
-                    and any(
-                        sucursal and sucursal.id != sucursal_activa.id
-                        for sucursal in sucursales_involucradas
-                    )
-                ):
-                    raise ValidationError(
-                        "Solo puede registrar movimientos en su sucursal asignada."
-                    )
+                if self.request.user.profile.role != UserProfile.Role.SUPER_ADMIN:
+                    if tipo in TrasladoService.TIPOS_DIRECTOS_ENTRADA:
+                        if not destino or destino.id != sucursal_activa.id:
+                            raise ValidationError(
+                                "La entrada debe registrarse en su sucursal asignada."
+                            )
+                    elif not origen or origen.id != sucursal_activa.id:
+                        raise ValidationError(
+                            "El inventario solo puede salir desde su sucursal asignada."
+                        )
 
                 traslado = Traslado.objects.create(
 
@@ -680,6 +689,8 @@ class TrasladoListView(LoginRequiredMixin, InventoryAccessMixin, SucursalScopedM
     context_object_name = "traslados"
 
     paginate_by = 50
+
+    allowed_roles = ["SUPER_ADMIN", "ADMIN_SUCURSAL", "CAJERO"]
 
     def get_queryset(self):
 
@@ -764,6 +775,8 @@ class TrasladoDetalleView(
     View,
 ):
     """Detalle de traslado con el mismo alcance de sucursal de la lista."""
+
+    allowed_roles = ["SUPER_ADMIN", "ADMIN_SUCURSAL", "CAJERO"]
 
     def get(self, request, pk):
         traslados = Traslado.objects.select_related(
