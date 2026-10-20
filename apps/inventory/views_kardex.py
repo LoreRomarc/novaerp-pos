@@ -11,8 +11,8 @@ from apps.core.models import Sucursal
 from apps.inventory.mixins import InventoryAccessMixin
 from apps.inventory.models import MovimientoStock, Traslado
 from apps.inventory.movimientos import (
-    FILTROS_TIPO_MOVIMIENTO,
-    codigos_para_filtro,
+    TIPOS_MOVIMIENTO_FILTRO,
+    codigos_para_tipo,
 )
 from apps.sales.mixins import SucursalIsolationMixin
 
@@ -50,9 +50,7 @@ class KardexListView(LoginRequiredMixin, InventoryAccessMixin, SucursalIsolation
 
         tipo_movimiento = self.request.GET.get("tipo_movimiento", "")
         if tipo_movimiento:
-            # El filtro usa categorías iguales a Movimientos de inventario,
-            # pero no se pierde el tipo exacto guardado en cada registro.
-            qs = qs.filter(tipo__in=codigos_para_filtro(tipo_movimiento))
+            qs = qs.filter(tipo__in=codigos_para_tipo(tipo_movimiento))
 
         q = self.request.GET.get("q", "").strip()
         if q:
@@ -79,7 +77,7 @@ class KardexListView(LoginRequiredMixin, InventoryAccessMixin, SucursalIsolation
         )
         context["sucursales"] = Sucursal.objects.filter(activa=True).order_by("nombre")
         context["sucursal_id"] = self.request.GET.get("sucursal", "")
-        context["tipos_movimiento"] = FILTROS_TIPO_MOVIMIENTO
+        context["tipos_movimiento"] = TIPOS_MOVIMIENTO_FILTRO
         return context
 
 

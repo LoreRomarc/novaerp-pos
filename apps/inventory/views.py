@@ -20,8 +20,8 @@ from apps.accounts.models import UserProfile
 from apps.core.models import Sucursal
 from apps.inventory.mixins import InventoryAccessMixin, SucursalScopedMixin
 from apps.inventory.movimientos import (
-    FILTROS_TIPO_MOVIMIENTO,
-    codigos_para_filtro,
+    TIPOS_MOVIMIENTO_FILTRO,
+    codigos_para_tipo,
 )
 from apps.inventory.models import (
     Stock,
@@ -452,15 +452,7 @@ class TrasladoForm(forms.Form):
 
     tipo = forms.ChoiceField(
         choices=[
-            ("COMPLETO", "Traslado entre sucursales"),
-            ("AJUSTE_ENTRADA", "Entrada / ajuste positivo"),
-            ("AJUSTE_SALIDA", "Salida por corrección"),
-            ("DANADO", "Baja por producto dañado"),
-            ("MERMA", "Baja por merma o pérdida"),
-            ("CONSUMO_INTERNO", "Salida por consumo interno"),
-            ("DEVOLUCION_CLIENTE", "Entrada por devolución de cliente"),
-            ("DEVOLUCION_PROVEEDOR", "Salida por devolución a proveedor"),
-            ("INICIAL", "Carga de inventario inicial"),
+            *TIPOS_MOVIMIENTO_FILTRO,
         ],
         initial="COMPLETO",
         widget=forms.Select(attrs={"class": "form-select"}),
@@ -729,7 +721,7 @@ class TrasladoListView(LoginRequiredMixin, InventoryAccessMixin, SucursalScopedM
             qs = qs.filter(estado=estado)
 
         if tipo_movimiento:
-            qs = qs.filter(tipo__in=codigos_para_filtro(tipo_movimiento))
+            qs = qs.filter(tipo__in=codigos_para_tipo(tipo_movimiento))
 
         if fecha_desde:
             qs = qs.filter(creado__date__gte=fecha_desde)
@@ -743,9 +735,7 @@ class TrasladoListView(LoginRequiredMixin, InventoryAccessMixin, SucursalScopedM
 
         context = super().get_context_data(**kwargs)
 
-        context["tipos_movimiento"] = FILTROS_TIPO_MOVIMIENTO
-
-        context["estados"] = Traslado.ESTADOS
+        context["tipos_movimiento"] = TIPOS_MOVIMIENTO_FILTRO
         context["puede_filtrar_sucursales"] = (
             self.request.user.profile.role == UserProfile.Role.SUPER_ADMIN
         )

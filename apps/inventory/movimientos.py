@@ -1,40 +1,29 @@
-"""Categorías simples compartidas por las pantallas de inventario.
+"""Tipos de movimiento legibles compartidos por Inventario y Kardex.
 
-Los valores internos del Kardex son deliberadamente detallados para conservar
-la trazabilidad.  La interfaz, en cambio, usa estas tres categorías para que
-la búsqueda sea la misma en Movimientos y Kardex.
+El código interno se conserva para auditoría, pero estas son las únicas
+opciones que el usuario ve y selecciona en ambas pantallas.
 """
 
-FILTROS_TIPO_MOVIMIENTO = (
-    ("ENTRADA", "Entradas"),
-    ("SALIDA", "Salidas"),
-    ("TRASLADO", "Traslados entre sucursales"),
+TIPOS_MOVIMIENTO_FILTRO = (
+    ("COMPLETO", "Traslado entre sucursales"),
+    ("AJUSTE_ENTRADA", "Entrada de inventario"),
+    ("AJUSTE_SALIDA", "Salida por ajuste o corrección"),
+    ("DANADO", "Producto dañado"),
+    ("MERMA", "Merma o pérdida"),
+    ("CONSUMO_INTERNO", "Uso interno"),
+    ("DEVOLUCION_CLIENTE", "Devolución de cliente"),
+    ("DEVOLUCION_PROVEEDOR", "Devolución a proveedor"),
+    ("INICIAL", "Inventario inicial"),
 )
 
 
-CODIGOS_POR_FILTRO = {
-    # Una anulación devuelve unidades, por eso se considera una entrada.
-    "ENTRADA": {
-        "AJUSTE_ENTRADA",
-        "DEVOLUCION_CLIENTE",
-        "PRODUCCION",
-        "INICIAL",
-        "ANULACION",
-    },
-    "SALIDA": {
-        "VENTA",
-        "AJUSTE_SALIDA",
-        "DANADO",
-        "MERMA",
-        "CONSUMO_INTERNO",
-        "DEVOLUCION_PROVEEDOR",
-    },
-    # SALIDA y ENTRADA son códigos históricos de traslados, no las
-    # categorías simplificadas usadas por el filtro de pantalla.
-    "TRASLADO": {"TRASLADO", "COMPLETO", "SALIDA", "ENTRADA"},
+CODIGOS_POR_TIPO = {
+    # Incluye las denominaciones históricas para que un traslado antiguo y
+    # uno nuevo aparezcan juntos al elegir "Traslado entre sucursales".
+    "COMPLETO": {"TRASLADO", "COMPLETO", "SALIDA", "ENTRADA"},
 }
 
 
-def codigos_para_filtro(tipo_filtro):
-    """Obtiene los códigos persistidos que representa una categoría UI."""
-    return CODIGOS_POR_FILTRO.get(tipo_filtro, set())
+def codigos_para_tipo(tipo):
+    """Códigos de base de datos representados por una opción visible."""
+    return CODIGOS_POR_TIPO.get(tipo, {tipo})
