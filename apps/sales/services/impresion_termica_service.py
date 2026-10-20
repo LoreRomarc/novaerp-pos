@@ -66,6 +66,33 @@ class ImpresionTermicaService:
             return [f"{etiqueta}{' ' * espacio}{valor}"]
         return cls._lineas(etiqueta, ancho) + [valor.rjust(ancho)]
 
+    @staticmethod
+    def _separador(ancho):
+        """Marcador que ZPL convierte en una línea punteada discreta."""
+        return "." * ancho
+
+    @classmethod
+    def _lineas_item(cls, nombre, cantidad, precio, total, ancho):
+        """Formato de artículo: descripción/total y cantidad × precio.
+
+        No se imprimen SKU ni datos técnicos de variante: son identificadores
+        internos y visualmente rompen un comprobante de venta compacto.
+        """
+        descripcion = str(nombre or "PRODUCTO").strip()
+        valor_total = cls._dinero(total)
+        detalle = f"{cls._cantidad(cantidad)} x {cls._dinero(precio)}"
+
+        if len(descripcion) + len(valor_total) + 1 <= ancho:
+            lineas = cls._derecha(descripcion, valor_total, ancho)
+            lineas.extend(cls._lineas(detalle, ancho))
+            return lineas
+
+        # En papel angosto un nombre largo ocupa sus propias líneas; el total
+        # queda alineado a la derecha debajo de la cantidad y precio.
+        lineas = cls._lineas(descripcion, ancho)
+        lineas.extend(cls._derecha(detalle, valor_total, ancho))
+        return lineas
+
     @classmethod
     def _ticket_venta(cls, venta, configuracion):
         ancho = cls._ancho_caracteres(configuracion.ancho_papel_mm)
@@ -82,7 +109,6 @@ class ImpresionTermicaService:
             lineas.extend(cls._centrado(venta.sucursal.direccion, ancho))
         if empresa and empresa.telefono:
             lineas.extend(cls._centrado(f"Tel: {empresa.telefono}", ancho))
-        lineas.append("-" * ancho)
         encabezado = (
             "FACTURA DE VENTA A CREDITO"
             if venta.estado == "CREDITO"
@@ -96,20 +122,16 @@ class ImpresionTermicaService:
         lineas.append(f"Vendedor: {venta.vendedor.nombre if venta.vendedor_id else 'Sin asignar'}")
         if venta.cliente:
             lineas.extend(cls._lineas(f"Cliente: {venta.cliente}", ancho))
-        lineas.append("-" * ancho)
+        lineas.append(cls._separador(ancho))
         for item in venta.items.all():
-            lineas.extend(cls._lineas(item.nombre_producto, ancho))
-            atributos = " · ".join(filter(None, [
-                item.sku,
-                item.tipo_tela,
-                item.color,
-                item.talla,
-            ]))
-            if atributos:
-                lineas.extend(cls._lineas(atributos, ancho))
-            detalle = f"{cls._cantidad(item.cantidad)} x {cls._dinero(item.precio_unitario)}"
-            lineas.extend(cls._derecha(detalle, cls._dinero(item.total_linea), ancho))
-        lineas.append("-" * ancho)
+            lineas.extend(cls._lineas_item(
+                item.nombre_producto,
+                item.cantidad,
+                item.precio_unitario,
+                item.total_linea,
+                ancho,
+            ))
+        lineas.append(cls._separador(ancho))
         lineas.extend(cls._derecha("Subtotal", cls._dinero(venta.subtotal), ancho))
         if venta.total_iva:
             lineas.extend(cls._derecha("IVA", cls._dinero(venta.total_iva), ancho))
@@ -121,7 +143,7 @@ class ImpresionTermicaService:
             lineas.extend(cls._derecha("SALDO PENDIENTE", cls._dinero(venta.saldo_pendiente), ancho))
         if venta.cambio:
             lineas.extend(cls._derecha("Vuelto", cls._dinero(venta.cambio), ancho))
-        lineas.append("-" * ancho)
+        lineas.append(cls._separador(ancho))
         lineas.extend(cls._centrado(configuracion.mensaje_pie or "Gracias por su compra.", ancho))
         return "\n".join(lineas)
 
@@ -135,7 +157,7 @@ class ImpresionTermicaService:
         if empresa and empresa.nit:
             lineas.extend(cls._centrado(f"NIT: {empresa.nit}", ancho))
         lineas.extend(cls._centrado(devolucion.sucursal.nombre, ancho))
-        lineas.append("-" * ancho)
+        lineas.append(cls._separador(ancho))
         lineas.extend(cls._centrado("COMPROBANTE DE CAMBIO / DEVOLUCION", ancho))
         lineas.append(f"No: CD-{devolucion.id}")
         lineas.append(f"Fecha: {devolucion.creada:%d/%m/%Y %H:%M}")
@@ -145,7 +167,7 @@ class ImpresionTermicaService:
             lineas.append(f"Venta origen: #{devolucion.venta_id}")
         if devolucion.referencia_externa:
             lineas.extend(cls._lineas(f"Ref: {devolucion.referencia_externa}", ancho))
-        lineas.append("-" * ancho)
+        lineas.append(cls._separador(ancho))
         lineas.extend(cls._centrado("PRENDAS RECIBIDAS", ancho))
         for item in devolucion.items_devueltos.all():
             lineas.extend(cls._lineas(str(item.variante), ancho))
@@ -161,7 +183,7 @@ class ImpresionTermicaService:
                     f"{cls._cantidad(item.cantidad)} x {cls._dinero(item.precio_unitario)}",
                     cls._dinero(item.total), ancho,
                 ))
-        lineas.append("-" * ancho)
+        lineas.append(cls._separador(ancho))
         lineas.extend(cls._derecha("Valor recibido", cls._dinero(devolucion.total_devuelto), ancho))
         lineas.extend(cls._derecha("Valor entregado", cls._dinero(devolucion.total_entregado), ancho))
         if devolucion.monto_recibido_efectivo:
@@ -171,7 +193,7 @@ class ImpresionTermicaService:
         if devolucion.monto_reembolsado:
             lineas.extend(cls._derecha("Reembolsado", cls._dinero(devolucion.monto_reembolsado), ancho))
         lineas.extend(cls._derecha("Cobro neto", cls._dinero(devolucion.monto_cobrado), ancho))
-        lineas.append("-" * ancho)
+        lineas.append(cls._separador(ancho))
         lineas.extend(cls._lineas(f"Motivo: {devolucion.motivo}", ancho))
         lineas.extend(cls._centrado("DOCUMENTO DE CAMBIO / DEVOLUCION", ancho))
         return "\n".join(lineas)
@@ -195,8 +217,13 @@ class ImpresionTermicaService:
         for linea in contenido.splitlines():
             centrada = linea != linea.strip()
             linea = cls._zpl_texto(linea.strip() if centrada else linea)
-            if linea and set(linea) == {"-"}:
-                campos.append(f"^FO{margen},{y + 10}^GB{ancho_dots - margen * 2},1,1^FS")
+            if linea and set(linea) == {"."}:
+                # Segmentos en vez de una banda sólida: el resultado se ve
+                # como el separador punteado de una factura POS tradicional.
+                campos.extend(
+                    f"^FO{x},{y + 10}^GB2,1,1^FS"
+                    for x in range(margen, ancho_dots - margen, 7)
+                )
                 y += 22
                 continue
             alto_fuente, ancho_fuente = cls._medidas_fuente_zpl(ancho_dots)
@@ -274,7 +301,7 @@ class ImpresionTermicaService:
         contenido = "\n".join(
             cls._centrado("PRUEBA DE IMPRESION", ancho)
             + cls._centrado(sucursal.nombre, ancho)
-            + ["-" * ancho, f"ANCHO: {configuracion.ancho_papel_mm} MM", "TEXTO DE PRUEBA", "-" * ancho]
+            + [cls._separador(ancho), f"ANCHO: {configuracion.ancho_papel_mm} MM", "TEXTO DE PRUEBA", cls._separador(ancho)]
         )
         return cls._payload_conector(contenido, configuracion, "NovaERP - prueba")
 
@@ -478,7 +505,7 @@ class ImpresionTermicaService:
         contenido = "\n".join(
             cls._centrado("PRUEBA DE IMPRESION", ancho)
             + cls._centrado(sucursal.nombre, ancho)
-            + ["-" * ancho, f"Ancho: {configuracion.ancho_papel_mm} mm", "Texto de prueba", "-" * ancho]
+            + [cls._separador(ancho), f"Ancho: {configuracion.ancho_papel_mm} mm", "Texto de prueba", cls._separador(ancho)]
         )
         return {
             "impresora": configuracion.nombre_impresora.strip(),
@@ -512,7 +539,7 @@ class ImpresionTermicaService:
         contenido = "\n".join(
             cls._centrado("PRUEBA DE IMPRESION", ancho)
             + cls._centrado(sucursal.nombre, ancho)
-            + ["-" * ancho, f"Ancho: {configuracion.ancho_papel_mm} mm", "Texto de prueba", "-" * ancho]
+            + [cls._separador(ancho), f"Ancho: {configuracion.ancho_papel_mm} mm", "Texto de prueba", cls._separador(ancho)]
         )
         impresora = configuracion.nombre_impresora.strip() or cls._impresora_predeterminada()
         cls._validar_impresora(impresora)

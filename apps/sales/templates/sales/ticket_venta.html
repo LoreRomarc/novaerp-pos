@@ -15,15 +15,15 @@
         .center { text-align: center; }
         .brand { font-size: 10pt; font-weight: 800; text-transform: uppercase; letter-spacing: .2px; }
         .muted { color: #52677a; font-size: 7pt; }
-        .line { border: 0; border-top: 1px dashed #52677a; margin: 2.5mm 0; }
+        .line { border: 0; border-top: 2px dotted #52677a; margin: 2.5mm 0; }
         .meta { display: grid; gap: 1px; font-size: 7pt; }
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        th { text-align: left; font-size: 6.5pt; color: #52677a; font-weight: 700; padding-bottom: 1mm; }
-        td { padding: 1mm 0; vertical-align: top; overflow-wrap: anywhere; }
-        .qty { width: 15%; text-align: center; }
-        .money { width: 29%; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-        .product { width: 56%; min-width:0; padding-right: 1mm; }
-        .sku { display: block; color: #52677a; font-size: 6.5pt; }
+        td { padding: 1.25mm 0; vertical-align: top; overflow-wrap: anywhere; }
+        .money { width: 31%; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 700; }
+        .product { width: 69%; min-width:0; padding-right: 1mm; }
+        .item-name { font-weight: 700; text-transform: uppercase; }
+        .variant { display: block; color: #52677a; font-size: 6.5pt; margin-top: .3mm; }
+        .line-price { display: block; margin-top: .7mm; font-size: 7.5pt; }
         .totals { margin-left: auto; width: 100%; font-size: 8pt; }
         .totals td { padding: .6mm 0; }
         .total td { border-top: 1px solid #10263d; padding-top: 1.5mm; font-size: 10pt; font-weight: 800; }
@@ -56,9 +56,8 @@
             {% if venta.cliente %}<span>Cliente: {{ venta.cliente }}</span>{% endif %}
         </div>
         <hr class="line">
-        <table>
-            <thead><tr><th class="product">Producto</th><th class="qty">Cant.</th><th class="money">Total</th></tr></thead>
-            <tbody>{% for item in venta.items.all %}<tr><td class="product">{{ item.nombre_producto }}<span class="sku">{% if item.sku %}{{ item.sku }} · {% endif %}{{ item.tipo_tela }} {{ item.color }} {{ item.talla }}</span></td><td class="qty">{{ item.cantidad|floatformat:"-2" }}</td><td class="money">${{ item.total_linea|floatformat:0|intcomma }}</td></tr>{% endfor %}</tbody>
+        <table class="items">
+            <tbody>{% for item in venta.items.all %}<tr><td class="product"><span class="item-name">{{ item.nombre_producto }}</span><span class="line-price">{{ item.cantidad|floatformat:"-2" }} × ${{ item.precio_unitario|floatformat:0|intcomma }}</span></td><td class="money">${{ item.total_linea|floatformat:0|intcomma }}</td></tr>{% endfor %}</tbody>
         </table>
         <hr class="line">
         <table class="totals">
