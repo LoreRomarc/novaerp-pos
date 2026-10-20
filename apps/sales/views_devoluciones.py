@@ -1,7 +1,6 @@
 # apps/sales/views_devoluciones.py
 import json
 import logging
-import sys
 
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -254,20 +253,6 @@ class CambioDirectoProcesarView(DevolucionBaseView):
             configuracion, _ = ConfiguracionImpresionVenta.objects.get_or_create(
                 sucursal=devolucion.sucursal,
             )
-            error_impresion = ""
-            impresion_directa = False
-            if configuracion.impresion_automatica and sys.platform == "win32":
-                try:
-                    ImpresionTermicaService.imprimir_devolucion(
-                        devolucion, configuracion
-                    )
-                    impresion_directa = True
-                except ValidationError as error_impresion_directa:
-                    error_impresion = error_impresion_directa.messages[0]
-                except Exception:
-                    logger.exception("Error al imprimir devolución %s.", devolucion.id)
-                    error_impresion = "La devolución se registró, pero no fue posible enviarla a la impresora."
-
             return JsonResponse(
                 {
                     "success": True,
@@ -294,12 +279,12 @@ class CambioDirectoProcesarView(DevolucionBaseView):
                         ),
                         "ticket_url": reverse(
                             "sales:ticket_devolucion", kwargs={"pk": devolucion.id}
-                        ) + ("" if impresion_directa else "?autoprint=1"),
+                        ) + "?autoprint=1",
                         "payload_impresion_url": reverse(
                             "sales:ticket_devolucion_payload", kwargs={"pk": devolucion.id}
                         ),
-                        "impresion_directa": impresion_directa,
-                        "error_impresion": error_impresion,
+                        "impresion_directa": False,
+                        "error_impresion": "",
                     },
                 },
                 status=201,

@@ -71,7 +71,7 @@ class ConfiguracionImpresionVenta(models.Model):
     """Preferencias del ticket térmico, independientes en cada sucursal."""
 
     MODOS_IMPRESION = (
-        ("ZPL_WINDOWS", "Etiquetas ZPL por Windows (SAT TT448 / Zebra)"),
+        ("QZ_PIXEL", "Impresora de Windows mediante QZ Tray (recomendado)"),
     )
 
     sucursal = models.OneToOneField(
@@ -83,7 +83,7 @@ class ConfiguracionImpresionVenta(models.Model):
     modo_impresion = models.CharField(
         max_length=20,
         choices=MODOS_IMPRESION,
-        default="ZPL_WINDOWS",
+        default="QZ_PIXEL",
     )
     nombre_impresora = models.CharField(
         max_length=255,

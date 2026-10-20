@@ -1,3 +1,4 @@
+{% load static %}
 <!doctype html>
 <html lang="es">
 <head>
@@ -20,12 +21,14 @@
 <body>
     <main class="ticket"><strong>PRUEBA DE IMPRESIÓN</strong><br><small>{{ sucursal.nombre }}</small><hr class="line"><div>Ancho configurado: {{ configuracion.ancho_papel_mm }} mm</div><div>Texto centrado</div><div class="sample"><span>Producto de prueba</span><strong>$12.500</strong></div><hr class="line"><small>Si el contenido queda cortado, cambie el ancho aquí y en el controlador de Windows.</small></main>
     <div class="actions"><button type="button" onclick="window.print()">Imprimir prueba</button></div>
+    <script src="{% static 'vendor/qz-tray-2.2.5.js' %}"></script>
+    <script src="{% static 'js/novaerp-qz-print.js' %}"></script>
     {% if auto_imprimir %}<script>
         window.addEventListener("load", async () => {
+            if (!{{ configuracion.impresion_automatica|yesno:"true,false" }}) { window.print(); return; }
             try {
                 const payload = await fetch("{{ payload_impresion_url }}", {credentials:"same-origin"}).then(async r => { const d=await r.json(); if(!r.ok) throw new Error(); return d; });
-                const resultado = await fetch("http://127.0.0.1:8765/print", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}).then(r=>r.json());
-                if (!resultado.ok) throw new Error();
+                await NovaERPPrint.imprimir(payload);
                 window.setTimeout(() => window.close(), 250);
             } catch (_) { window.setTimeout(() => window.print(), 250); }
         });

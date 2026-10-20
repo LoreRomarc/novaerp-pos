@@ -72,7 +72,7 @@ PRODUCTOS = [
         "descripcion": "Suéter básico",
         "activo": True,
         "variantes": variantes_para_telas(
-            "Lycra Algodón",
+            "Algodón Licrado",
             "Tela Fría",
             "Algodón Puro",
             "Algodón Pesado 250gr",
@@ -84,50 +84,50 @@ PRODUCTOS = [
         "activo": True,
         "variantes": variantes_para_telas(
             "Algodón Pesado 250gr",
-            "Tela Burda",
+            "Burda",
         ),
     },
     {
         "nombre": "Suéter Combinado",
-        "descripcion": "Suéter combinado en lycra algodón",
+        "descripcion": "Suéter combinado en Algodón Licrado",
         "activo": True,
-        "variantes": variantes_para_telas("Lycra Algodón"),
+        "variantes": variantes_para_telas("Algodón Licrado"),
     },
     {
         "nombre": "Short",
         "descripcion": "Short",
         "activo": True,
-        "variantes": variantes_para_telas("Tela Burda", "Algodón Perchado"),
+        "variantes": variantes_para_telas("Burda", "Algodón Perchado"),
     },
     {
         "nombre": "Pantaloneta",
         "descripcion": "Pantaloneta",
         "activo": True,
-        "variantes": variantes_para_telas("Tela Burda", "Algodón Perchado"),
+        "variantes": variantes_para_telas("Burda", "Algodón Perchado"),
     },
     {
         "nombre": "Pantalón con Vena",
         "descripcion": "Pantalón con vena en tela burda",
         "activo": True,
-        "variantes": variantes_para_telas("Tela Burda"),
+        "variantes": variantes_para_telas("Burda"),
     },
     {
         "nombre": "Pantalón 3 Rayas",
         "descripcion": "Pantalón de tres rayas en tela burda",
         "activo": True,
-        "variantes": variantes_para_telas("Tela Burda"),
+        "variantes": variantes_para_telas("Burda"),
     },
     {
         "nombre": "Jogger",
         "descripcion": "Jogger",
         "activo": True,
-        "variantes": variantes_para_telas("Algodón Perchado", "Tela Burda"),
+        "variantes": variantes_para_telas("Algodón Perchado", "Burda"),
     },
     {
         "nombre": "Camiseta Polo",
         "descripcion": "Camiseta tipo polo",
         "activo": True,
-        "variantes": variantes_para_telas("Tela Piqué", "Lycra Algodón"),
+        "variantes": variantes_para_telas("Piqué", "Algodón Licrado"),
     },
     {
         "nombre": "Licra Larga",
@@ -143,9 +143,9 @@ PRODUCTOS = [
     },
     {
         "nombre": "Suéter de Pechera",
-        "descripcion": "Suéter de pechera en lycra algodón",
+        "descripcion": "Suéter de pechera en Algodón Licrado",
         "activo": True,
-        "variantes": variantes_para_telas("Lycra Algodón"),
+        "variantes": variantes_para_telas("Algodón Licrado"),
     },
 ]
 

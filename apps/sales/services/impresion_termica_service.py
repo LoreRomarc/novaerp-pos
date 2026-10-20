@@ -5,6 +5,7 @@ térmicos que solo aceptan trabajos gráficos de Windows.
 """
 
 import ctypes
+from html import escape
 import os
 import unicodedata
 from ctypes import POINTER, byref, c_int, c_void_p, create_unicode_buffer
@@ -199,6 +200,59 @@ class ImpresionTermicaService:
             "^XZ",
         ]
         return "".join(comandos).encode("ascii", errors="replace")
+
+    @staticmethod
+    def _ticket_html(contenido, configuracion, titulo):
+        """Documento HTML autocontenido que QZ entrega al driver de Windows.
+
+        A diferencia de ZPL o ESC/POS, la impresión pixel/HTML no depende del
+        lenguaje de una marca de impresora: usa cualquier impresora instalada
+        en Windows y su propio controlador.
+        """
+        ancho = int(configuracion.ancho_papel_mm)
+        alto = max(70, min(1000, len(contenido.splitlines()) * 5 + 28))
+        return {
+            "impresora": configuracion.nombre_impresora.strip(),
+            "tipo": "pixel",
+            "titulo": titulo,
+            "ancho_mm": ancho,
+            "alto_mm": alto,
+            "html": (
+                "<!doctype html><html><head><meta charset='utf-8'><style>"
+                f"@page{{size:{ancho}mm auto;margin:0}}"
+                f"html,body{{width:{ancho}mm;margin:0;padding:0;background:#fff;}}"
+                "pre{box-sizing:border-box;margin:0;padding:2mm 1.5mm;"
+                "font:8pt/1.28 'Courier New',monospace;white-space:pre-wrap;"
+                "word-break:break-word;color:#000;}"
+                "</style></head><body><pre>"
+                f"{escape(contenido)}"
+                "</pre></body></html>"
+            ),
+        }
+
+    @classmethod
+    def payload_venta_qz(cls, venta, configuracion):
+        return cls._ticket_html(
+            cls._ticket_venta(venta, configuracion), configuracion,
+            "NovaERP - venta",
+        )
+
+    @classmethod
+    def payload_devolucion_qz(cls, devolucion, configuracion):
+        return cls._ticket_html(
+            cls._ticket_devolucion(devolucion, configuracion), configuracion,
+            "NovaERP - devolución",
+        )
+
+    @classmethod
+    def payload_prueba_qz(cls, sucursal, configuracion):
+        ancho = cls._ancho_caracteres(configuracion.ancho_papel_mm)
+        contenido = "\n".join(
+            cls._centrado("PRUEBA DE IMPRESION", ancho)
+            + cls._centrado(sucursal.nombre, ancho)
+            + ["-" * ancho, f"ANCHO: {configuracion.ancho_papel_mm} MM", "TEXTO DE PRUEBA", "-" * ancho]
+        )
+        return cls._ticket_html(contenido, configuracion, "NovaERP - prueba")
 
     # FUTURO — impresora POS convencional ESC/POS (58/80 mm).
     # Para activarla: (1) descomente `_ticket_escpos`; (2) en los métodos

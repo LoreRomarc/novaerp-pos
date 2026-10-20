@@ -1,4 +1,5 @@
 {% load humanize %}
+{% load static %}
 <!doctype html>
 <html lang="es">
 <head>
@@ -73,14 +74,16 @@
     </main>
     <div class="screen-actions"><button type="button" onclick="window.print()">Imprimir comprobante</button></div>
     <div class="print-note">En el diálogo de impresión seleccione la impresora instalada y el mismo ancho de papel configurado para este comprobante ({{ configuracion.ancho_papel_mm }} mm).</div>
+    <script src="{% static 'vendor/qz-tray-2.2.5.js' %}"></script>
+    <script src="{% static 'js/novaerp-qz-print.js' %}"></script>
     {% if auto_imprimir %}<script>
         window.addEventListener("load", async () => {
+            if (!{{ configuracion.impresion_automatica|yesno:"true,false" }}) { window.print(); return; }
             try {
                 const payload = await fetch("{{ payload_impresion_url }}", {credentials:"same-origin"}).then(async r => {
                     const data = await r.json(); if (!r.ok) throw new Error(data.detail || "Sin impresión automática."); return data;
                 });
-                const resultado = await fetch("http://127.0.0.1:8765/print", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(payload)}).then(r => r.json());
-                if (!resultado.ok) throw new Error(resultado.error || "Agente no disponible.");
+                await NovaERPPrint.imprimir(payload);
                 window.setTimeout(() => window.close(), 250);
             } catch (_) {
                 window.setTimeout(() => window.print(), 250);

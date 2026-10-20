@@ -2,6 +2,8 @@
 {% extends "base.html" %}
 {% load static %}
 
+{% block content-link %}<script src="{% static 'vendor/qz-tray-2.2.5.js' %}"></script><script src="{% static 'js/novaerp-qz-print.js' %}"></script>{% endblock %}
+
 {% block content %}
 
 <style>
@@ -1441,24 +1443,13 @@ function guardarEstadoVenta(){
       /* =========================================================
         CERRAR / CANCELAR VENTA
     ========================================================= */
-      const agenteImpresionURL = "http://127.0.0.1:8765";
       const impresionAutomaticaActiva = {{ impresion_automatica|yesno:"true,false" }};
 
-      async function imprimirConAgenteLocal(urlPayload) {
+      async function imprimirAutomaticamente(urlPayload) {
         const respuestaPayload = await fetch(urlPayload, { credentials: "same-origin" });
         if (!respuestaPayload.ok) throw new Error("No fue posible preparar el ticket.");
         const payload = await respuestaPayload.json();
-        if (!payload.impresora) throw new Error("Seleccione una impresora en Impresión de tickets antes de activar la impresión automática.");
-        const respuestaAgente = await fetch(agenteImpresionURL + "/print", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        const resultado = await respuestaAgente.json().catch(() => ({}));
-        if (!respuestaAgente.ok || !resultado.ok) {
-          throw new Error(resultado.error || "El agente local no pudo imprimir el ticket.");
-        }
-        return resultado;
+        return NovaERPPrint.imprimir(payload);
       }
 
       function abrirTicket(ventana, url) {
@@ -1469,10 +1460,7 @@ function guardarEstadoVenta(){
       function cerrarVenta() {
       // Abrir la ventana durante el clic evita que el navegador bloquee el
       // comprobante. Se carga únicamente después de confirmar la venta.
-      const debeImprimirTicket = {{ impresion_ticket_navegador|yesno:"true,false" }};
-      const ventanaTicket = debeImprimirTicket
-        ? window.open("about:blank", "ticket_venta", "popup=yes,width=420,height=680")
-        : null;
+      const ventanaTicket = window.open("about:blank", "ticket_venta", "popup=yes,width=420,height=680");
 
       postJSON("{% url 'sales:pos_cerrar' %}", {
         venta_uuid:ventaActualUUID,
@@ -1493,10 +1481,10 @@ function guardarEstadoVenta(){
         }
 
         if (impresionAutomaticaActiva && !response.data.impresion_directa && response.data.payload_impresion_url) {
-          imprimirConAgenteLocal(response.data.payload_impresion_url)
+          imprimirAutomaticamente(response.data.payload_impresion_url)
             .then(() => { if (ventanaTicket) ventanaTicket.close(); })
             .catch((error) => {
-              // El comprobante nunca se pierde: si el agente no está activo,
+              // El comprobante nunca se pierde: si QZ no está disponible,
               // se usa el cuadro del navegador para imprimir o guardar PDF.
               abrirTicket(ventanaTicket, response.data.ticket_url);
               alert("Venta registrada. " + error.message + " Se abrió el comprobante para imprimir desde el navegador.");

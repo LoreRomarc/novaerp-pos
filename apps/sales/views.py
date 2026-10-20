@@ -1,7 +1,6 @@
 # apps/sales/views.py
 import json
 import logging
-import sys
 
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
@@ -180,13 +179,9 @@ class POSView(POSBaseView):
         configuracion_impresion, _ = ConfiguracionImpresionVenta.objects.get_or_create(
             sucursal=sucursal,
         )
-        # El navegador es quien conoce las impresoras del PC del cajero. En
-        # Render/Linux no existe acceso a la impresora Windows del usuario,
-        # por lo que siempre se abre el comprobante para imprimir o guardar.
-        usar_impresion_directa = (
-            configuracion_impresion.impresion_automatica
-            and sys.platform == "win32"
-        )
+        # QZ Tray se ejecuta en el PC del cajero y conoce sus impresoras,
+        # incluso cuando el ERP está desplegado en Render/Linux.
+        usar_impresion_directa = configuracion_impresion.impresion_automatica
 
         return render(
             request,
@@ -374,20 +369,6 @@ class POSCerrarVentaView(POSBaseView):
             configuracion, _ = ConfiguracionImpresionVenta.objects.get_or_create(
                 sucursal=venta.sucursal,
             )
-            error_impresion = ""
-            impresion_directa = False
-            if configuracion.impresion_automatica and sys.platform == "win32":
-                try:
-                    from apps.sales.services.impresion_termica_service import ImpresionTermicaService
-
-                    ImpresionTermicaService.imprimir_venta(venta, configuracion)
-                    impresion_directa = True
-                except ValidationError as error_impresion_directa:
-                    error_impresion = error_impresion_directa.messages[0]
-                except Exception:
-                    logger.exception("Error al imprimir comprobante de venta %s.", venta.id)
-                    error_impresion = "La venta se registró, pero no fue posible enviarla a la impresora."
-
             return success(
                 {
                     "reset": True,
@@ -402,12 +383,9 @@ class POSCerrarVentaView(POSBaseView):
                     "payload_impresion_url": reverse(
                         "sales:ticket_venta_payload", kwargs={"pk": venta.id}
                     ),
-                    "imprimir_ticket": not (
-                        configuracion.impresion_automatica
-                        and sys.platform == "win32"
-                    ),
-                    "impresion_directa": impresion_directa,
-                    "error_impresion": error_impresion,
+                    "imprimir_ticket": not configuracion.impresion_automatica,
+                    "impresion_directa": False,
+                    "error_impresion": "",
                     "nuevo_carrito": serializar_carrito(nuevo_carrito),
                 }
             )

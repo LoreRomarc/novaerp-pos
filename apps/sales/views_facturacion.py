@@ -2,7 +2,6 @@
 """Vistas de comprobantes térmicos de venta."""
 
 import logging
-import sys
 
 from django.contrib import messages
 from django.contrib.messages import get_messages
@@ -67,7 +66,7 @@ class TicketVentaView(LoginRequiredMixin, RolePermissionMixin, SucursalIsolation
 class TicketVentaPayloadImpresionView(
     LoginRequiredMixin, RolePermissionMixin, SucursalIsolationMixin, View
 ):
-    """Entrega un ticket autenticado al agente local de impresión Windows."""
+    """Entrega un ticket autenticado para QZ Tray en el PC del usuario."""
 
     allowed_roles = ["SUPER_ADMIN", "ADMIN_SUCURSAL", "CAJERO", "SUPERVISOR"]
 
@@ -89,7 +88,7 @@ class TicketVentaPayloadImpresionView(
         )
         if not configuracion.impresion_automatica:
             raise PermissionDenied("La impresión automática está desactivada.")
-        return JsonResponse(ImpresionTermicaService.payload_venta_zpl(venta, configuracion))
+        return JsonResponse(ImpresionTermicaService.payload_venta_qz(venta, configuracion))
 
 
 class TicketDevolucionView(LoginRequiredMixin, RolePermissionMixin, SucursalIsolationMixin, View):
@@ -148,7 +147,7 @@ class TicketDevolucionPayloadImpresionView(
         if not configuracion.impresion_automatica:
             raise PermissionDenied("La impresión automática está desactivada.")
         return JsonResponse(
-            ImpresionTermicaService.payload_devolucion_zpl(devolucion, configuracion)
+            ImpresionTermicaService.payload_devolucion_qz(devolucion, configuracion)
         )
 
 
@@ -178,8 +177,8 @@ class ConfiguracionImpresionVentaView(
         # Esta pantalla no debe arrastrar notificaciones de otros módulos.
         # Se consumen para que el ticket no se convierta en una bandeja global.
         list(get_messages(request))
-        if configuracion.modo_impresion != "ZPL_WINDOWS":
-            configuracion.modo_impresion = "ZPL_WINDOWS"
+        if configuracion.modo_impresion != "QZ_PIXEL":
+            configuracion.modo_impresion = "QZ_PIXEL"
             configuracion.save(update_fields=["modo_impresion", "actualizado"])
         return render(request, self.template_name, self._contexto(sucursal, configuracion))
 
@@ -205,10 +204,8 @@ class ConfiguracionImpresionVentaView(
                 ),
                 status=400,
             )
-        # Perfil activo de prueba: SAT TT448-2 ZPL. El ancho se conserva por
-        # sucursal y se convierte a puntos ZPL en el servicio de impresión.
         configuracion.ancho_papel_mm = ancho_papel_mm
-        configuracion.modo_impresion = "ZPL_WINDOWS"
+        configuracion.modo_impresion = "QZ_PIXEL"
         configuracion.nombre_impresora = (request.POST.get("nombre_impresora") or "").strip()
         configuracion.cortar_papel = request.POST.get("cortar_papel") == "on"
         configuracion.mensaje_pie = (request.POST.get("mensaje_pie") or "").strip()
@@ -228,7 +225,7 @@ class ConfiguracionImpresionVentaView(
 class ImpresionPruebaDirectaView(
     LoginRequiredMixin, RolePermissionMixin, SucursalIsolationMixin, View
 ):
-    """Envía un ticket de prueba sin abrir el diálogo del navegador."""
+    """Compatibilidad: abre la prueba para impresión desde el navegador."""
 
     allowed_roles = ["SUPER_ADMIN", "ADMIN_SUCURSAL"]
 
@@ -237,24 +234,7 @@ class ImpresionPruebaDirectaView(
         configuracion, _ = ConfiguracionImpresionVenta.objects.get_or_create(
             sucursal=sucursal,
         )
-        # En Render/Linux la impresora pertenece al PC del usuario, no al
-        # servidor. Abrir el diálogo del navegador permite usar cualquier
-        # impresora Windows instalada sin generar un falso error de sistema.
-        if sys.platform != "win32":
-            return redirect(f"{reverse('sales:ticket_prueba')}?autoprint=1")
-        try:
-            impresora = ImpresionTermicaService.imprimir_prueba(
-                sucursal,
-                configuracion,
-            )
-        except ValidationError as error:
-            messages.error(request, error.messages[0])
-        except Exception:
-            logger.exception("Error al imprimir ticket de prueba.")
-            messages.error(request, "No fue posible enviar la prueba a la impresora.")
-        else:
-            messages.success(request, f"Prueba enviada a: {impresora}.")
-        return redirect("sales:configuracion_impresion")
+        return redirect(f"{reverse('sales:ticket_prueba')}?autoprint=1")
 
 
 class TicketPruebaView(LoginRequiredMixin, RolePermissionMixin, SucursalIsolationMixin, View):
@@ -293,5 +273,5 @@ class TicketPruebaPayloadImpresionView(
         if not configuracion.impresion_automatica:
             raise PermissionDenied("Active la impresión automática para usar la prueba directa.")
         return JsonResponse(
-            ImpresionTermicaService.payload_prueba_zpl(sucursal, configuracion)
+            ImpresionTermicaService.payload_prueba_qz(sucursal, configuracion)
         )

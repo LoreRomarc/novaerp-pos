@@ -1,7 +1,9 @@
 {% extends "base.html" %}
-{% load humanize %}
+{% load humanize static %}
 
 {% block title %}Cambio o devolución{% endblock %}
+
+{% block content-link %}<script src="{% static 'vendor/qz-tray-2.2.5.js' %}"></script><script src="{% static 'js/novaerp-qz-print.js' %}"></script>{% endblock %}
 
 {% block content %}
 <style>
@@ -976,8 +978,7 @@ async function procesarOperacion() {
         if (data.data.payload_impresion_url && !data.data.impresion_directa) {
             try {
                 const payload = await fetch(data.data.payload_impresion_url, {credentials:"same-origin"}).then(async r => { const d=await r.json(); if(!r.ok) throw new Error(d.detail || "No fue posible preparar el comprobante."); return d; });
-                const resultado = await fetch("http://127.0.0.1:8765/print", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}).then(r=>r.json());
-                if (!resultado.ok) throw new Error(resultado.error || "El agente local no pudo imprimir.");
+                await NovaERPPrint.imprimir(payload);
                 ventanaComprobante?.close();
             } catch (errorImpresion) {
                 if (data.data.ticket_url) ventanaComprobante?.location.replace(data.data.ticket_url);
