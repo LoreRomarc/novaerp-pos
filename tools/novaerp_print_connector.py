@@ -11,6 +11,8 @@ import ctypes
 import json
 import logging
 import os
+import sys
+import winreg
 from ctypes import POINTER, byref, c_byte, c_int, c_void_p
 from ctypes.wintypes import DWORD, LPCWSTR
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -39,6 +41,28 @@ def is_allowed_origin(origin):
         return False
     origin = origin.rstrip("/")
     return origin in allowed_origins()
+
+
+def instalar_inicio_automatico():
+    """Registra el ejecutable en el inicio del usuario, sin administrador.
+
+    Solo se activa en el .exe distribuible. Al ejecutar el archivo por primera
+    vez en una caja, queda instalado en HKCU y no necesita terminal, Python ni
+    la carpeta de NovaERP.
+    """
+    if not getattr(sys, "frozen", False):
+        return False
+    value = f'"{sys.executable}" --silent'
+    key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
+    with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key_path) as key:
+        try:
+            current, _ = winreg.QueryValueEx(key, "NovaERPPrintConnector")
+        except FileNotFoundError:
+            current = None
+        if current == value:
+            return False
+        winreg.SetValueEx(key, "NovaERPPrintConnector", 0, winreg.REG_SZ, value)
+    return True
 
 
 def default_printer():
@@ -207,7 +231,15 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    installed_now = instalar_inicio_automatico()
     LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(filename=LOG_PATH, level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     logging.info("Iniciando conector en %s:%s", HOST, PORT)
+    if installed_now and "--silent" not in sys.argv:
+        ctypes.windll.user32.MessageBoxW(
+            0,
+            "El conector de impresión NovaERP quedó instalado. Se iniciará automáticamente con Windows; puede cerrar esta ventana y no necesita usar terminal.",
+            "NovaERP · impresión lista",
+            0x40,
+        )
     ThreadingHTTPServer((HOST, PORT), Handler).serve_forever()

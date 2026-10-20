@@ -19,6 +19,10 @@ from django.db.models import ExpressionWrapper, Sum, Q, F, DecimalField
 from apps.accounts.models import UserProfile
 from apps.core.models import Sucursal
 from apps.inventory.mixins import InventoryAccessMixin, SucursalScopedMixin
+from apps.inventory.movimientos import (
+    FILTROS_TIPO_MOVIMIENTO,
+    codigos_para_filtro,
+)
 from apps.inventory.models import (
     Stock,
     Traslado,
@@ -447,20 +451,30 @@ class AjusteStockCreateView(
 class TrasladoForm(forms.Form):
 
     tipo = forms.ChoiceField(
-        choices=[("COMPLETO", "Traslado entre sucursales")],
+        choices=[
+            ("COMPLETO", "Traslado entre sucursales"),
+            ("AJUSTE_ENTRADA", "Entrada / ajuste positivo"),
+            ("AJUSTE_SALIDA", "Salida por corrección"),
+            ("DANADO", "Baja por producto dañado"),
+            ("MERMA", "Baja por merma o pérdida"),
+            ("CONSUMO_INTERNO", "Salida por consumo interno"),
+            ("DEVOLUCION_CLIENTE", "Entrada por devolución de cliente"),
+            ("DEVOLUCION_PROVEEDOR", "Salida por devolución a proveedor"),
+            ("INICIAL", "Carga de inventario inicial"),
+        ],
         initial="COMPLETO",
-        widget=forms.HiddenInput(),
+        widget=forms.Select(attrs={"class": "form-select"}),
     )
 
     origen = forms.ModelChoiceField(
-        queryset=Sucursal.objects.all(),
+        queryset=Sucursal.objects.filter(activa=True),
         label="Sucursal de origen",
         required=False,
         widget=forms.Select(attrs={"class": "form-select"}),
     )
 
     destino = forms.ModelChoiceField(
-        queryset=Sucursal.objects.all(),
+        queryset=Sucursal.objects.filter(activa=True),
         label="Sucursal de destino",
         required=False,
         widget=forms.Select(attrs={"class": "form-select"}),
@@ -518,10 +532,6 @@ class TrasladoForm(forms.Form):
 
         destino = cleaned.get("destino")
 
-        # ==============================================
-        # TRASLADO COMPLETO
-        # ==============================================
-
         if tipo == "COMPLETO":
 
             if not origen:
@@ -538,6 +548,14 @@ class TrasladoForm(forms.Form):
                 raise ValidationError(
                     "Origen y destino no pueden ser iguales."
                 )
+
+        elif tipo in TrasladoService.TIPOS_DIRECTOS_SALIDA:
+            if not origen:
+                self.add_error("origen", "Seleccione la sucursal de la que sale el inventario.")
+
+        elif tipo in TrasladoService.TIPOS_DIRECTOS_ENTRADA:
+            if not destino:
+                self.add_error("destino", "Seleccione la sucursal a la que ingresa el inventario.")
 
         return cleaned
 
@@ -578,7 +596,7 @@ class TrasladoCreateView(LoginRequiredMixin, InventoryAccessMixin, SucursalScope
 
         context = super().get_context_data(**kwargs)
 
-        context["tipos"] = [("COMPLETO", "Traslado entre sucursales")]
+        context["tipos"] = TrasladoForm.base_fields["tipo"].choices
 
         return context
 
@@ -589,21 +607,31 @@ class TrasladoCreateView(LoginRequiredMixin, InventoryAccessMixin, SucursalScope
             with transaction.atomic():
 
                 sucursal_activa = self.get_sucursal()
+                tipo = form.cleaned_data["tipo"]
                 origen = form.cleaned_data.get("origen")
                 destino = form.cleaned_data.get("destino")
 
+                if tipo in TrasladoService.TIPOS_DIRECTOS_SALIDA:
+                    sucursales_involucradas = [origen]
+                elif tipo in TrasladoService.TIPOS_DIRECTOS_ENTRADA:
+                    sucursales_involucradas = [destino]
+                else:
+                    sucursales_involucradas = [origen, destino]
+
                 if (
                     self.request.user.profile.role != UserProfile.Role.SUPER_ADMIN
-                    and origen
-                    and origen.id != sucursal_activa.id
+                    and any(
+                        sucursal and sucursal.id != sucursal_activa.id
+                        for sucursal in sucursales_involucradas
+                    )
                 ):
                     raise ValidationError(
-                        "Solo puede enviar inventario desde su sucursal asignada."
+                        "Solo puede registrar movimientos en su sucursal asignada."
                     )
 
                 traslado = Traslado.objects.create(
 
-                    tipo="COMPLETO",
+                    tipo=tipo,
 
                     origen=origen,
 
@@ -632,7 +660,7 @@ class TrasladoCreateView(LoginRequiredMixin, InventoryAccessMixin, SucursalScope
 
                 messages.success(
                     self.request,
-                    "Movimiento procesado correctamente."
+                    "Movimiento registrado y enviado al Kardex."
                 )
 
         except ValidationError as error:
@@ -678,7 +706,7 @@ class TrasladoListView(LoginRequiredMixin, InventoryAccessMixin, SucursalScopedM
 
         estado = self.request.GET.get("estado")
 
-        tipo = self.request.GET.get("tipo")
+        tipo_movimiento = self.request.GET.get("tipo_movimiento", "")
         sucursal_id = self.request.GET.get("sucursal", "")
         fecha_desde = self.request.GET.get("fecha_desde", "")
         fecha_hasta = self.request.GET.get("fecha_hasta", "")
@@ -700,8 +728,8 @@ class TrasladoListView(LoginRequiredMixin, InventoryAccessMixin, SucursalScopedM
         if estado:
             qs = qs.filter(estado=estado)
 
-        if tipo:
-            qs = qs.filter(tipo=tipo)
+        if tipo_movimiento:
+            qs = qs.filter(tipo__in=codigos_para_filtro(tipo_movimiento))
 
         if fecha_desde:
             qs = qs.filter(creado__date__gte=fecha_desde)
@@ -715,7 +743,7 @@ class TrasladoListView(LoginRequiredMixin, InventoryAccessMixin, SucursalScopedM
 
         context = super().get_context_data(**kwargs)
 
-        context["tipos"] = Traslado.TIPOS
+        context["tipos_movimiento"] = FILTROS_TIPO_MOVIMIENTO
 
         context["estados"] = Traslado.ESTADOS
         context["puede_filtrar_sucursales"] = (

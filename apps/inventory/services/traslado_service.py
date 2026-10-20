@@ -11,6 +11,14 @@ from apps.inventory.services.stock_service import InventoryService
 
 class TrasladoService:
 
+    TIPOS_DIRECTOS_SALIDA = {
+        "AJUSTE_SALIDA", "DANADO", "MERMA", "CONSUMO_INTERNO",
+        "DEVOLUCION_PROVEEDOR",
+    }
+    TIPOS_DIRECTOS_ENTRADA = {
+        "AJUSTE_ENTRADA", "DEVOLUCION_CLIENTE", "INICIAL",
+    }
+
     TIPOS_SALIDA = [
         "COMPLETO",
         "SALIDA",
@@ -57,14 +65,14 @@ class TrasladoService:
         # VALIDACIONES
         # =================================================
 
-        if traslado.tipo in ["COMPLETO", "SALIDA"]:
+        if traslado.tipo in TrasladoService.TIPOS_SALIDA:
 
             if not traslado.origen:
                 raise ValidationError(
                     "Sucursal origen requerida."
                 )
 
-        if traslado.tipo in ["COMPLETO", "SALIDA", "ENTRADA"]:
+        if traslado.tipo in TrasladoService.TIPOS_ENTRADA or traslado.tipo in {"COMPLETO", "SALIDA", "ENTRADA"}:
 
             if not traslado.destino:
                 raise ValidationError(
@@ -122,13 +130,21 @@ class TrasladoService:
                     observacion=traslado.observaciones,
                 )
 
-        # Un traslado entre sucursales nunca suma automáticamente en destino.
-        # Permanece ENVIADO hasta que otro usuario confirme la recepción física.
-        traslado.estado = "ENVIADO"
-
         traslado.enviado_por = usuario
-
         traslado.fecha_envio = timezone.now()
+        if traslado.tipo in (
+            TrasladoService.TIPOS_DIRECTOS_SALIDA
+            | TrasladoService.TIPOS_DIRECTOS_ENTRADA
+        ):
+            # Un ajuste/merma/entrada no viaja a otra sede: queda terminado
+            # de inmediato y conserva su documento, motivo y detalle.
+            traslado.estado = "RECIBIDO"
+            traslado.recibido_por = usuario
+            traslado.fecha_recepcion = traslado.fecha_envio
+        else:
+            # Un traslado entre sucursales nunca suma automáticamente en
+            # destino. Permanece ENVIADO hasta la verificación física.
+            traslado.estado = "ENVIADO"
 
         traslado.save()
 

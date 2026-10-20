@@ -11,11 +11,11 @@
 
             <div>
                 <h3 class="mb-1">
-                    Traslados entre sucursales
+                    Movimientos de inventario
                 </h3>
 
                 <p class="text-muted mb-0">
-                    Envíe desde una sede y confirme la recepción física en el destino.
+                    Traslados, entradas y salidas con documento, responsable y trazabilidad en Kardex.
                 </p>
             </div>
 
@@ -23,7 +23,7 @@
                class="btn btn-primary">
 
                 <i class="bi bi-plus-lg"></i>
-                Nuevo traslado
+                Nuevo movimiento
 
             </a>
 
@@ -96,7 +96,7 @@
                         </label>
 
                         <select
-                            name="tipo"
+                            name="tipo_movimiento"
                             class="form-select"
                         >
 
@@ -104,11 +104,11 @@
                                 Todos
                             </option>
 
-                            {% for k,v in tipos %}
+                            {% for k,v in tipos_movimiento %}
 
                                 <option
                                     value="{{ k }}"
-                                    {% if request.GET.tipo == k %}
+                                    {% if request.GET.tipo_movimiento == k %}
                                         selected
                                     {% endif %}
                                 >

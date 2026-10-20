@@ -30,11 +30,11 @@ class ImpresionTermicaService:
 
     @classmethod
     def _ancho_caracteres(cls, ancho_mm):
-        # La SAT TT448-2 trabaja a 203 dpi (8 puntos/mm). El cálculo se basa
-        # en la fuente ZPL de 10 puntos y usa prácticamente todo el papel.
-        # Así 33 mm producen unas 25 columnas útiles, no media etiqueta.
+        # La SAT TT448-2 trabaja a 203 dpi (8 puntos/mm). La fuente ZPL que
+        # usamos para texto mide 14 puntos de ancho: el cálculo evita que se
+        # corte y aprovecha todo el ancho realmente imprimible.
         puntos = max(160, round(int(ancho_mm) * 8))
-        return max(12, (puntos - 8) // 10)
+        return max(12, (puntos - 8) // 14)
 
     @staticmethod
     def _lineas(texto, ancho):
@@ -178,20 +178,28 @@ class ImpresionTermicaService:
         ancho_dots = max(160, round(int(ancho_mm) * 8))  # 203 dpi aprox.
         # Fuerza el ancho ZPL configurado, independientemente del último
         # tamaño de etiqueta usado por el driver de Windows.
-        alto_fuente = 21
-        ancho_fuente = 10
-        salto = 26
         margen = 4
         y = 8
         campos = []
         for linea in contenido.splitlines():
-            linea = cls._zpl_texto(linea)
+            centrada = linea != linea.strip()
+            linea = cls._zpl_texto(linea.strip() if centrada else linea)
             if linea and set(linea) == {"-"}:
                 campos.append(f"^FO{margen},{y + 10}^GB{ancho_dots - margen * 2},1,1^FS")
-                y += salto
+                y += 22
                 continue
+            # Aumenta automáticamente textos cortos y compacta los largos.
+            # Así cada renglón aprovecha el ancho físico del papel sin cortar.
+            longitud = max(len(linea), 6)
+            ancho_fuente = max(14, min(36, int((ancho_dots - margen * 2) * 0.84 / longitud)))
+            alto_fuente = max(27, min(52, ancho_fuente * 2))
+            salto = alto_fuente + 7
+            # ^FB fija el ancho exacto de cada renglón. Sin este bloque el
+            # driver puede conservar el ancho de una etiqueta anterior y el
+            # texto queda apretado aunque la línea horizontal mida 33 mm.
             campos.append(
-                f"^FO{margen},{y}^A0N,{alto_fuente},{ancho_fuente}^FD{linea}^FS"
+                f"^FO{margen},{y}^A0N,{alto_fuente},{ancho_fuente}"
+                f"^FB{ancho_dots - margen * 2},1,0,{'C' if centrada else 'L'},0^FD{linea}^FS"
             )
             y += salto
         comandos = [

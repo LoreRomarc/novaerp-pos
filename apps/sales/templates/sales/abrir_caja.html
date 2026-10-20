@@ -182,11 +182,11 @@
                                             aria-describedby="ayudaMontoInicial"
                                             class="form-control"
                                             id="montoInicial"
-                                            min="0"
                                             name="monto_inicial"
                                             required
-                                            step="0.01"
-                                            type="number"
+                                            inputmode="numeric"
+                                            data-money-input
+                                            type="text"
                                             value="{{ monto_inicial }}">
                                     </div>
 
@@ -336,7 +336,7 @@ document.addEventListener("DOMContentLoaded", function () {
     actualizarCajaSeleccionada();
 
     formulario.addEventListener("submit", function (evento) {
-        const valor = Number(monto.value);
+        const valor = NovaERPMoney.value(monto);
 
         if (!Number.isFinite(valor) || valor < 0) {
             evento.preventDefault();

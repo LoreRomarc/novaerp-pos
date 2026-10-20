@@ -998,6 +998,14 @@ class ArqueoTurno(models.Model):
         related_name="arqueos_aprobados",
     )
     aprobado_en = models.DateTimeField(null=True, blank=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+    actualizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="arqueos_actualizados",
+    )
 
     class Meta:
         ordering = ["-creado_en", "-id"]

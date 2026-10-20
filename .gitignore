@@ -31,3 +31,7 @@ Thumbs.db
 
 # Archivos estáticos recolectados
 staticfiles/
+
+# Archivos temporales del empaquetado del conector Windows
+.build/
+.tmp-pip/

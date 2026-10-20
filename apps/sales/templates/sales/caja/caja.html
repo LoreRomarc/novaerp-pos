@@ -136,6 +136,17 @@
                 <div class="col-6 col-md-4 col-xl-3">
                     <div class="card cash-card h-100">
                         <div class="card-body p-3">
+                            <div class="text-muted small">Abonos a crédito</div>
+                            <div class="fs-5 fw-bold text-success">
+                                +${{ resumen.abonos_efectivo|floatformat:0|intcomma }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-6 col-md-4 col-xl-3">
+                    <div class="card cash-card h-100">
+                        <div class="card-body p-3">
                             <div class="text-muted small">Ventas en efectivo</div>
                             <div class="fs-5 fw-bold text-success">
                                 +${{ resumen.ventas_efectivo|floatformat:0|intcomma }}
@@ -310,7 +321,7 @@
                     <div>
                         <div class="fw-semibold">Realizar arqueo físico</div>
                         <div class="text-muted small">
-                            El conteo bloquea la operación visual de caja y habilita el cierre.
+                            Puede corregir las cantidades antes de confirmar el cierre.
                         </div>
                     </div>
 
@@ -344,6 +355,9 @@
                         {{ arqueo_actual.get_estado_display }}
                     {% endif %}
                 </span>
+                <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#modalArqueo" type="button">
+                    <i class="bi bi-pencil-square"></i> Corregir arqueo
+                </button>
             </div>
 
             <div class="card-body">
@@ -539,8 +553,9 @@
                                 id="montoMovimiento"
                                 min="1"
                                 required
-                                step="0.01"
-                                type="number">
+                                inputmode="numeric"
+                                data-money-input
+                                type="text">
                         </div>
 
                         <div>
@@ -566,7 +581,6 @@
             </div>
         </div>
 
-        {% if not cierre_en_proceso %}
             <div
                 class="modal fade"
                 id="modalArqueo"
@@ -659,13 +673,12 @@
                                 Cancelar
                             </button>
                             <button class="btn btn-primary" type="submit">
-                                Registrar arqueo
+                                {% if arqueo_actual %}Guardar corrección{% else %}Registrar arqueo{% endif %}
                             </button>
                         </div>
                     </form>
                 </div>
             </div>
-        {% endif %}
     {% else %}
         <div class="card border-0 shadow-sm">
             <div class="card-body text-center py-5">
@@ -778,7 +791,7 @@
             await enviarJson(
                 formMovimiento.dataset.url,
                 {
-                    monto: document.getElementById("montoMovimiento").value,
+                    monto: NovaERPMoney.value(document.getElementById("montoMovimiento")),
                     motivo: document.getElementById("motivoMovimiento").value,
                 }
             );
@@ -869,11 +882,8 @@
         document.getElementById("montoReal").value =
             arqueo.total_contado;
 
-        document.querySelectorAll(
-            "[data-bs-target='#modalMovimiento'], [data-bs-target='#modalArqueo']"
-        ).forEach((boton) => {
-            boton.disabled = true;
-        });
+        // El arqueo puede corregirse hasta el cierre; los movimientos de caja
+        // siguen bloqueados visualmente por el estado "cierre en proceso".
     }
 
     formArqueo?.addEventListener("submit", async (evento) => {
@@ -927,6 +937,21 @@
         }
     );
 
+    const denominacionesIniciales = {
+        {% if arqueo_actual %}
+            {% for item in arqueo_actual.denominaciones.all %}
+                "{{ item.denominacion|floatformat:0 }}": {{ item.cantidad }},
+            {% endfor %}
+        {% endif %}
+    };
+    document.querySelectorAll(".js-denominacion").forEach((input) => {
+        if (Object.prototype.hasOwnProperty.call(denominacionesIniciales, input.dataset.valor)) {
+            input.value = denominacionesIniciales[input.dataset.valor];
+        }
+    });
+    {% if arqueo_actual %}
+        document.getElementById("observacionArqueo").value = "{{ arqueo_actual.observacion|escapejs }}";
+    {% endif %}
     calcularTotalArqueo();
 </script>
 {% endif %}

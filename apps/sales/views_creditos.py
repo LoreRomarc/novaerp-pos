@@ -26,11 +26,21 @@ class CreditoListView(
         ventas = (
             Venta.objects.select_related("usuario", "vendedor", "sucursal")
             .prefetch_related("abonos")
-            .filter(sucursal=self.get_sucursal(), estado="CREDITO")
+            .filter(sucursal=self.get_sucursal())
+            # Una vez pagado, el crédito queda CERRADO pero conserva sus
+            # abonos. Se muestra en historial sin volver a ser cobrable.
+            .filter(Q(estado="CREDITO") | Q(estado="CERRADA", abonos__isnull=False))
+            .distinct()
             .order_by("creada", "id")
         )
         buscar = self.request.GET.get("q", "").strip()
         medio_pago = self.request.GET.get("medio_pago", "").strip()
+        estado_credito = self.request.GET.get("estado", "PENDIENTES").strip()
+        if estado_credito == "PAGADOS":
+            ventas = ventas.filter(estado="CERRADA")
+        elif estado_credito != "TODOS":
+            estado_credito = "PENDIENTES"
+            ventas = ventas.filter(estado="CREDITO")
         if buscar:
             filtros = (
                 Q(cliente__icontains=buscar)
@@ -86,6 +96,7 @@ class CreditoListView(
                 "historial_pagos": historial_pagos,
                 "q": self.request.GET.get("q", "").strip(),
                 "medio_pago": self.request.GET.get("medio_pago", "").strip(),
+                "estado_credito": self.request.GET.get("estado", "PENDIENTES").strip(),
                 "turno": CajaService.obtener_turno_operable(sucursal, self.request.user),
                 "error_abono": getattr(self, "error_abono", ""),
                 "exito_abono": getattr(self, "exito_abono", ""),

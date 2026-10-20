@@ -1278,21 +1278,37 @@ class CajaService:
             total_contado - esperado
         )
 
-        try:
+        # Mientras el turno siga abierto, el arqueo es una preparación de
+        # cierre y puede corregirse. No se crea un segundo arqueo: se conserva
+        # el mismo registro y se deja quién realizó la última corrección.
+        arqueo = (
+            ArqueoTurno.objects.select_for_update()
+            .filter(turno=turno, estado=ArqueoTurno.Estado.REGISTRADO)
+            .first()
+        )
+        if arqueo:
+            arqueo.monto_esperado = esperado
+            arqueo.total_contado = total_contado
+            arqueo.diferencia = diferencia
+            arqueo.observacion = (observacion or "").strip().upper()
+            arqueo.actualizado_por = usuario
+            arqueo.save(
+                update_fields=[
+                    "monto_esperado", "total_contado", "diferencia",
+                    "observacion", "actualizado_por", "actualizado_en",
+                ]
+            )
+            arqueo.denominaciones.all().delete()
+        else:
             arqueo = ArqueoTurno.objects.create(
                 turno=turno,
                 realizado_por=usuario,
                 monto_esperado=esperado,
                 total_contado=total_contado,
                 diferencia=diferencia,
-                observacion=(
-                    observacion or ""
-                ).strip(),
+                observacion=(observacion or "").strip().upper(),
+                actualizado_por=usuario,
             )
-        except IntegrityError as error:
-            raise ValidationError(
-                "Ya existe un arqueo pendiente para este turno."
-            ) from error
 
         ArqueoDenominacion.objects.bulk_create(
             [

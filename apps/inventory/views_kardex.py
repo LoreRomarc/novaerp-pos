@@ -10,6 +10,10 @@ from apps.accounts.models import UserProfile
 from apps.core.models import Sucursal
 from apps.inventory.mixins import InventoryAccessMixin
 from apps.inventory.models import MovimientoStock, Traslado
+from apps.inventory.movimientos import (
+    FILTROS_TIPO_MOVIMIENTO,
+    codigos_para_filtro,
+)
 from apps.sales.mixins import SucursalIsolationMixin
 
 
@@ -44,12 +48,11 @@ class KardexListView(LoginRequiredMixin, InventoryAccessMixin, SucursalIsolation
         if variante_id:
             qs = qs.filter(variante_id=variante_id)
 
-        tipo = self.request.GET.get("tipo", "")
-        if tipo:
-            qs = qs.filter(tipo=tipo)
-
-        if self.request.GET.get("excluir_ventas") == "1":
-            qs = qs.exclude(tipo="VENTA")
+        tipo_movimiento = self.request.GET.get("tipo_movimiento", "")
+        if tipo_movimiento:
+            # El filtro usa categorías iguales a Movimientos de inventario,
+            # pero no se pierde el tipo exacto guardado en cada registro.
+            qs = qs.filter(tipo__in=codigos_para_filtro(tipo_movimiento))
 
         q = self.request.GET.get("q", "").strip()
         if q:
@@ -76,7 +79,7 @@ class KardexListView(LoginRequiredMixin, InventoryAccessMixin, SucursalIsolation
         )
         context["sucursales"] = Sucursal.objects.filter(activa=True).order_by("nombre")
         context["sucursal_id"] = self.request.GET.get("sucursal", "")
-        context["tipos_movimiento"] = MovimientoStock.TIPOS
+        context["tipos_movimiento"] = FILTROS_TIPO_MOVIMIENTO
         return context
 
 
@@ -91,7 +94,7 @@ class KardexDetalleView(LoginRequiredMixin, InventoryAccessMixin, SucursalIsolat
             movimientos = movimientos.filter(sucursal=self.get_sucursal())
         movimiento = get_object_or_404(movimientos, pk=pk)
         traslado = None
-        if movimiento.tipo in {"COMPLETO", "SALIDA", "ENTRADA"}:
+        if movimiento.referencia:
             traslado = (
                 Traslado.objects.select_related("origen", "destino")
                 .prefetch_related("detalles__variante__producto_base")

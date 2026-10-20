@@ -8,8 +8,8 @@
 
         <div class="card-body">
 
-            <h3 class="mb-1">Enviar traslado</h3>
-            <p class="text-muted small mb-4">El stock sale de origen ahora y entra al destino solo cuando este confirme la recepción física.</p>
+            <h3 class="mb-1">Movimiento de inventario</h3>
+            <p class="text-muted small mb-4" id="ayudaMovimiento">Registre traslados, entradas, salidas, daños y ajustes. Cada operación queda documentada en el Kardex.</p>
 
             <form method="post">
 
@@ -21,14 +21,18 @@
 
                 <div class="row g-3">
 
-                    {{ form.tipo }}
+                    <div class="col-12 col-md-6">
+                        <label class="form-label" for="{{ form.tipo.id_for_label }}">Operación *</label>
+                        {{ form.tipo }}
+                        {% for error in form.tipo.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+                    </div>
 
                     <div
                         class="col-md-6"
                         id="origen-wrapper"
                     >
 
-                        <label class="form-label" for="{{ form.origen.id_for_label }}">Sucursal origen *</label>
+                        <label class="form-label" id="origen-label" for="{{ form.origen.id_for_label }}">Sucursal origen *</label>
 
                         {{ form.origen }}
                         {% for error in form.origen.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
@@ -40,7 +44,7 @@
                         id="destino-wrapper"
                     >
 
-                        <label class="form-label" for="{{ form.destino.id_for_label }}">Sucursal destino *</label>
+                        <label class="form-label" id="destino-label" for="{{ form.destino.id_for_label }}">Sucursal destino *</label>
 
                         {{ form.destino }}
                         {% for error in form.destino.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
@@ -89,7 +93,7 @@
 
                         <button class="btn btn-primary">
 
-                            Enviar traslado
+                            <span id="textoGuardarMovimiento">Registrar movimiento</span>
 
                         </button>
 
@@ -123,6 +127,37 @@ document.addEventListener("DOMContentLoaded", () => {
             selectVariante.dispatchEvent(new Event("change", { bubbles: true }));
         },
     });
+
+    const tipo = document.getElementById("{{ form.tipo.id_for_label }}");
+    const origen = document.getElementById("origen-wrapper");
+    const destino = document.getElementById("destino-wrapper");
+    const etiquetaOrigen = document.getElementById("origen-label");
+    const etiquetaDestino = document.getElementById("destino-label");
+    const ayuda = document.getElementById("ayudaMovimiento");
+    const textoBoton = document.getElementById("textoGuardarMovimiento");
+    const salida = new Set(["AJUSTE_SALIDA", "DANADO", "MERMA", "CONSUMO_INTERNO", "DEVOLUCION_PROVEEDOR"]);
+    const entrada = new Set(["AJUSTE_ENTRADA", "DEVOLUCION_CLIENTE", "INICIAL"]);
+    const actualizarOperacion = () => {
+        const valor = tipo.value;
+        origen.classList.toggle("d-none", entrada.has(valor));
+        destino.classList.toggle("d-none", salida.has(valor));
+        if (valor === "COMPLETO") {
+            etiquetaOrigen.textContent = "Sucursal de origen *";
+            etiquetaDestino.textContent = "Sucursal de destino *";
+            ayuda.textContent = "El stock sale de origen ahora y entra al destino solo cuando este confirme la recepción física.";
+            textoBoton.textContent = "Enviar traslado";
+        } else if (salida.has(valor)) {
+            etiquetaOrigen.textContent = "Sucursal donde se descuenta *";
+            ayuda.textContent = "La salida se registra de inmediato en el Kardex; no requiere recepción en otra sucursal.";
+            textoBoton.textContent = "Registrar salida";
+        } else {
+            etiquetaDestino.textContent = "Sucursal donde ingresa *";
+            ayuda.textContent = "La entrada se registra de inmediato en el Kardex; indique el motivo para conservar trazabilidad.";
+            textoBoton.textContent = "Registrar entrada";
+        }
+    };
+    tipo.addEventListener("change", actualizarOperacion);
+    actualizarOperacion();
 });
 </script>
 {% endblock %}

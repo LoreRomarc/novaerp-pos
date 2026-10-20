@@ -638,6 +638,33 @@ document.querySelectorAll(".toast").forEach((elemento) => {
     bootstrap.Toast.getOrCreateInstance(elemento).show();
 });
 
+// Campos monetarios COP. Los formularios envían el número limpio al servidor,
+// pero mientras se escribe se muestran los miles con puntos colombianos.
+window.NovaERPMoney = (() => {
+    const digits = (value) => String(value ?? "").replace(/\D/g, "");
+    const value = (input) => Number(digits(input?.value) || 0);
+    const format = (raw) => new Intl.NumberFormat("es-CO", {
+        maximumFractionDigits: 0,
+    }).format(Number(raw || 0));
+    const bind = (input) => {
+        if (!input || input.dataset.moneyBound) return;
+        input.dataset.moneyBound = "1";
+        input.setAttribute("inputmode", "numeric");
+        input.addEventListener("input", () => {
+            const raw = digits(input.value);
+            input.value = raw ? format(raw) : "";
+        });
+        if (input.value) input.value = format(digits(input.value));
+    };
+    document.querySelectorAll("[data-money-input]").forEach(bind);
+    document.addEventListener("submit", (event) => {
+        event.target.querySelectorAll?.("[data-money-input]").forEach((input) => {
+            input.value = String(value(input));
+        });
+    }, true);
+    return { value, format, bind };
+})();
+
 // Los lectores USB/Bluetooth habituales escriben el código como un teclado y
 // terminan con Enter. Esta utilidad permite usar el mismo comportamiento en
 // cualquier formulario que seleccione una prenda, sin acoplarlo al POS.

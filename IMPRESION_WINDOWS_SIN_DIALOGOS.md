@@ -5,6 +5,24 @@ no pide aceptar sitios y no requiere comprar certificados. El conector se
 instala una vez en cada computador que tenga impresora y se inicia solo al
 iniciar sesión en Windows.
 
+## Instalación sin terminal ni carpeta del proyecto
+
+El archivo distribuible es:
+
+`releases\NovaERP_Print_Connector.exe`
+
+Después de subir los cambios al repositorio, copie **solo ese archivo** al
+escritorio de cada computador que tenga impresora, por USB, OneDrive, correo o
+la carpeta compartida que usen. No necesita copiar NovaERP, Python, el entorno
+virtual ni abrir una terminal.
+
+La primera vez haga doble clic en el archivo. NovaERP registra el conector en
+el inicio automático del usuario y muestra un único mensaje de confirmación.
+Luego puede cerrar la ventana: el conector queda funcionando en segundo plano
+en cada inicio de Windows. Si Windows SmartScreen pregunta por el archivo, use
+**Más información > Ejecutar de todas formas** solamente si el archivo fue
+recibido desde el repositorio oficial de NovaERP.
+
 ## 1. Preparar el material de la SAT TT448-2 (prueba)
 
 1. Abra **Configuración > Bluetooth y dispositivos > Impresoras y escáneres**.
@@ -27,9 +45,10 @@ iniciar sesión en Windows.
 > el motivo de que una impresión de 33 mm pareciera ocupar menos de la mitad
 > de la cinta. Debe quedar seleccionado `NOVAERP-33`.
 
-## 2. Instalar el conector una única vez
+## 2. Instalación para desarrollo (opcional)
 
-Hágalo desde la carpeta del proyecto, por ejemplo
+Este procedimiento queda solo como alternativa para desarrollo desde la
+carpeta del proyecto, por ejemplo
 `C:\Users\User\novaerp-pos`:
 
 1. Cierre QZ Tray si lo tiene abierto; ya no se usa.

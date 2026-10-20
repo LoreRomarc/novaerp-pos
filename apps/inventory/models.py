@@ -490,6 +490,11 @@ class MovimientoStock(models.Model):
         ("AJUSTE_SALIDA", "Ajuste salida"),
 
         ("TRASLADO", "Traslado"),
+        # Tipos usados por traslados existentes y nuevos. Se mantienen los
+        # legados para que ningún kardex histórico quede sin etiqueta/filtro.
+        ("COMPLETO", "Traslado completo"),
+        ("SALIDA", "Salida entre sucursales"),
+        ("ENTRADA", "Entrada entre sucursales"),
 
         ("DANADO", "Dañado"),
         ("MERMA", "Merma"),
@@ -514,7 +519,7 @@ class MovimientoStock(models.Model):
         on_delete=models.PROTECT
     )
 
-    tipo = models.CharField(max_length=20, choices=TIPOS)
+    tipo = models.CharField(max_length=30, choices=TIPOS)
 
     cantidad = models.DecimalField(max_digits=12, decimal_places=2)
 
