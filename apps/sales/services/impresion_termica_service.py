@@ -6,6 +6,8 @@ térmicos que solo aceptan trabajos gráficos de Windows.
 
 import ctypes
 import os
+import re
+import textwrap
 import unicodedata
 from ctypes import POINTER, byref, c_int, c_void_p, create_unicode_buffer
 from ctypes.wintypes import DWORD, LPCWSTR
@@ -52,11 +54,25 @@ class ImpresionTermicaService:
         texto = " ".join(str(texto or "").split())
         if not texto:
             return []
-        return [texto[indice:indice + ancho] for indice in range(0, len(texto), ancho)]
+        # Nunca separar una palabra como "VENTA" en dos renglones. Si una
+        # palabra aislada supera el papel, textwrap sí la divide como último
+        # recurso para que no se pierda contenido.
+        return textwrap.wrap(
+            texto,
+            width=max(1, ancho),
+            break_long_words=True,
+            break_on_hyphens=False,
+        )
 
     @classmethod
     def _centrado(cls, texto, ancho):
-        return [linea.center(ancho) for linea in cls._lineas(texto, ancho)]
+        # Se reservan dos columnas para asegurar espacios a ambos lados. ZPL
+        # identifica así el renglón como centrado incluso cuando ocupa casi
+        # toda la anchura disponible.
+        return [
+            linea.center(ancho)
+            for linea in cls._lineas(texto, max(1, ancho - 2))
+        ]
 
     @classmethod
     def _derecha(cls, etiqueta, valor, ancho):
@@ -231,10 +247,27 @@ class ImpresionTermicaService:
             # ^FB fija el ancho exacto de cada renglón. Sin este bloque el
             # driver puede conservar el ancho de una etiqueta anterior y el
             # texto queda apretado aunque la línea horizontal mida 33 mm.
-            campos.append(
-                f"^FO{margen},{y}^A0N,{alto_fuente},{ancho_fuente}"
-                f"^FB{ancho_dots - margen * 2},1,0,{'C' if centrada else 'L'},0^FD{linea}^FS"
+            ancho_util = ancho_dots - margen * 2
+            # Las filas creadas por _derecha contienen un bloque de espacios
+            # entre etiqueta y valor. En ZPL las convertimos en dos columnas
+            # reales; así el total queda exactamente al borde derecho sin
+            # depender del ancho visual de los espacios de la fuente.
+            columnas = None if centrada else re.match(
+                r"^(.*?\S)\s{2,}(\S+)$", linea
             )
+            if columnas:
+                etiqueta, valor = columnas.groups()
+                campos.extend((
+                    f"^FO{margen},{y}^A0N,{alto_fuente},{ancho_fuente}"
+                    f"^FB{ancho_util},1,0,L,0^FD{etiqueta}^FS",
+                    f"^FO{margen},{y}^A0N,{alto_fuente},{ancho_fuente}"
+                    f"^FB{ancho_util},1,0,R,0^FD{valor}^FS",
+                ))
+            else:
+                campos.append(
+                    f"^FO{margen},{y}^A0N,{alto_fuente},{ancho_fuente}"
+                    f"^FB{ancho_util},1,0,{'C' if centrada else 'L'},0^FD{linea}^FS"
+                )
             y += salto
         comandos = [
             "^XA",
