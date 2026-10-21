@@ -6,7 +6,6 @@ térmicos que solo aceptan trabajos gráficos de Windows.
 
 import ctypes
 import os
-import re
 import textwrap
 import unicodedata
 from ctypes import POINTER, byref, c_int, c_void_p, create_unicode_buffer
@@ -20,6 +19,7 @@ class ImpresionTermicaService:
 
     ESC = b"\x1b"
     GS = b"\x1d"
+    SEPARADOR_COLUMNA = "\x1e"
 
     @staticmethod
     def _dinero(valor):
@@ -45,8 +45,11 @@ class ImpresionTermicaService:
         58 u 80 mm sin modificar el diseño.
         """
         escala = ancho_dots / 264  # 264 dots equivale a 33 mm a 203 dpi.
-        ancho = max(14, min(22, round(16 * escala)))
-        alto = max(28, min(44, round(30 * escala)))
+        # El ancho reducido permite que en 33 mm convivan una etiqueta y un
+        # total largo ($1.000.000) sin enviar el último dígito a otra línea.
+        # La altura conserva la legibilidad y se escala para otros papeles.
+        ancho = max(10, min(28, round(12 * escala)))
+        alto = max(24, min(58, round(28 * escala)))
         return alto, ancho
 
     @staticmethod
@@ -79,8 +82,10 @@ class ImpresionTermicaService:
         valor = str(valor)
         espacio = ancho - len(etiqueta) - len(valor)
         if espacio >= 1:
-            return [f"{etiqueta}{' ' * espacio}{valor}"]
-        return cls._lineas(etiqueta, ancho) + [valor.rjust(ancho)]
+            return [f"{etiqueta}{cls.SEPARADOR_COLUMNA}{valor}"]
+        return cls._lineas(etiqueta, ancho) + [
+            f"{cls.SEPARADOR_COLUMNA}{valor}"
+        ]
 
     @staticmethod
     def _separador(ancho):
@@ -88,11 +93,11 @@ class ImpresionTermicaService:
         return "." * ancho
 
     @classmethod
-    def _lineas_item(cls, nombre, cantidad, precio, total, ancho):
+    def _lineas_item(cls, nombre, cantidad, precio, total, ancho, atributos=()):
         """Formato de artículo: descripción/total y cantidad × precio.
 
-        No se imprimen SKU ni datos técnicos de variante: son identificadores
-        internos y visualmente rompen un comprobante de venta compacto.
+        SKU no se imprime. Tela y talla sí, debajo del producto y antes de
+        cantidad × precio, como identificación comercial de la prenda.
         """
         descripcion = str(nombre or "PRODUCTO").strip()
         valor_total = cls._dinero(total)
@@ -100,13 +105,18 @@ class ImpresionTermicaService:
 
         if len(descripcion) + len(valor_total) + 1 <= ancho:
             lineas = cls._derecha(descripcion, valor_total, ancho)
-            lineas.extend(cls._lineas(detalle, ancho))
-            return lineas
+        else:
+            # En papel angosto un nombre largo ocupa sus propias líneas; el
+            # importe queda en una columna derecha independiente.
+            lineas = cls._lineas(descripcion, ancho)
+            lineas.append(f"{cls.SEPARADOR_COLUMNA}{valor_total}")
 
-        # En papel angosto un nombre largo ocupa sus propias líneas; el total
-        # queda alineado a la derecha debajo de la cantidad y precio.
-        lineas = cls._lineas(descripcion, ancho)
-        lineas.extend(cls._derecha(detalle, valor_total, ancho))
+        detalle_variante = " · ".join(
+            str(valor).strip() for valor in atributos if valor
+        )
+        if detalle_variante:
+            lineas.extend(cls._lineas(detalle_variante, ancho))
+        lineas.extend(cls._lineas(detalle, ancho))
         return lineas
 
     @classmethod
@@ -146,6 +156,7 @@ class ImpresionTermicaService:
                 item.precio_unitario,
                 item.total_linea,
                 ancho,
+                (item.tipo_tela, item.talla),
             ))
         lineas.append(cls._separador(ancho))
         # Etiquetas cortas: en rollos de 33 mm siguen compartiendo renglón
@@ -234,9 +245,15 @@ class ImpresionTermicaService:
         margen = 4
         y = 8
         campos = []
-        for linea in contenido.splitlines():
+        # splitlines() interpreta U+001E (nuestro separador de columnas)
+        # como fin de línea. Solo el salto LF real separa renglones del ticket.
+        for linea in contenido.split("\n"):
             centrada = linea != linea.strip()
-            linea = cls._zpl_texto(linea.strip() if centrada else linea)
+            linea_original = linea.strip() if centrada else linea
+            columna = None if centrada else linea_original.partition(
+                cls.SEPARADOR_COLUMNA
+            )
+            linea = cls._zpl_texto(linea_original)
             if linea and set(linea) == {"."}:
                 # Segmentos en vez de una banda sólida: el resultado se ve
                 # como el separador punteado de una factura POS tradicional.
@@ -252,20 +269,20 @@ class ImpresionTermicaService:
             # driver puede conservar el ancho de una etiqueta anterior y el
             # texto queda apretado aunque la línea horizontal mida 33 mm.
             ancho_util = ancho_dots - margen * 2
-            # Las filas creadas por _derecha contienen un bloque de espacios
-            # entre etiqueta y valor. En ZPL las convertimos en dos columnas
-            # reales; así el total queda exactamente al borde derecho sin
-            # depender del ancho visual de los espacios de la fuente.
-            columnas = None if centrada else re.match(
-                r"^(.*?\S)\s{2,}(\S+)$", linea
-            )
-            if columnas:
-                etiqueta, valor = columnas.groups()
+            # Las filas creadas por _derecha llevan un separador interno. En
+            # ZPL se convierten en dos columnas reales para fijar el total al
+            # borde derecho, sin depender de espacios de la fuente.
+            if columna and columna[1]:
+                etiqueta = cls._zpl_texto(columna[0])
+                valor = cls._zpl_texto(columna[2])
+                ancho_valor = max(1, round(ancho_util * 0.50))
+                x_valor = margen + ancho_util - ancho_valor
+                ancho_etiqueta = max(1, x_valor - margen - 3)
                 campos.extend((
                     f"^FO{margen},{y}^A0N,{alto_fuente},{ancho_fuente}"
-                    f"^FB{ancho_util},1,0,L,0^FD{etiqueta}^FS",
-                    f"^FO{margen},{y}^A0N,{alto_fuente},{ancho_fuente}"
-                    f"^FB{ancho_util},1,0,R,0^FD{valor}^FS",
+                    f"^FB{ancho_etiqueta},1,0,L,0^FD{etiqueta}^FS",
+                    f"^FO{x_valor},{y}^A0N,{alto_fuente},{ancho_fuente}"
+                    f"^FB{ancho_valor},1,0,R,0^FD{valor}^FS",
                 ))
             else:
                 campos.append(

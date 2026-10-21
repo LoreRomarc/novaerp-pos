@@ -58,7 +58,7 @@
         </div>
         <hr class="line">
         <table class="items">
-            <tbody>{% for item in venta.items.all %}<tr><td class="product"><span class="item-name">{{ item.nombre_producto }}</span><span class="line-price">{{ item.cantidad|floatformat:"-2" }} × ${{ item.precio_unitario|floatformat:0|intcomma }}</span></td><td class="money">${{ item.total_linea|floatformat:0|intcomma }}</td></tr>{% endfor %}</tbody>
+            <tbody>{% for item in venta.items.all %}<tr><td class="product"><span class="item-name">{{ item.nombre_producto }}</span>{% if item.tipo_tela or item.talla %}<span class="variant">{{ item.tipo_tela }}{% if item.talla %} · {{ item.talla }}{% endif %}</span>{% endif %}<span class="line-price">{{ item.cantidad|floatformat:"-2" }} × ${{ item.precio_unitario|floatformat:0|intcomma }}</span></td><td class="money">${{ item.total_linea|floatformat:0|intcomma }}</td></tr>{% endfor %}</tbody>
         </table>
         <hr class="line">
         <table class="totals">
