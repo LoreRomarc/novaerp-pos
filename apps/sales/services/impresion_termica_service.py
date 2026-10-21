@@ -148,17 +148,21 @@ class ImpresionTermicaService:
                 ancho,
             ))
         lineas.append(cls._separador(ancho))
-        lineas.extend(cls._derecha("Subtotal", cls._dinero(venta.subtotal), ancho))
+        # Etiquetas cortas: en rollos de 33 mm siguen compartiendo renglón
+        # con el importe, incluso cuando el total supera los cientos de mil.
+        lineas.extend(cls._derecha("SUBT.", cls._dinero(venta.subtotal), ancho))
         if venta.total_iva:
             lineas.extend(cls._derecha("IVA", cls._dinero(venta.total_iva), ancho))
+        lineas.append(cls._separador(ancho))
         lineas.extend(cls._derecha("TOTAL", cls._dinero(venta.total), ancho))
-        lineas.extend(cls._derecha("Efectivo", cls._dinero(venta.monto_efectivo), ancho))
-        lineas.extend(cls._derecha("Transferencia", cls._dinero(venta.monto_transferencia), ancho))
+        lineas.append(cls._separador(ancho))
+        lineas.extend(cls._derecha("EFEC.", cls._dinero(venta.monto_efectivo), ancho))
+        lineas.extend(cls._derecha("TRANSF.", cls._dinero(venta.monto_transferencia), ancho))
         if venta.estado == "CREDITO":
-            lineas.extend(cls._derecha("TOTAL ABONADO", cls._dinero(venta.total_pagado), ancho))
-            lineas.extend(cls._derecha("SALDO PENDIENTE", cls._dinero(venta.saldo_pendiente), ancho))
+            lineas.extend(cls._derecha("ABON.", cls._dinero(venta.total_pagado), ancho))
+            lineas.extend(cls._derecha("SALDO", cls._dinero(venta.saldo_pendiente), ancho))
         if venta.cambio:
-            lineas.extend(cls._derecha("Vuelto", cls._dinero(venta.cambio), ancho))
+            lineas.extend(cls._derecha("VUELTO", cls._dinero(venta.cambio), ancho))
         lineas.append(cls._separador(ancho))
         lineas.extend(cls._centrado(configuracion.mensaje_pie or "Gracias por su compra.", ancho))
         return "\n".join(lineas)
