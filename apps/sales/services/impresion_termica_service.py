@@ -45,11 +45,13 @@ class ImpresionTermicaService:
         58 u 80 mm sin modificar el diseño.
         """
         escala = ancho_dots / 264  # 264 dots equivale a 33 mm a 203 dpi.
-        # El ancho reducido permite que en 33 mm convivan una etiqueta y un
-        # total largo ($1.000.000) sin enviar el último dígito a otra línea.
-        # La altura conserva la legibilidad y se escala para otros papeles.
-        ancho = max(10, min(28, round(12 * escala)))
-        alto = max(24, min(58, round(28 * escala)))
+        # En 33 mm hay aproximadamente 260 dots imprimibles. El ancho 12
+        # usado antes solo dejaba cerca de 20 caracteres por renglón y partía
+        # nombres que físicamente caben en el papel. La fuente A0 permite un
+        # ancho compacto sin perder altura/legibilidad; en 33 mm deja unas 40
+        # columnas útiles y en papeles mayores escala proporcionalmente.
+        ancho = max(6, min(22, round(6 * escala)))
+        alto = max(22, min(56, round(24 * escala)))
         return alto, ancho
 
     @staticmethod
@@ -275,7 +277,19 @@ class ImpresionTermicaService:
             if columna and columna[1]:
                 etiqueta = cls._zpl_texto(columna[0])
                 valor = cls._zpl_texto(columna[2])
-                ancho_valor = max(1, round(ancho_util * 0.50))
+                # El importe solo necesita el espacio de sus propios
+                # caracteres. Reservar siempre el 50 % del papel dejaba una
+                # columna de producto artificialmente angosta y provocaba
+                # saltos de renglón. Conservamos el importe alineado a la
+                # derecha, pero damos el resto disponible a la descripción.
+                ancho_necesario_valor = (
+                    len(valor) * ancho_fuente
+                    + max(4, ancho_fuente // 2)
+                )
+                ancho_valor = min(
+                    max(1, round(ancho_util * 0.42)),
+                    max(1, ancho_necesario_valor),
+                )
                 x_valor = margen + ancho_util - ancho_valor
                 ancho_etiqueta = max(1, x_valor - margen - 3)
                 campos.extend((
