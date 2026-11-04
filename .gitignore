@@ -34,4 +34,5 @@ staticfiles/
 
 # Archivos temporales del empaquetado del conector Windows
 .build/
+.build-print-connector/
 .tmp-pip/

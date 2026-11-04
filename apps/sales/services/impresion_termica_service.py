@@ -20,6 +20,9 @@ class ImpresionTermicaService:
     ESC = b"\x1b"
     GS = b"\x1d"
     SEPARADOR_COLUMNA = "\x1e"
+    # Los artículos no usan la misma composición que los totales: su importe
+    # se ubica junto al nombre para no crear un hueco visual en el centro.
+    SEPARADOR_ITEM = "\x1f"
 
     @staticmethod
     def _dinero(valor):
@@ -34,6 +37,8 @@ class ImpresionTermicaService:
     def _ancho_caracteres(cls, ancho_mm):
         puntos = max(160, round(float(ancho_mm) * 8))
         _, ancho_fuente = cls._medidas_fuente_zpl(puntos)
+        if 55 <= float(ancho_mm) <= 60:
+            return 42
         return max(12, (puntos - 8) // ancho_fuente)
 
     @staticmethod
@@ -48,10 +53,10 @@ class ImpresionTermicaService:
         # En 33 mm hay aproximadamente 260 dots imprimibles. El ancho 12
         # usado antes solo dejaba cerca de 20 caracteres por renglón y partía
         # nombres que físicamente caben en el papel. La fuente A0 permite un
-        # ancho compacto sin perder altura/legibilidad; en 33 mm deja unas 40
+        # ancho compacto sin perder altura/legibilidad; en 33 mm deja unas 50
         # columnas útiles y en papeles mayores escala proporcionalmente.
-        ancho = max(6, min(22, round(6 * escala)))
-        alto = max(22, min(56, round(24 * escala)))
+        ancho = max(5, min(20, round(5 * escala)))
+        alto = max(21, min(54, round(23 * escala)))
         return alto, ancho
 
     @staticmethod
@@ -105,8 +110,13 @@ class ImpresionTermicaService:
         valor_total = cls._dinero(total)
         detalle = f"{cls._cantidad(cantidad)} x {cls._dinero(precio)}"
 
-        if len(descripcion) + len(valor_total) + 1 <= ancho:
-            lineas = cls._derecha(descripcion, valor_total, ancho)
+        # En las prendas el valor va inmediatamente después del nombre. Así
+        # se conserva una sola fila compacta y no aparece un hueco gigante
+        # entre ambas columnas como en una tabla de escritorio.
+        if len(descripcion) + len(valor_total) + 2 <= ancho:
+            lineas = [
+                f"{descripcion}{cls.SEPARADOR_ITEM}{valor_total}"
+            ]
         else:
             # En papel angosto un nombre largo ocupa sus propias líneas; el
             # importe queda en una columna derecha independiente.
@@ -252,8 +262,13 @@ class ImpresionTermicaService:
         for linea in contenido.split("\n"):
             centrada = linea != linea.strip()
             linea_original = linea.strip() if centrada else linea
-            columna = None if centrada else linea_original.partition(
-                cls.SEPARADOR_COLUMNA
+            item = None if centrada else linea_original.partition(
+                cls.SEPARADOR_ITEM
+            )
+            columna = (
+                None
+                if centrada or (item and item[1])
+                else linea_original.partition(cls.SEPARADOR_COLUMNA)
             )
             linea = cls._zpl_texto(linea_original)
             if linea and set(linea) == {"."}:
@@ -274,7 +289,36 @@ class ImpresionTermicaService:
             # Las filas creadas por _derecha llevan un separador interno. En
             # ZPL se convierten en dos columnas reales para fijar el total al
             # borde derecho, sin depender de espacios de la fuente.
-            if columna and columna[1]:
+            if item and item[1]:
+                descripcion = cls._zpl_texto(item[0])
+                valor = cls._zpl_texto(item[2])
+                # Se usa 6 dots en artículos habituales: llena el ancho de
+                # 33 mm y sigue dejando nombre + importe en un solo renglón.
+                # Para una descripción excepcionalmente larga se baja a 5,
+                # conservando el renglón sin truncar ni partir palabras.
+                ancho_item = 6
+                separacion_item = max(7, ancho_item + 2)
+                if (
+                    (len(descripcion) + len(valor)) * ancho_item
+                    + separacion_item > ancho_util
+                ):
+                    ancho_item = 5
+                    separacion_item = max(7, ancho_item + 2)
+                alto_item = alto_fuente + (2 if ancho_item > ancho_fuente else 0)
+                # La posición parte del ancho real del nombre. Es una fila
+                # compacta y continua, no dos columnas separadas por media
+                # factura. El control previo en _lineas_item garantiza que
+                # el precio también cabe en el mismo renglón.
+                x_valor = margen + (
+                    len(descripcion) * ancho_item
+                ) + separacion_item
+                campos.extend((
+                    f"^FO{margen},{y}^A0N,{alto_item},{ancho_item}"
+                    f"^FD{descripcion}^FS",
+                    f"^FO{x_valor},{y}^A0N,{alto_item},{ancho_item}"
+                    f"^FD{valor}^FS",
+                ))
+            elif columna and columna[1]:
                 etiqueta = cls._zpl_texto(columna[0])
                 valor = cls._zpl_texto(columna[2])
                 # El importe solo necesita el espacio de sus propios
@@ -346,6 +390,7 @@ class ImpresionTermicaService:
             "tipo": "texto-windows",
             "titulo": titulo,
             "ancho_mm": int(configuracion.ancho_papel_mm),
+            "columnas": cls._ancho_caracteres(configuracion.ancho_papel_mm),
             "contenido": contenido,
         }
 

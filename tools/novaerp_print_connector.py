@@ -123,8 +123,13 @@ def raw_print(printer, content, title):
         winspool.ClosePrinter(handle)
 
 
-def windows_text_print(printer, content, title):
-    """Dibuja texto con el driver Windows; apropiado para POS comunes."""
+def windows_text_print(printer, content, title, columns=42):
+    """Imprime un ticket POS, aprovechando todo el ancho del driver Windows.
+
+    El ERP envía filas semánticas, no posiciones fijas.  El conector compone
+    las columnas en el computador que tiene instalada la impresora, por lo
+    que un ticket de 58 mm conserva alineación aunque cambie el controlador.
+    """
     class DOCINFOW(ctypes.Structure):
         _fields_ = [("cbSize", c_int), ("lpszDocName", LPCWSTR), ("lpszOutput", LPCWSTR), ("lpszDatatype", LPCWSTR), ("fwType", DWORD)]
 
@@ -134,29 +139,83 @@ def windows_text_print(printer, content, title):
     gdi32.SelectObject.restype = c_void_p
     gdi32.StartDocW.restype = c_int
     gdi32.StartPage.restype = c_int
+    gdi32.GetTextExtentPoint32W.restype = c_int
     hdc = gdi32.CreateDCW("WINSPOOL", printer, None, None)
     if not hdc:
         raise RuntimeError(f"Windows no pudo inicializar el controlador de '{printer}'.")
     font = c_void_p()
+    previous = c_void_p()
     try:
-        font = gdi32.CreateFontW(-18, 0, 0, 0, 400, False, False, False, 1, 0, 0, 4, 0, "Courier New")
-        if not font:
-            raise RuntimeError("Windows no pudo crear la fuente de impresión.")
-        previous = gdi32.SelectObject(hdc, font)
         info = DOCINFOW(ctypes.sizeof(DOCINFOW), title, None, None, 0)
-        if gdi32.StartDocW(hdc, byref(info)) <= 0 or gdi32.StartPage(hdc) <= 0:
+        if gdi32.StartDocW(hdc, byref(info)) <= 0:
             raise RuntimeError("Windows no pudo iniciar el documento de impresión.")
         try:
-            width = gdi32.GetDeviceCaps(hdc, 8)  # HORZRES
-            x, y = max(4, int(width * .03)), max(6, int(width * .04))
-            for line in content.splitlines() or [""]:
-                if not gdi32.TextOutW(hdc, x, y, line, len(line)):
-                    raise RuntimeError("Windows no pudo dibujar el ticket.")
-                y += 24
+            if gdi32.StartPage(hdc) <= 0:
+                raise RuntimeError("Windows no pudo iniciar la página de impresión.")
+            try:
+                width = gdi32.GetDeviceCaps(hdc, 8)  # HORZRES
+                x = max(4, int(width * 0.03))
+                usable = max(1, width - (x * 2))
+                columns = max(24, min(80, int(columns or 42)))
+                font_width = max(1, usable // columns)
+                font_height = max(16, min(28, int(font_width * 1.9)))
+                font = gdi32.CreateFontW(
+                    -font_height,
+                    font_width,
+                    0,
+                    0,
+                    400,
+                    False,
+                    False,
+                    False,
+                    1,
+                    0,
+                    0,
+                    4,
+                    0,
+                    "Courier New",
+                )
+                if not font:
+                    raise RuntimeError("Windows no pudo crear la fuente de impresión.")
+                previous = gdi32.SelectObject(hdc, font)
+
+                class SIZE(ctypes.Structure):
+                    _fields_ = [("cx", c_int), ("cy", c_int)]
+
+                def text_width(value):
+                    size = SIZE()
+                    if gdi32.GetTextExtentPoint32W(hdc, value, len(value), byref(size)):
+                        return size.cx
+                    return len(value) * font_width
+
+                def draw(x_pos, value, y_pos):
+                    if value and not gdi32.TextOutW(hdc, x_pos, y_pos, value, len(value)):
+                        raise RuntimeError("Windows no pudo dibujar el ticket.")
+
+                y = max(6, int(width * 0.04))
+                line_height = font_height + max(4, font_height // 3)
+                for raw_line in content.splitlines() or [""]:
+                    if "\x1f" in raw_line:
+                        left, right = raw_line.split("\x1f", 1)
+                        right_x = min(
+                            x + usable - text_width(right),
+                            x + text_width(left) + font_width,
+                        )
+                        draw(x, left, y)
+                        draw(max(x, right_x), right, y)
+                    elif "\x1e" in raw_line:
+                        left, right = raw_line.split("\x1e", 1)
+                        draw(x, left, y)
+                        draw(x + usable - text_width(right), right, y)
+                    else:
+                        draw(x, raw_line, y)
+                    y += line_height
+            finally:
+                gdi32.EndPage(hdc)
         finally:
-            gdi32.EndPage(hdc)
             gdi32.EndDoc(hdc)
-            gdi32.SelectObject(hdc, previous)
+            if font:
+                gdi32.SelectObject(hdc, previous)
     finally:
         if font:
             gdi32.DeleteObject(font)
@@ -221,7 +280,12 @@ class Handler(BaseHTTPRequestHandler):
             if kind == "raw-zpl":
                 raw_print(printer, str(payload.get("datos") or ""), title)
             elif kind == "texto-windows":
-                windows_text_print(printer, str(payload.get("contenido") or ""), title)
+                windows_text_print(
+                    printer,
+                    str(payload.get("contenido") or ""),
+                    title,
+                    columns=payload.get("columnas", 42),
+                )
             else:
                 raise RuntimeError("Formato de impresión no soportado.")
             self._json(200, {"ok": True, "printer": printer})

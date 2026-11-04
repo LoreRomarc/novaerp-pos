@@ -96,7 +96,7 @@ class ConfiguracionImpresionVenta(models.Model):
     )
     cortar_papel = models.BooleanField(default=True)
     ancho_papel_mm = models.PositiveSmallIntegerField(
-        default=33,
+        default=58,
     )
     mensaje_pie = models.CharField(
         max_length=180,
