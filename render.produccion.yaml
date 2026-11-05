@@ -15,7 +15,7 @@ services:
     runtime: python
     region: oregon
     # Plan inicial pagado: 0.5 CPU y 512 MB RAM.
-    plan: free
+    plan: freer{}
     branch: main
     buildCommand: bash build.sh
     # Un proceso evita agotar la memoria del plan inicial de 512 MB.
