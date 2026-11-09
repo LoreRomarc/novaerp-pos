@@ -439,6 +439,40 @@ class ProductoVarianteCodigoBarra(models.Model):
         return f"{self.codigo} → {self.variante.sku}"
 
 
+class RegistroMigracionExterna(models.Model):
+    """Trazabilidad entre un registro NovaERP y su fuente anterior."""
+
+    origen = models.CharField(max_length=80)
+    tipo_registro = models.CharField(max_length=80)
+    id_origen = models.CharField(max_length=100)
+    modelo_destino = models.CharField(max_length=120)
+    id_destino = models.BigIntegerField()
+    datos_origen = models.JSONField(default=dict, blank=True)
+    importado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["origen", "tipo_registro", "id_origen"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["origen", "tipo_registro", "id_origen"],
+                name="inventory_migracion_externa_origen_unico",
+            )
+        ]
+        indexes = [
+            models.Index(
+                fields=["origen", "tipo_registro"],
+                name="inventory_reg_origen_tipo_idx",
+            ),
+            models.Index(
+                fields=["modelo_destino", "id_destino"],
+                name="inventory_reg_destino_idx",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.origen} · {self.tipo_registro} #{self.id_origen}"
+
+
 # PRODUCTO FINAL
 class ProductoQuerySet(models.QuerySet):
     def activos(self):

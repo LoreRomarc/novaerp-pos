@@ -20,6 +20,7 @@ from apps.inventory.models import (
     ProductoBase,
     ProductoVariante,
     ProductoVarianteCodigoBarra,
+    RegistroMigracionExterna,
     Stock,
     Talla,
     TipoTela,
@@ -226,7 +227,22 @@ class Command(BaseCommand):
                     if creado:
                         resumen["codigos_alternos"] += 1
             resultado[str(item.get("id_origen"))] = variante
+            self._registrar_origen("VARIANTE", item.get("id_origen"), variante, item)
         return resultado
+
+    @staticmethod
+    def _registrar_origen(tipo_registro, id_origen, objeto_destino, datos_origen):
+        """Conserva la relación de auditoría sin alterar el modelo operativo."""
+        RegistroMigracionExterna.objects.update_or_create(
+            origen="POS_JNSTUDIO",
+            tipo_registro=tipo_registro,
+            id_origen=str(id_origen),
+            defaults={
+                "modelo_destino": objeto_destino._meta.label,
+                "id_destino": objeto_destino.pk,
+                "datos_origen": datos_origen,
+            },
+        )
 
     def _importar_vendedores(self, datos, sucursales, resumen):
         sucursal_predeterminada = next(iter(sucursales.values()))
@@ -300,6 +316,12 @@ class Command(BaseCommand):
                     referencia=referencia,
                     observacion="INVENTARIO INICIAL MIGRADO DESDE POS_JNSTUDIO",
                     costo_unitario=stock.costo_promedio,
+                )
+                self._registrar_origen(
+                    "INVENTARIO",
+                    f"{item.get('local')}:{item.get('variante_origen_id')}",
+                    stock,
+                    item,
                 )
                 resumen["stocks"] += 1
             mayor, detal = self._listas(sucursal)

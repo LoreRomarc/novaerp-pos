@@ -39,6 +39,7 @@ from .views import (
 )
 
 from apps.inventory.views_variantes import (
+    VarianteCodigosExportView,
     VarianteListView,
     VarianteCreateView,
     VarianteUpdateView,
@@ -105,6 +106,7 @@ urlpatterns = [
     # VARIANTES
     # ======================================================
     path( "variantes/", VarianteListView.as_view(),  name="variante_list"),
+    path("variantes/codigos/exportar/", VarianteCodigosExportView.as_view(), name="variante_codigos_exportar"),
     path( "variantes/nuevo/", VarianteCreateView.as_view(), name="variante_create"),
     path( "variantes/<int:pk>/editar/", VarianteUpdateView.as_view(),  name="variante_update"),
 

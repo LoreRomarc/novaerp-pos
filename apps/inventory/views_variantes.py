@@ -3,6 +3,7 @@ from django import forms
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Case, IntegerField, Q, Sum, Value, When
+from django.http import HttpResponse
 from django.urls import reverse_lazy
 from django.views.generic import (
     ListView,
@@ -20,6 +21,46 @@ from apps.inventory.models import (
 # ======================================================
 # FORM
 # ======================================================
+
+class VarianteCodigosExportView(LoginRequiredMixin, InventoryAccessMixin, ListView):
+    """Descarga etiquetas de variantes sin exponerlas públicamente."""
+
+    allowed_roles = ["SUPER_ADMIN", "ADMIN_SUCURSAL", "INVENTARIO"]
+
+    def get(self, request, *args, **kwargs):
+        variantes = (
+            ProductoVariante.objects.select_related(
+                "producto_base", "tipo_tela", "color", "talla"
+            )
+            .prefetch_related("codigos_barras_alternos")
+            .filter(activo=True)
+            .order_by(
+                "producto_base__nombre",
+                "tipo_tela__nombre",
+                "talla__orden",
+                "color__nombre",
+            )
+        )
+        lineas = ["CODIGO_BARRAS\tTIPO_CODIGO\tSKU\tNOMBRE_VARIANTE"]
+        for variante in variantes:
+            nombre = variante.nombre_completo
+            if variante.codigo_barras:
+                lineas.append(
+                    f"{variante.codigo_barras}\tPRINCIPAL\t{variante.sku}\t{nombre}"
+                )
+            for alterno in variante.codigos_barras_alternos.all():
+                lineas.append(
+                    f"{alterno.codigo}\tMIGRADO\t{variante.sku}\t{nombre}"
+                )
+
+        respuesta = HttpResponse(
+            "\ufeff" + "\n".join(lineas) + "\n",
+            content_type="text/plain; charset=utf-8",
+        )
+        respuesta["Content-Disposition"] = (
+            'attachment; filename="variantes_codigos_novaerp.txt"'
+        )
+        return respuesta
 
 class VarianteForm(forms.ModelForm):
 
