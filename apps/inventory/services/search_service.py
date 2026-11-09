@@ -18,8 +18,10 @@ class InventorySearchService:
             "producto_base", "color", "tipo_tela", "talla"
         ).filter(activo=True)
         coincidencias_codigo = list(base.filter(
-            Q(sku__icontains=query) | Q(codigo_barras__icontains=query)
-        )[:limit])
+            Q(sku__icontains=query)
+            | Q(codigo_barras__icontains=query)
+            | Q(codigos_barras_alternos__codigo__icontains=query)
+        ).distinct()[:limit])
         termino = normalizar_busqueda(query)
         vistos = {variante.pk for variante in coincidencias_codigo}
         resultado = list(coincidencias_codigo)

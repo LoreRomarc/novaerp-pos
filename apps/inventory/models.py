@@ -408,6 +408,37 @@ class ProductoVariante(models.Model):
         )
 
 
+class ProductoVarianteCodigoBarra(models.Model):
+    """Código adicional que identifica una variante existente.
+
+    Se usa al consolidar catálogos antiguos: diferentes etiquetas físicas
+    pueden seguir funcionando aunque ahora representen una misma variante.
+    """
+
+    variante = models.ForeignKey(
+        ProductoVariante,
+        on_delete=models.CASCADE,
+        related_name="codigos_barras_alternos",
+    )
+    codigo = models.CharField(max_length=120, unique=True, db_index=True)
+    origen = models.CharField(max_length=80, blank=True, default="")
+    creado = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["codigo"]
+
+    def clean(self):
+        self.codigo = (self.codigo or "").strip().upper()
+        self.origen = (self.origen or "").strip().upper()
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.codigo} → {self.variante.sku}"
+
+
 # PRODUCTO FINAL
 class ProductoQuerySet(models.QuerySet):
     def activos(self):

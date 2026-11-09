@@ -93,9 +93,11 @@ class CarritoService:
                 |
                 Q(codigo_barras__iexact=termino)
                 |
+                Q(codigos_barras_alternos__codigo__iexact=termino)
+                |
                 Q(producto_base__nombre__icontains=termino)
 
-            )
+            ).distinct()
 
         else:
 

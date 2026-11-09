@@ -499,7 +499,10 @@ class ProductoAutocompleteView(POSBaseView):
             # prioridad al código exacto evita que una coincidencia por nombre
             # agregue una variante diferente.
             coincidencia_codigo = list(
-                base_variantes.filter(codigo_barras__iexact=q)[:1]
+                base_variantes.filter(
+                    Q(codigo_barras__iexact=q)
+                    | Q(codigos_barras_alternos__codigo__iexact=q)
+                ).distinct()[:1]
             )
             if coincidencia_codigo:
                 variantes = coincidencia_codigo

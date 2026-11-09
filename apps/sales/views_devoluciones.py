@@ -373,11 +373,13 @@ class CambioProductoBusquedaView(DevolucionBaseView):
             .filter(
                 Q(sku__icontains=q)
                 | Q(codigo_barras__icontains=q)
+                | Q(codigos_barras_alternos__codigo__icontains=q)
                 | Q(producto_base__nombre__icontains=q)
                 | Q(tipo_tela__nombre__icontains=q)
                 | Q(color__nombre__icontains=q)
                 | Q(talla__nombre__icontains=q)
             )
+            .distinct()
             .order_by(
                 "producto_base__nombre",
                 "sku",
