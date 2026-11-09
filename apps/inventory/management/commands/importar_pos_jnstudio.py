@@ -7,6 +7,7 @@ operación: maestros, sucursales, vendedores, precios y stock inicial.
 """
 
 import json
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
@@ -21,6 +22,9 @@ from apps.inventory.models import (
     ProductoVariante,
     ProductoVarianteCodigoBarra,
     RegistroMigracionExterna,
+    VarianteHistoricaPOS,
+    VentaHistoricaPOS,
+    VentaHistoricaPOSItem,
     Stock,
     Talla,
     TipoTela,
@@ -41,8 +45,8 @@ def decimal(valor, etiqueta):
 
 class Command(BaseCommand):
     help = (
-        "Importa maestros, códigos de barra, precios y stock inicial desde "
-        "el JSON generado por POS_JNSTUDIO. Nunca crea ventas históricas."
+        "Archiva ventas y variantes de POS_JNSTUDIO como historial no "
+        "operativo. No crea productos, stock ni códigos vendibles."
     )
 
     def add_arguments(self, parser):
@@ -69,6 +73,26 @@ class Command(BaseCommand):
             raise CommandError(f"No se pudo leer el JSON: {error}") from error
         if origen.get("formato") != "POS_JNSTUDIO_A_NOVAERP":
             raise CommandError("El archivo no corresponde a una exportación válida de POS_JNSTUDIO.")
+
+        # Por seguridad, el catálogo antiguo se archiva fuera del flujo
+        # operativo. NovaERP mantiene exclusivamente sus propios productos,
+        # SKU, precios, stock y códigos de barra.
+        resumen = self._archivar_historial(origen)
+        if options["dry_run"]:
+            transaction.set_rollback(True)
+            prefijo = "SIMULACIÓN: "
+        else:
+            prefijo = "ARCHIVO HISTÓRICO COMPLETADO: "
+        self.stdout.write(self.style.SUCCESS(
+            prefijo + "; ".join(
+                f"{clave}={valor}" for clave, valor in resumen.items()
+            )
+        ))
+        self.stdout.write(
+            "No se creó ningún producto, variante, precio, stock, movimiento "
+            "de caja ni código de barras operativo desde POS_JNSTUDIO."
+        )
+        return
 
         resumen = {clave: 0 for clave in (
             "sucursales", "telas", "tallas", "productos", "variantes",
@@ -127,6 +151,106 @@ class Command(BaseCommand):
             f"ventas={len(historial.get('ventas', []))}; "
             f"movimientos={len(historial.get('movimientos_inventario', []))}."
         )
+
+    def _archivar_historial(self, origen):
+        """Guarda datos antiguos fuera del catálogo y flujo operativo NovaERP."""
+        resumen = {
+            "variantes_historicas": 0,
+            "ventas_historicas": 0,
+            "items_historicos": 0,
+            "movimientos_en_respaldo": len(
+                origen.get("historial", {}).get("movimientos_inventario", [])
+            ),
+        }
+        datos_variantes = origen.get("variantes", [])
+        ids_variantes = [int(item["id_origen"]) for item in datos_variantes]
+        variantes = {
+            variante.origen_id: variante
+            for variante in VarianteHistoricaPOS.objects.filter(
+                origen_id__in=ids_variantes
+            )
+        }
+        nuevas_variantes = []
+        for datos in datos_variantes:
+            origen_id = int(datos["id_origen"])
+            if origen_id in variantes:
+                continue
+            nuevas_variantes.append(VarianteHistoricaPOS(
+                origen_id=origen_id,
+                producto=texto(datos.get("producto")),
+                tela=texto(datos.get("tela")),
+                talla=texto(datos.get("talla")),
+                codigo_barras_anterior=str(datos.get("codigo_barras") or "").strip(),
+                precio_mayor_anterior=decimal(
+                    datos.get("precio_mayor", 0), "precio mayor anterior"
+                ),
+                precio_detal_anterior=decimal(
+                    datos.get("precio_detal", 0), "precio detal anterior"
+                ),
+                datos_origen=datos,
+            ))
+        VarianteHistoricaPOS.objects.bulk_create(nuevas_variantes)
+        resumen["variantes_historicas"] = len(nuevas_variantes)
+        variantes = {
+            variante.origen_id: variante
+            for variante in VarianteHistoricaPOS.objects.filter(
+                origen_id__in=ids_variantes
+            )
+        }
+
+        datos_ventas = origen.get("historial", {}).get("ventas", [])
+        ids_ventas = [int(item["id_origen"]) for item in datos_ventas]
+        ventas_existentes = set(
+            VentaHistoricaPOS.objects.filter(origen_id__in=ids_ventas).values_list(
+                "origen_id", flat=True
+            )
+        )
+        nuevas_ventas = []
+        for datos in datos_ventas:
+            if int(datos["id_origen"]) in ventas_existentes:
+                continue
+            nuevas_ventas.append(VentaHistoricaPOS(
+                origen_id=int(datos["id_origen"]),
+                fecha=datetime.fromisoformat(str(datos["fecha"]).replace("Z", "+00:00")),
+                total=decimal(datos.get("total", 0), "total anterior"),
+                cliente=str(datos.get("cliente") or "").strip(),
+                observaciones=str(datos.get("observaciones") or "").strip(),
+                local_anterior=str(datos.get("local") or "").strip(),
+                vendedor_anterior=str(datos.get("vendedor") or "").strip(),
+                pago_origen=datos.get("pago") or {},
+                datos_origen=datos,
+            ))
+        VentaHistoricaPOS.objects.bulk_create(nuevas_ventas)
+        resumen["ventas_historicas"] = len(nuevas_ventas)
+        ventas = {
+            venta.origen_id: venta
+            for venta in VentaHistoricaPOS.objects.filter(origen_id__in=ids_ventas)
+        }
+        claves_existentes = set(
+            VentaHistoricaPOSItem.objects.filter(
+                venta__origen_id__in=ids_ventas
+            ).values_list("venta__origen_id", "orden")
+        )
+        nuevos_items = []
+        for datos_venta in datos_ventas:
+            origen_venta = int(datos_venta["id_origen"])
+            for orden, item in enumerate(datos_venta.get("items", []), start=1):
+                if (origen_venta, orden) in claves_existentes:
+                    continue
+                variante_id = item.get("variante_origen_id")
+                nuevos_items.append(VentaHistoricaPOSItem(
+                    venta=ventas[origen_venta],
+                    orden=orden,
+                    variante_historica=variantes.get(int(variante_id)) if variante_id else None,
+                    servicio_anterior=str(item.get("servicio") or "").strip(),
+                    cantidad=decimal(item.get("cantidad", 0), "cantidad anterior"),
+                    precio=decimal(item.get("precio", 0), "precio anterior"),
+                    total=decimal(item.get("total", 0), "total línea anterior"),
+                    tipo_precio=str(item.get("tipo") or "").strip(),
+                ))
+        VentaHistoricaPOSItem.objects.bulk_create(nuevos_items)
+        resumen["items_historicos"] = len(nuevos_items)
+        return resumen
 
     def _empresa(self, nombre, resumen):
         if nombre:

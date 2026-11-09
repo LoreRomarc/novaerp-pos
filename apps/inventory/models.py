@@ -473,6 +473,98 @@ class RegistroMigracionExterna(models.Model):
         return f"{self.origen} · {self.tipo_registro} #{self.id_origen}"
 
 
+class VarianteHistoricaPOS(models.Model):
+    """Referencia no operativa a una variante del sistema POS anterior.
+
+    Nunca participa en ventas, stock, producción, precios ni búsquedas del POS.
+    Solo permite consultar trazabilidad y asociar la venta antigua a una
+    variante NovaERP cuando el usuario lo decida expresamente.
+    """
+
+    origen_id = models.PositiveIntegerField(unique=True)
+    producto = models.CharField(max_length=200)
+    tela = models.CharField(max_length=100, blank=True, default="")
+    talla = models.CharField(max_length=50, blank=True, default="")
+    codigo_barras_anterior = models.CharField(max_length=120, blank=True, default="")
+    precio_mayor_anterior = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    precio_detal_anterior = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    variante_nova = models.ForeignKey(
+        ProductoVariante,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="referencias_historicas_pos",
+    )
+    datos_origen = models.JSONField(default=dict, blank=True)
+    importado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["producto", "tela", "talla", "origen_id"]
+
+    @property
+    def nombre_anterior(self):
+        return " · ".join(
+            parte for parte in (self.producto, self.tela, self.talla) if parte
+        ).upper()
+
+    def __str__(self):
+        return f"HISTÓRICA #{self.origen_id} · {self.nombre_anterior}"
+
+
+class VentaHistoricaPOS(models.Model):
+    """Venta anterior archivada: no afecta caja, stock ni reportes operativos."""
+
+    origen_id = models.PositiveIntegerField(unique=True)
+    fecha = models.DateTimeField()
+    total = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    cliente = models.CharField(max_length=255, blank=True, default="")
+    observaciones = models.TextField(blank=True, default="")
+    local_anterior = models.CharField(max_length=150, blank=True, default="")
+    vendedor_anterior = models.CharField(max_length=150, blank=True, default="")
+    pago_origen = models.JSONField(default=dict, blank=True)
+    datos_origen = models.JSONField(default=dict, blank=True)
+    importado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-fecha", "-origen_id"]
+        indexes = [
+            models.Index(fields=["fecha"], name="inventory_vhpos_fecha_idx")
+        ]
+
+    def __str__(self):
+        return f"VENTA ANTERIOR #{self.origen_id}"
+
+
+class VentaHistoricaPOSItem(models.Model):
+    venta = models.ForeignKey(
+        VentaHistoricaPOS,
+        on_delete=models.CASCADE,
+        related_name="items",
+    )
+    orden = models.PositiveIntegerField()
+    variante_historica = models.ForeignKey(
+        VarianteHistoricaPOS,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="items_ventas_historicas",
+    )
+    servicio_anterior = models.CharField(max_length=200, blank=True, default="")
+    cantidad = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    precio = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    total = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    tipo_precio = models.CharField(max_length=30, blank=True, default="")
+
+    class Meta:
+        ordering = ["orden"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["venta", "orden"],
+                name="inventory_venta_historica_pos_item_unico",
+            )
+        ]
+
+
 # PRODUCTO FINAL
 class ProductoQuerySet(models.QuerySet):
     def activos(self):
