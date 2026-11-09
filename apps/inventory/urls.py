@@ -44,6 +44,9 @@ from apps.inventory.views_variantes import (
     VarianteCreateView,
     VarianteUpdateView,
 )
+from apps.inventory.views_etiquetas import (
+    EtiquetasBuscarAPIView, EtiquetasConfiguracionView, EtiquetasProductoView,
+)
 
 app_name = "inventory"
 
@@ -82,6 +85,9 @@ urlpatterns = [
     # STOCK
     # ======================================================
     path("api/variantes/search/", VarianteSearchAPI.as_view(), name="variant_search_api" ),
+    path("etiquetas/", EtiquetasProductoView.as_view(), name="etiquetas_producto"),
+    path("etiquetas/buscar/", EtiquetasBuscarAPIView.as_view(), name="etiquetas_buscar"),
+    path("etiquetas/configuracion/", EtiquetasConfiguracionView.as_view(), name="etiquetas_configuracion"),
     # URL anterior conservada para marcadores; usa el único formulario
     # auditable de ajustes y evita que existan dos flujos distintos.
     path("ajuste-stock/", AjusteStockCreateView.as_view(), name="ajuste_stock" ),

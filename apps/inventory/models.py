@@ -408,6 +408,27 @@ class ProductoVariante(models.Model):
         )
 
 
+class ConfiguracionEtiquetaProducto(models.Model):
+    """Única configuración editable del diseño de etiquetas de producto."""
+    ancho_mm = models.DecimalField(max_digits=5, decimal_places=2, default=45)
+    alto_mm = models.DecimalField(max_digits=5, decimal_places=2, default=35)
+    margen_lateral_mm = models.DecimalField(max_digits=4, decimal_places=2, default=1)
+    margen_superior_mm = models.DecimalField(max_digits=4, decimal_places=2, default=3)
+    margen_inferior_mm = models.DecimalField(max_digits=4, decimal_places=2, default=3)
+    alto_barra_mm = models.DecimalField(max_digits=5, decimal_places=2, default=13.5)
+    ancho_modulo_mm = models.DecimalField(max_digits=4, decimal_places=3, default=0.25)
+    tamano_nombre_pt = models.DecimalField(max_digits=4, decimal_places=1, default=8)
+    tamano_codigo_pt = models.DecimalField(max_digits=4, decimal_places=1, default=7.5)
+    espacio_nombre_codigo_mm = models.DecimalField(max_digits=4, decimal_places=2, default=1)
+    espacio_codigo_texto_mm = models.DecimalField(max_digits=4, decimal_places=2, default=3)
+    actualizado = models.DateTimeField(auto_now=True)
+
+    @classmethod
+    def obtener(cls):
+        configuracion, _ = cls.objects.get_or_create(pk=1)
+        return configuracion
+
+
 class ProductoVarianteCodigoBarra(models.Model):
     """Código adicional que identifica una variante existente.
 

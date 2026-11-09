@@ -382,6 +382,7 @@
 
                     <div class="section">Inventario</div>
                     <a href="{% url 'inventory:stock_list' %}"><i class="bi bi-boxes nav-icon"></i> Stock por sucursal</a>
+                    <a href="{% url 'inventory:etiquetas_producto' %}" data-nav-prefix="/inventory/etiquetas"><i class="bi bi-upc-scan nav-icon"></i> Etiquetas</a>
                     <a href="{% url 'inventory:traslado_list' %}" data-nav-prefix="/inventory/traslados"><i class="bi bi-truck nav-icon"></i> Traslados{% if traslados_pendientes_recepcion %}<span class="badge rounded-pill text-bg-warning ms-auto">{{ traslados_pendientes_recepcion }}</span>{% endif %}</a>
                     <a href="{% url 'inventory:kardex' %}"><i class="bi bi-journal-text nav-icon"></i> Kardex</a>
 
@@ -397,6 +398,7 @@
 
             {% if request.user.is_authenticated and request.user.profile.role == "CAJERO" %}
                 <div class="section">Inventario</div>
+                <a href="{% url 'inventory:etiquetas_producto' %}" data-nav-prefix="/inventory/etiquetas"><i class="bi bi-upc-scan nav-icon"></i> Etiquetas</a>
                 <a href="{% url 'inventory:traslado_list' %}" data-nav-prefix="/inventory/traslados"><i class="bi bi-truck nav-icon"></i> Traslados{% if traslados_pendientes_recepcion %}<span class="badge rounded-pill text-bg-warning ms-auto">{{ traslados_pendientes_recepcion }}</span>{% endif %}</a>
             {% endif %}
 
