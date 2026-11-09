@@ -6,7 +6,6 @@ import unicodedata
 from django.utils import timezone
 from django.db import models, transaction
 from django.db.models import Q, Sum
-from django.core.exceptions import ValidationError
 from django.db.models.functions import Lower
 from django.utils.text import slugify
 
